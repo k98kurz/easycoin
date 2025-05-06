@@ -1,0 +1,8 @@
+venv/
+.vscode/
+__pycache__/
+*/__pycache__/
+dist/
+build/
+temp/
+**/debug.py

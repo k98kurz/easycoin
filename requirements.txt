@@ -1,0 +1,8 @@
+cffi==1.17.1
+merkleasy==0.1.2
+packify==0.3.1
+pycparser==2.22
+PyNaCl==1.5.0
+sqloquent==0.7.0
+tapehash==0.1.0
+tapescript==0.7.0
