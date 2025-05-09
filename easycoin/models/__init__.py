@@ -1,7 +1,9 @@
-from sqloquent import contains, within
+from sqloquent import contains, within, belongs_to, has_many
 from .Coin import Coin
 from .Txn import Txn
 from .Wallet import Wallet
+from .Input import Input
+from .Output import Output
 
 Coin.origins = within(Coin, Txn, 'output_ids')
 Coin.spends = within(Coin, Txn, 'input_ids')
@@ -13,4 +15,7 @@ Txn.wallet = belongs_to(Txn, Wallet, 'wallet_id')
 
 Wallet.txns = has_many(Wallet, Txn, 'wallet_id')
 Wallet.coins = has_many(Wallet, Coin, 'wallet_id')
+
+Input.coin = belongs_to(Input, Coin, 'id')
+Output.coin = belongs_to(Output, Coin, 'id')
 
