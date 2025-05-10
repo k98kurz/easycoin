@@ -19,7 +19,7 @@ class Coin(HashedModel):
     timestamp: int
     lock: bytes
     amount: int
-    details: bytes|None|Default[None]
+    details: bytes|None
     nonce: int|Default[0]
     wallet_id: str|None
     origins: RelatedCollection
