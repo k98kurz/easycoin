@@ -23,21 +23,29 @@ class TestCoin(unittest.TestCase):
         models.Output.connection_info = DB_FILEPATH
         models.Wallet.connection_info = DB_FILEPATH
         sqloquent.DeletedModel.connection_info = DB_FILEPATH
-        super().setUpClass()
-
-    def setUp(self):
         if isfile(DB_FILEPATH):
             os.remove(DB_FILEPATH)
-        super().setUp()
+        cls.automigrate()
+        super().setUpClass()
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(cls):
         for file in os.listdir(MIGRATIONS_PATH):
             if isfile(f'{MIGRATIONS_PATH}/{file}'):
                 os.remove(f'{MIGRATIONS_PATH}/{file}')
         if isfile(DB_FILEPATH):
             os.remove(DB_FILEPATH)
-        super().tearDown()
+        super().tearDownClass()
 
+    def setUp(self):
+        models.Coin.query().delete()
+        models.Txn.query().delete()
+        models.Input.query().delete()
+        models.Output.query().delete()
+        models.Wallet.query().delete()
+        super().setUp()
+
+    @classmethod
     def automigrate(self):
         sqloquent.tools.publish_migrations(MIGRATIONS_PATH)
         tomigrate = [ 
@@ -50,6 +58,7 @@ class TestCoin(unittest.TestCase):
             with open(f'{MIGRATIONS_PATH}/create_{name}.py', 'w') as f:
                 f.write(m)
         sqloquent.tools.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
+
 
     def test_lock_property_serializes_properly(self):
         c = models.Coin()
