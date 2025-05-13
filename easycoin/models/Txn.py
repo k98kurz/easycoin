@@ -2,22 +2,7 @@ from __future__ import annotations
 from hashlib import sha256
 from sqloquent import HashedModel, RelatedCollection
 from tapescript import run_auth_scripts, Script
-from typing import Protocol
 import packify
-
-
-class UTXOSetInterface(Protocol):
-    def add(self, coin_id: bytes|str):
-        ...
-
-    def remove(self, coin_id: bytes|str):
-        ...
-
-    def exists(self, coin_id: bytes|str) -> bool:
-        ...
-
-    def has_been_removed(self, coin_id: bytes|str) -> bool:
-        ...
 
 
 _empty = packify.pack({})
@@ -25,6 +10,10 @@ _empty = packify.pack({})
 def type_assert(condition: bool, message: str = 'invalid type'):
     if not condition:
         raise TypeError(message)
+
+def value_assert(condition: bool, message: str = 'invalid value'):
+    if not condition:
+        raise ValueError(message)
 
 
 class Txn(HashedModel):
@@ -43,56 +32,111 @@ class Txn(HashedModel):
     outputs: RelatedCollection
 
     @property
-    def details(self) -> dict:
-        return packify.unpack(self.data.get('details', _empty))
-    @details.setter
-    def details(self, val: dict):
-        type_assert(isinstance(val, dict),
-            'details must be dict')
-        self.data['details'] = packify.pack(val)
+    def input_ids(self) -> list[str]:
+        """The list of input IDs. Setting to a type other than list[str]
+            raises TypeError.
+        """
+        if not self.data.get('input_ids', None):
+            return []
+        return self.data.get('input_ids').split(',')
+    @input_ids.setter
+    def input_ids(self, val: list[str]|None):
+        type_assert(type(val) in (list, tuple, type(None)),
+            'input_ids must be list[str]|None')
+        if not val:
+            self.data['input_ids'] = None
+            return
+        type_assert(all([type(s) is str for s in val]),
+            'input_ids must be list[str]')
+        self.data['input_ids'] = ','.join(val)
 
     @property
-    def witness(self) -> dict:
-        return packify.unpack(self.data['witness'] or _empty)
+    def output_ids(self) -> list[str]:
+        """The list of output IDs. Setting to a type other than list[str]
+            raises TypeError. Output IDs will be sorted automatically.
+        """
+        if not self.data.get('output_ids', None):
+            return []
+        return self.data.get('output_ids').split(',')
+    @output_ids.setter
+    def output_ids(self, val: list[str]|None):
+        type_assert(type(val) in (list, tuple, type(None)),
+            'output_ids must be list[str]|None')
+        if not val:
+            self.data['output_ids'] = None
+            return
+        type_assert(all([type(s) is str for s in val]),
+            'output_ids must be list[str]|None')
+        self.data['output_ids'] = ','.join(sorted(val))
+
+    @property
+    def details(self) -> dict:
+        """Optional transaction details in dict form. Setting raises
+            `TypeError` for non-dict values or `packify.UsageError` if a
+            type not serializable via packify is used in the dict.
+        """
+        return packify.unpack(self.data.get('details', _empty))
+    @details.setter
+    def details(self, val: dict|None):
+        type_assert(isinstance(val, dict) or val is None,
+            'details must be dict or None')
+        self.data['details'] = packify.pack(val) if val is not None else None
+
+    @property
+    def witness(self) -> dict[bytes, bytes]:
+        """Witness data dict mapping bytes `coin.id` to bytes witness
+            script (tapescript byte code).
+        """
+        return packify.unpack(self.data.get('witness', None) or _empty)
     @witness.setter
-    def witness(self, val: dict[str, bytes]):
+    def witness(self, val: dict[bytes, bytes]):
         type_assert(isinstance(val, dict),
-            'witness must be dict[str, bytes]')
-        type_assert(all(isinstance(n, str) for n in val),
-            'witness must be dict[str, bytes]')
+            'witness must be dict[bytes, bytes]')
+        type_assert(all(isinstance(n, bytes) for n in val),
+            'witness must be dict[bytes, bytes]')
         type_assert(all(isinstance(val[n], bytes) for n in val),
-            'witness must be dict[str, bytes]')
+            'witness must be dict[bytes, bytes]')
+        value_assert(all(len(n) == 32 for n in val),
+            'witness keys must each be 32-byte hash')
         self.data['witness'] = packify.pack(val)
+
+    def pack(self) -> bytes:
+        return packify.pack({
+            **self.data,
+            'inputs': [i.pack() for i in self.inputs],
+            'outputs': [o.pack() for o in self.outputs],
+        })
+
+    @classmethod
+    def unpack(cls, data: bytes, inject: dict = {}) -> 'Txn':
+        return cls(packify.unpack(data, inject))
 
     @staticmethod
     def minimum_fee(txn: Txn) -> int:
         """Calculates the minimum burn required for the transaction."""
         witlen = len(txn.data.get('witness', _empty))
-        out_count = len(txn.output_ids.split(','))
+        out_count = len(txn.output_ids)
         out_len = sum([len(o.preimage(o.data)) for o in txn.outputs])
-        return witlen + out_count * 32 + out_len
+        in_len = sum([len(i.preimage(i.data)) for i in txn.inputs])
+        return witlen + out_count * 32 + out_len + in_len
 
-    def validate(self, utxos: UTXOSetInterface) -> bool:
-        input_ids = [bytes.fromhex(i) for i in self.input_ids.split(',') if i]
-        for i in input_ids:
-            if not utxos.exists(i) or utxos.has_been_removed(i):
-                print('non-existant/double-spent input')
-                return False
-
-        output_ids = [bytes.fromhex(i) for i in self.output_ids.split(',')]
-        for i in output_ids:
-            if utxos.exists(i) or utxos.has_been_removed(i):
-                print('output already exists or has been spent')
-                return False
-
-        self.inputs().reload()
-        self.outputs().reload()
+    def validate(self, debug: bool = False, reload: bool = True) -> bool:
+        """Runs the transaction validation logic. Returns False if a
+            mint Txn has a coin amount that is greater than the mint
+            value; or if the total amount in outputs is greater than the
+            total amount in inputs; or if an input lock is not fulfilled
+            by a witness script; or if a new stamp does not follow
+            
+        """
+        if reload:
+            self.inputs().reload()
+            self.outputs().reload()
 
         # minting Txn is a special case
         if len(self.inputs) == 0 and len(self.outputs) == 1:
             coin = self.outputs[0]
-            #print('mint requires amount <= mint_value and no coin.details')
-            return coin.amount <= coin.mint_value() and coin.details is None
+            print('mint requires amount <= mint_value and no coin.details') if debug else ''
+            return coin.amount + Txn.minimum_fee(self) <= coin.mint_value() and not coin.details
 
         # ensure total spent is less than total funding of EC⁻¹
         total_out = Txn.minimum_fee(self)
@@ -102,54 +146,192 @@ class Txn(HashedModel):
         for coin in self.inputs:
             total_in += coin.amount
         if total_out > total_in:
-            print('total_out > total_in')
+            print('total_out > total_in') if debug else ''
             return False
 
         # validate tapescript auth
         for coin in self.inputs:
             if coin.id_bytes not in self.witness:
-                print('missing witness')
-                return False
+                print('missing witness; adding empty script') if debug else ''
+                #return False
+                self.witness[coin.id_bytes] = b''
             scripts = []
             if coin.details and '_' in coin.details:
                 scripts.append(coin.details['_'])
             if coin.id_bytes in self.witness:
                 scripts.append(self.witness[coin.id_bytes])
             scripts.append(coin.lock)
+            # enforce Stamp covenants
             if coin.details:
-                # enforce Stamp covenant
                 if '$' in coin.details:
                     scripts.append(coin.details['$'])
                 else:
-                    cdh = sha256(packify.pack(coin.details)).digest()
-                    scripts.append(Script.from_src(f'''
-                        get_value s"o_len" push d1 equal_verify
-                        get_value s"o_det" push x{cdh.hex()} equal_verify
-                    '''))
+                    scripts.append(Txn.std_stamp_covenant())
+            if debug:
+                print('run_auth_scripts(')
+                for s in scripts:
+                    s = Script.from_bytes(s) if type(s) is bytes else s
+                    print(',\t' + '\n\t'.join(s.src.split('\n')))
+                print(')')
             if not run_auth_scripts(scripts, self.runtime_cache(coin)):
-                print('witness validation failed for a lock')
+                print('witness validation failed for a lock') if debug else ''
                 return False
 
-        # handle new stamps
+        # handle new stamping constraints
         for coin in self.outputs:
             if coin.details:
-                if b'ML' in coin.details and not run_auth_scripts(
-                    [coin.details[b'ML']], self.runtime_cache(coin)
+                if 'L' not in coin.details:
+                    continue
+                if coin.details['msh'] in (
+                    c.details['msh'] for c in self.inputs if c.details
                 ):
-                    print('stamp creation constraint failed validation')
+                    continue
+                if not run_auth_scripts(
+                    [self.witness.get(coin.id_bytes, b''), coin.details['L']],
+                    self.runtime_cache(coin)
+                ):
+                    print('stamp creation constraint failed validation') if debug else ''
                     return False
+        # all other stamp constraints must be embedded in the scripts
 
         return True
 
     def runtime_cache(self, coin: 'Coin'):
+        """Construct the tapescript runtime cache for evaluating the
+            lock of a given coin within the transaction.
+        """
+        # counts
+        i_len = len(self.inputs)
+        si_len = len([1 for i in self.inputs if i.details])
+        o_len = len(self.outputs)
+        so_len = len([1 for o in self.outputs if o.details])
+        # stamp ids
+        so_det = [
+            sha256(packify.pack({
+                k: v for k,v in o.details.items()
+                if k not in ('id', 'msh')
+            })).digest()
+            for o in self.outputs
+            if o.details
+        ]
+        si_det = [
+            sha256(packify.pack({
+                k: v for k,v in i.details.items()
+                if k not in ('id', 'msh')
+            })).digest()
+            for i in self.inputs
+            if i.details
+        ]
+        ii_det = sha256(packify.pack({
+            k: v for k,v in coin.details.items()
+            if k not in ('id', 'msh')
+        })).digest()
+
+        # stamp nonces/numbers/notes
+        so_n = [o.details.get('n', b'') for o in self.outputs if o.details]
+        si_n = [i.details.get('n', b'') for i in self.inputs if i.details]
+        ii_n = coin.details.get('n', b'')
+
+        # stamp meta-script-hashes
+        so_msh = [
+            sha256(packify.pack({
+                k: v for k,v in o.details.items()
+                if k in ('m', 'L', '_', '$')
+            })).digest()
+            for o in self.outputs
+            if o.details
+        ]
+        si_msh = [
+            sha256(packify.pack({
+                k: v for k,v in i.details.items()
+                if k in ('m', 'L', '_', '$')
+            })).digest()
+            for i in self.inputs
+            if i.details
+        ]
+        ii_msh = sha256(packify.pack({
+            k: v for k, v in coin.details.items()
+            if k in ('m', 'L', '_', '$')
+        })).digest()
+
         cache = {
-            "o_len": len(self.outputs),
-            "o_det": [o.data['details'] for o in self.outputs],
-            "i_len": len(self.inputs),
-            "i_det": coin.data['details'] or b'',
+            "i_len": i_len,
+            "si_len": si_len,
+            "si_det": si_det,
+            "ii_det": ii_det,
+            "si_msh": si_msh,
+            "ii_msh": ii_msh,
+            "si_n": si_n,
+            "ii_n": ii_n,
+            "o_len": o_len,
+            "so_len": so_len,
+            "so_det": so_det,
+            "so_msh": so_msh,
+            "so_n": so_n,
             "sigfield1": coin.id_bytes,
             "sigfield2": sha256(b''.join(sorted([i.id_bytes for i in self.inputs]))).digest(),
             "sigfield3": sha256(b''.join(sorted([o.id_bytes for o in self.outputs]))).digest(),
         }
         return cache
+
+    @staticmethod
+    def std_stamp_covenant() -> Script:
+        """Returns the standard covenant ('$' script) for unique stamps.
+            This requires that there is only one stamped output and that
+            it shares the same stamp ID.
+        """
+        return Script.from_src('''
+            get_value s"so_len" push d1 equal_verify
+            get_value s"so_det" get_value s"ii_det" equal_verify
+        ''')
+
+    @staticmethod
+    def std_series_covenant() -> Script:
+        """Returns the standard covenant ('$' script) for fungible stamps
+            in a series. This requires that all stamped inputs and
+            outputs share the same metadata-script-hash, and that the sum
+            of output 'n' values is less than or equal to the sum of the
+            input 'n' values.
+        """
+        return Script.from_src('''
+            # set some varibables #
+            get_value s"si_len" @= il 1
+            get_value s"ii_msh" @= s 1
+            get_value s"so_len" @= ol 1
+
+            # ensure all stamped inputs are from the same series #
+            get_value s"si_msh"
+            @il loop {
+                push d-1 add_ints d2 @= i 1
+                @s equal_verify
+                @i
+            } pop0
+
+            # ensure all stamped outputs are from the same series #
+            get_value s"so_msh"
+            @ol loop {
+                push d-1 add_ints d2 @= i 1
+                @s equal_verify
+                @i
+            } pop0
+
+            # calculate the sum of stamped inputs #
+            get_value s"si_n" push d0
+            @il loop {
+                push d-1 add_ints d2 @= i 1
+                add_ints d2
+                @i
+            } pop0
+
+            # calculate the sum of stamped outputs #
+            get_value s"so_n" push d0
+            @ol loop {
+                push d-1 add_ints d2 @= i 1
+                add_ints d2
+                @i
+            } pop0
+
+            # ensure stamped output sum <= stamped input sum #
+            leq verify
+        ''')
 
