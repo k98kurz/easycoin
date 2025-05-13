@@ -43,6 +43,7 @@ class TestCoin(unittest.TestCase):
         models.Input.query().delete()
         models.Output.query().delete()
         models.Wallet.query().delete()
+        sqloquent.DeletedModel.query().delete()
         super().setUp()
 
     @classmethod
@@ -59,11 +60,11 @@ class TestCoin(unittest.TestCase):
                 f.write(m)
         sqloquent.tools.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
 
-
     def test_lock_property_serializes_properly(self):
         c = models.Coin()
         c.lock = Script.from_src('true')
-        assert type(c.lock) is Script
+        assert type(c.lock) is bytes
+        assert c.lock == Script.from_src('true').bytes
         assert type(c.data['lock']) is bytes
 
     def test_lock_property_raises_TypeError_for_bad_input(self):
@@ -84,6 +85,16 @@ class TestCoin(unittest.TestCase):
         with self.assertRaises(TypeError):
             c.details = "Not a dict"
 
+    def test_create_result_id_depends_on_arguments(self):
+        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 9999)
+        c2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1111)
+        c2.timestamp = c1.timestamp
+        c3 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 9999, b'some network')
+        c3.timestamp = c1.timestamp
+        assert c1.id_bytes != c2.id_bytes
+        assert c1.id_bytes != c3.id_bytes
+        assert c2.id_bytes != c3.id_bytes
+
     def test_create_result_serializes_and_deserializes_correctly(self):
         c = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 9999)
         assert isinstance(c, models.Coin)
@@ -96,7 +107,7 @@ class TestCoin(unittest.TestCase):
     def test_mine_result_passes_difficulty_threshold(self):
         threshold = 128 + 10
         c = models.Coin.mine(ANYONE_CAN_SPEND_LOCK)
-        assert calculate_difficulty(tapehash3(c.preimage(c.data))) >= threshold
+        assert calculate_difficulty(tapehash3(bytes.fromhex(c.generate_id(c.data)))) >= threshold
         assert c.mint_value() >= c.amount
 
     def test_stamp_method_returns_coin(self):
