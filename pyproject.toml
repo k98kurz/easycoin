@@ -8,6 +8,12 @@ version = "0.0.1"
 authors = [
   { name="k98kurz", email="k98kurz@gmail.com" },
 ]
+dependencies = [
+  "packify >= 0.3.1",
+  "sqloquent >= 0.7.0",
+  "tapescript >= 0.7.1",
+  "tapehash >= 0.1.0",
+]
 description = "Proof-of-concept + proof-of-work - consensus = easycoin."
 readme = "readme.md"
 requires-python = ">=3.10"
