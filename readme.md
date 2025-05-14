@@ -241,7 +241,7 @@ Future developments/experiments include the following:
 
 ## Testing
 
-This project contains 40 tests, most of them unit tests but some integration
+This project contains 42 tests, most of them unit tests but some integration
 tests.
 
 To set up, clone the repository and run the following:
