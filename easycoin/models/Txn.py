@@ -125,12 +125,18 @@ class Txn(HashedModel):
             mint Txn has a coin amount that is greater than the mint
             value; or if the total amount in outputs is greater than the
             total amount in inputs; or if an input lock is not fulfilled
-            by a witness script; or if a new stamp does not follow
-            
+            by a witness script; or if a new stamp is not authorized by
+            an 'L' script; or if a transferred stamp does not validate
+            against its covenants; or if the serialized txn size is
+            greater than 32 KiB. Returns True if all checks pass.
         """
         if reload:
             self.inputs().reload()
             self.outputs().reload()
+
+        # reject large txns
+        if len(self.pack()) > 32*1024:
+            return False
 
         # minting Txn is a special case
         if len(self.inputs) == 0 and len(self.outputs) == 1:
