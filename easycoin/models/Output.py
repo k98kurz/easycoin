@@ -5,8 +5,8 @@ class Output(SqlModel):
     connection_info: str = ''
     table: str = 'outputs'
     id_column: str = 'id'
-    columns: tuple[str] = ('id', 'spent')
+    columns: tuple[str] = ('id', 'wallet_id')
     id: str
-    spent: bool|Default[False]
+    wallet_id: str|None
     coin: RelatedModel
 

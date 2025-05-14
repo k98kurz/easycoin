@@ -15,7 +15,11 @@ Txn.wallet = belongs_to(Txn, Wallet, 'wallet_id')
 
 Wallet.txns = has_many(Wallet, Txn, 'wallet_id')
 Wallet.coins = has_many(Wallet, Coin, 'wallet_id')
+Wallet.inputs = has_many(Wallet, Input, 'wallet_id')
+Wallet.outputs = has_many(Wallet, Output, 'wallet_id')
 
 Input.coin = belongs_to(Input, Coin, 'id')
+Input.wallet = belongs_to(Input, Wallet, 'wallet_id')
 Output.coin = belongs_to(Output, Coin, 'id')
+Output.wallet = belongs_to(Output, Wallet, 'wallet_id')
 

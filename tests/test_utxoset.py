@@ -11,21 +11,47 @@ import unittest
 
 DB_FILEPATH = 'tests/test.db'
 MIGRATIONS_PATH = 'tests/migrations'
+SEED_PHRASE = ['test', 'obviously', 'not', 'secure']
+PASSWORD = 'testp4ssword'
 ANYONE_CAN_SPEND_LOCK = Script.from_src('true')
 
 
-class TestUTXOSet(unittest.TestCase):
+def automigrate():
+    sqloquent.tools.publish_migrations(MIGRATIONS_PATH)
+    tomigrate = [ 
+        models.Coin, models.Txn, models.Wallet,
+        models.Input, models.Output,
+    ]
+    for model in tomigrate:
+        name = model.__name__
+        m = sqloquent.tools.make_migration_from_model(model, name)
+        with open(f'{MIGRATIONS_PATH}/create_{name}.py', 'w') as f:
+            f.write(m)
+    sqloquent.tools.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
+
+def setup_class():
+    models.Coin.connection_info = DB_FILEPATH
+    models.Txn.connection_info = DB_FILEPATH
+    models.Input.connection_info = DB_FILEPATH
+    models.Output.connection_info = DB_FILEPATH
+    models.Wallet.connection_info = DB_FILEPATH
+    sqloquent.DeletedModel.connection_info = DB_FILEPATH
+    if isfile(DB_FILEPATH):
+        os.remove(DB_FILEPATH)
+    automigrate()
+
+def setup():
+    models.Coin.query().delete()
+    models.Txn.query().delete()
+    models.Input.query().delete()
+    models.Output.query().delete()
+    models.Wallet.query().delete()
+
+
+class TestInput(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        models.Coin.connection_info = DB_FILEPATH
-        models.Txn.connection_info = DB_FILEPATH
-        models.Input.connection_info = DB_FILEPATH
-        models.Output.connection_info = DB_FILEPATH
-        models.Wallet.connection_info = DB_FILEPATH
-        sqloquent.DeletedModel.connection_info = DB_FILEPATH
-        if isfile(DB_FILEPATH):
-            os.remove(DB_FILEPATH)
-        cls.automigrate()
+        setup_class()
         super().setUpClass()
 
     @classmethod
@@ -38,26 +64,39 @@ class TestUTXOSet(unittest.TestCase):
         super().tearDownClass()
 
     def setUp(self):
-        models.Coin.query().delete()
-        models.Txn.query().delete()
-        models.Input.query().delete()
-        models.Output.query().delete()
-        models.Wallet.query().delete()
+        setup()
         super().setUp()
 
+    def test_Input_relations_work(self):
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        w.save()
+        c = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1000)
+        c.save()
+        i = models.Input.insert({'id': c.id, 'wallet_id': w.id})
+        w2 = i.wallet
+        c2 = i.coin
+        assert w2.id == w.id
+        assert c2.id == c.id
+
+
+class TestUTXOSet(unittest.TestCase):
     @classmethod
-    def automigrate(self):
-        sqloquent.tools.publish_migrations(MIGRATIONS_PATH)
-        tomigrate = [ 
-            models.Coin, models.Txn, models.Wallet,
-            models.Input, models.Output,
-        ]
-        for model in tomigrate:
-            name = model.__name__
-            m = sqloquent.tools.make_migration_from_model(model, name)
-            with open(f'{MIGRATIONS_PATH}/create_{name}.py', 'w') as f:
-                f.write(m)
-        sqloquent.tools.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
+    def setUpClass(cls):
+        setup_class()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        for file in os.listdir(MIGRATIONS_PATH):
+            if isfile(f'{MIGRATIONS_PATH}/{file}'):
+                os.remove(f'{MIGRATIONS_PATH}/{file}')
+        if isfile(DB_FILEPATH):
+            os.remove(DB_FILEPATH)
+        super().tearDownClass()
+
+    def setUp(self):
+        setup()
+        super().setUp()
 
     def test_can_apply_Txn_spending_existing_Output(self):
         u = easycoin.UTXOSet()
