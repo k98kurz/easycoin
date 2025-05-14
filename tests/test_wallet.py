@@ -187,6 +187,38 @@ class TestWallet(unittest.TestCase):
         w.reload()
         assert w.get_pubkey(*hdw_i) == pubk
 
+    def test_Wallet_relations_work(self):
+        # create records
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD).save()
+        c = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 999).save()
+        t = models.Txn.insert({'output_ids': c.id})
+        i = models.Input.insert({'id': 'some coin ID that was spent'})
+        o = models.Output.insert({'id': 'some coin ID that can be spent'})
+
+        # set relations
+        c.wallet = w
+        c.wallet().save()
+        t.wallet = w
+        t.wallet().save()
+        i.wallet = w
+        i.wallet().save()
+        o.wallet = w
+        o.wallet().save()
+
+        # reload and test
+        w.coins().reload()
+        w.txns().reload()
+        w.outputs().reload()
+        w.inputs().reload()
+        assert len(w.coins) == 1
+        assert w.coins[0].id == c.id
+        assert len(w.txns) == 1
+        assert w.txns[0].id == t.id
+        assert len(w.inputs) == 1
+        assert w.inputs[0].id == i.id
+        assert len(w.outputs) == 1
+        assert w.outputs[0].id == o.id
+
 
 if __name__ == '__main__':
     unittest.main()

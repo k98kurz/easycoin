@@ -41,6 +41,8 @@ class Wallet(HashedModel):
     pubkeys: bytes|None
     txns: RelatedCollection
     coins: RelatedCollection
+    inputs: RelatedCollection
+    outputs: RelatedCollection
 
     @property
     def pubkeys(self) -> dict[tuple[int, int|None], bytes]:
