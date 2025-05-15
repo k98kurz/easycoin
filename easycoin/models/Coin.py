@@ -15,9 +15,9 @@ class Coin(HashedModel):
     id_column: str = 'id'
     columns: tuple[str] = (
         'id', 'timestamp', 'lock', 'amount', 'details', 'nonce',
-        'net_id', 'wallet_id'
+        'net_id', 'wallet_id', 'key_index1', 'key_index2'
     )
-    columns_excluded_from_hash = ('wallet_id',)
+    columns_excluded_from_hash = ('wallet_id', 'key_index1', 'key_index2')
     id: str
     timestamp: int
     lock: bytes
@@ -26,6 +26,8 @@ class Coin(HashedModel):
     nonce: int|Default[0]
     net_id: str|None
     wallet_id: str|None
+    key_index1: int|None
+    key_index2: int|None
     origins: RelatedCollection
     spends: RelatedCollection
     wallet: RelatedModel
@@ -84,7 +86,8 @@ class Coin(HashedModel):
 
     @classmethod
     def create(
-        cls, lock: bytes|Script, amount: int, net_id: bytes|None = None
+        cls, lock: bytes|Script, amount: int, net_id: bytes|None = None,
+        nonce_offset: int = 0
     ) -> 'Coin':
         """Creates a new coin that must be funded or mined."""
         ts = int(time())
@@ -92,16 +95,17 @@ class Coin(HashedModel):
             'timestamp': ts,
             'lock': lock if type(lock) is bytes else lock.bytes,
             'amount': amount,
-            'nonce': 0,
+            'nonce': nonce_offset,
             'net_id': net_id,
         })
 
     @classmethod
     def mine(
-        cls, lock: bytes|Script, amount: int = 10000, net_id: bytes|None = None
+        cls, lock: bytes|Script, amount: int = 10000, net_id: bytes|None = None,
+        nonce_offset: int = 0
     ) -> 'Coin':
         """Mines a coin with the `amount` of value."""
-        coin = cls.create(lock, amount, net_id)
+        coin = cls.create(lock, amount, net_id, nonce_offset)
         # calculate mint Txn fee overhead
         overhead = len(coin.preimage(coin.data)) + 3 + 32
         difficulty = ((amount + overhead) // 1000) + _mint_difficulty
