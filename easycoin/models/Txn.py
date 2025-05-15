@@ -114,7 +114,7 @@ class Txn(HashedModel):
     @staticmethod
     def minimum_fee(txn: Txn) -> int:
         """Calculates the minimum burn required for the transaction."""
-        witlen = len(txn.data.get('witness', _empty))
+        witlen = len(txn.data.get('witness', _empty) or b'')
         out_count = len(txn.output_ids)
         out_len = sum([len(o.preimage(o.data)) for o in txn.outputs])
         in_len = sum([len(i.preimage(i.data)) for i in txn.inputs])
