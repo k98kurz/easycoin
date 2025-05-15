@@ -7,6 +7,7 @@ import packify
 
 
 _mint_difficulty = 200
+_min_coin_mint_size = 100000
 
 
 class Coin(HashedModel):
@@ -82,6 +83,8 @@ class Coin(HashedModel):
         val = calculate_difficulty(val)
         if val < _mint_difficulty:
             return 0
+        if val * 1000 < _min_coin_mint_size:
+            return 0
         return (val - _mint_difficulty) * 1000
 
     @classmethod
@@ -101,10 +104,12 @@ class Coin(HashedModel):
 
     @classmethod
     def mine(
-        cls, lock: bytes|Script, amount: int = 10000, net_id: bytes|None = None,
-        nonce_offset: int = 0
+        cls, lock: bytes|Script, amount: int = _min_coin_mint_size,
+        net_id: bytes|None = None, nonce_offset: int = 0
     ) -> 'Coin':
         """Mines a coin with the `amount` of value."""
+        if amount < _min_coin_mint_size:
+            raise ValueError(f'amount must be >= {_min_coin_mint_size}')
         coin = cls.create(lock, amount, net_id, nonce_offset)
         # calculate mint Txn fee overhead
         overhead = len(coin.preimage(coin.data)) + 3 + 32

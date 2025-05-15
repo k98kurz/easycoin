@@ -104,6 +104,10 @@ class TestCoin(unittest.TestCase):
             assert k in unpacked.data
             assert unpacked.data[k] == v
 
+    def test_mine_with_low_amount_raises_ValueError(self):
+        with self.assertRaises(ValueError):
+            models.Coin.mine(ANYONE_CAN_SPEND_LOCK, 1)
+
     def test_mine_result_passes_difficulty_threshold(self):
         threshold = 128 + 10
         c = models.Coin.mine(ANYONE_CAN_SPEND_LOCK)
