@@ -30,5 +30,15 @@ classifiers = [
 "Repository" = "https://github.com/k98kurz/easycoin"
 "Bug Tracker" = "https://github.com/k98kurz/easycoin/issues"
 
+[project.optional-dependencies]
+node = [
+  "netaio >= 0.0.7",
+]
+cui = [
+  "textual >= 3.2.0",
+  "netaio >= 0.0.7",
+]
+
 [project.scripts]
+easycoin = "easycoin.cli:run"
 
