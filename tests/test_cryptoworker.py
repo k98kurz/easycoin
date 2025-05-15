@@ -105,7 +105,8 @@ class TestCryptoWorker(unittest.TestCase):
         result = run(cryptoworker.work_mine_job())
         assert result is None
 
-        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, 5555, 5)
+        total_target = 555555
+        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, 5)
         result = run(cryptoworker.work_mine_job())
         assert type(result) is tuple
         assert len(result) == 2
@@ -114,6 +115,7 @@ class TestCryptoWorker(unittest.TestCase):
         jm, coins = result
         for c in coins:
             assert c.mint_value() >= c.amount
+        assert sum([c.amount for c in coins]) >= total_target
 
 
 if __name__ == '__main__':
