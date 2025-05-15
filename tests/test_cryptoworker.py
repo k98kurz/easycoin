@@ -180,14 +180,27 @@ class TestCryptoWorker(unittest.TestCase):
         cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, 5)
 
         # wait for the jobs to complete
-        await sleep(1)
+        await sleep(1.5)
 
         coins = cryptoworker.get_mined_coins()
         assert coins is not None
-
+        assert type(coins) is list
         for c in coins:
             assert c.mint_value() >= c.amount
         assert sum([c.amount for c in coins]) >= total_target
+
+        # now test a job that raises an exception (mining less than min mint size)
+        total_target = 555
+        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, 5)
+
+        # wait for the jobs to complete
+        await sleep(1)
+
+        result = cryptoworker.get_mined_coins()
+        assert result is not None
+        assert type(result) is list
+        for r in result:
+            assert isinstance(r, Exception), type(r)
 
         task.cancel()
 

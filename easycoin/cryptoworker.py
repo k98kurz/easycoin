@@ -37,7 +37,7 @@ class JobMessage:
     """Object for communicating jobs and results via queues."""
     job_type: JobType = field()
     job_data: bytes = field(default=b'')
-    result: bool|bytes|list[Coin]|None = field(default=None)
+    result: bool|list[Coin|Exception]|Exception|None = field(default=None)
     queue: deque = field(default=None)
 
     def pack(self) -> bytes:
@@ -91,9 +91,10 @@ def submit_mine_job(
         jm.queue = output_q
     _mine_coins_jobs.append(jm)
 
-def get_mined_coins() -> list[Coin]|None:
-    """If a mining job has completed, return the newly mined Coins.
-        Otherwise, return `None`.
+def get_mined_coins() -> list[Coin|Exception]|None:
+    """If a mining job has completed, return the newly mined `Coin`s or
+        the `Exception`s encountered during mining. Otherwise, return
+        `None`.
     """
     try:
         if len(_mine_coins_results):
@@ -112,7 +113,10 @@ async def work():
         await _work_mine_job()
 
 def _validate(jm: JobMessage) -> tuple[JobMessage, bool]:
-    return (jm, Txn.unpack(jm.job_data).validate())
+    try:
+        return (jm, Txn.unpack(jm.job_data).validate())
+    except Exception as e:
+        return (jm, e)
 
 async def work_txn_validation_jobs() -> list[JobMessage]|None:
     """Works a batch of up to 16 available Txn validation jobs, then
@@ -163,7 +167,10 @@ async def _work_txn_validation_jobs():
             _validate_txn_results.append(jm)
 
 def __mine(j: tuple):
-    return Coin.mine(*j).pack()
+    try:
+        return Coin.mine(*j).pack()
+    except Exception as e:
+        return e
 
 async def work_mine_job() -> tuple[JobMessage, list[Coin]]|None:
     """Works a mining job if one is available, then returns the original
@@ -191,7 +198,11 @@ async def work_mine_job() -> tuple[JobMessage, list[Coin]]|None:
                 for j in jobs
             ]
             result = await asyncio.gather(*tasks)
-            return (jm, [Coin.unpack(r) for r in result])
+            result = [
+                Coin.unpack(r) if type(r) is bytes else r
+                for r in result
+            ]
+            return (jm, result)
     except IndexError:
         pass
 
