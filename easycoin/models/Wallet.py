@@ -1,3 +1,4 @@
+from .errors import type_assert, value_assert
 from hashlib import sha256, pbkdf2_hmac
 from nacl.bindings import crypto_core_ed25519_scalar_mul, crypto_scalarmult_ed25519
 from nacl.signing import SigningKey, VerifyKey
@@ -52,15 +53,15 @@ class Wallet(HashedModel):
         return packify.unpack(self.data.get('pubkeys', _empty_dict))
     @pubkeys.setter
     def pubkeys(self, val: dict[tuple[int, int|None], bytes]):
-        if not isinstance(val, dict):
-            raise TypeError('pubkeys must be dict[tuple[int, int|None], bytes]')
+        type_assert(isinstance(val, dict),
+            'pubkeys must be dict[tuple[int, int|None], bytes]')
         for k, v in val.items():
-            if not isinstance(k, tuple) or not isinstance(v, bytes):
-                raise TypeError('pubkeys must be dict[tuple[int, int|None], bytes]')
-            if not len(k) == 2:
-                raise ValueError('pubkeys must be dict[tuple[int, int|None], bytes]')
-            if not isinstance(k[0], int) or type(k[1]) not in (int, type(None)):
-                raise TypeError('pubkeys must be dict[tuple[int, int|None], bytes]')
+            type_assert(isinstance(k, tuple) or isinstance(v, bytes),
+                'pubkeys must be dict[tuple[int, int|None], bytes]')
+            value_assert(len(k) == 2,
+                'pubkeys must be dict[tuple[int, int|None], bytes]')
+            type_assert(isinstance(k[0], int) or type(k[1]) in (int, type(None)),
+                'pubkeys must be dict[tuple[int, int|None], bytes]')
         self.data['pubkeys'] = packify.pack(val)
 
     @property
@@ -71,11 +72,10 @@ class Wallet(HashedModel):
         return packify.unpack(self.data.get('secrets', _empty_dict))
     @secrets.setter
     def secrets(self, val: dict[bytes, bytes]):
-        if not isinstance(val, dict):
-            raise TypeError('secrets must be dict[bytes, bytes]')
+        type_assert(isinstance(val, dict), 'secrets must be dict[bytes, bytes]')
         for k, v in val.items():
-            if not isinstance(k, bytes) or not isinstance(v, bytes):
-                raise TypeError('secrets must be dict[bytes, bytes]')
+            type_assert(isinstance(k, bytes) or isinstance(v, bytes),
+                'secrets must be dict[bytes, bytes]')
         self.data['secrets'] = packify.pack(val)
 
     @property
@@ -95,8 +95,8 @@ class Wallet(HashedModel):
         key = pbkdf2_hmac(
             'sha256', password.encode(), sha256(b'easycoin').digest(), 10000
         )
-        if sha256(key + b'checksum check').digest() != self.checksum:
-            raise ValueError('checksum check failed; invalid password or corrupt wallet data')
+        value_assert(sha256(key + b'checksum check').digest() == self.checksum,
+            'checksum check failed; invalid password or corrupt wallet data')
         self._key = key
         self._is_locked = False
 
@@ -115,12 +115,11 @@ class Wallet(HashedModel):
             wordlist is not `tuple[str]` and `ValueError` if it is not
             2048 long.
         """
-        if type(wordlist) not in (tuple, list):
-            raise TypeError('wordlist must be tuple[str]')
-        if not all([type(w) is str for w in wordlist]):
-            raise TypeError('wordlist must be tuple[str]')
-        if len(wordlist) != 2048:
-            raise ValueError('wordlist must contain 2048 distinct words')
+        type_assert(type(wordlist) in (tuple, list), 'wordlist must be tuple[str]')
+        type_assert(all([type(w) is str for w in wordlist]),
+            'wordlist must be tuple[str]')
+        value_assert(len(wordlist) == 2048,
+            'wordlist must contain 2048 distinct words')
 
         seed = os.urandom(16)
         checksum = int.from_bytes(sha256(seed).digest(), 'big') % 2048
@@ -154,8 +153,8 @@ class Wallet(HashedModel):
             address will include a 4-byte checksum to detect errors.
             Raises `TypeError` if the lock is not a `bytes|Script`.
         """
-        if type(lock) not in (bytes, Script):
-            raise TypeError('lock must be bytes|Script')
+        type_assert(type(lock) in (bytes, Script),
+            'lock must be bytes|Script')
         lock = lock.bytes if type(lock) is Script else lock
         checksum = sha256(lock).digest()[:4]
         return (lock + checksum).hex()
@@ -166,8 +165,7 @@ class Wallet(HashedModel):
             fails or if the script cannot be decompiled. Raises
             `TypeError` if the address is not a `str`.
         """
-        if type(address) is not str:
-            raise TypeError('address must be str')
+        type_assert(type(address) is str, 'address must be str')
         try:
             address = bytes.fromhex(address)
             lock = address[:-4]
@@ -183,10 +181,9 @@ class Wallet(HashedModel):
             address is not a `str`. Raises `ValueError` if validation
             fails.
         """
-        if type(address) is not str:
-            raise TypeError('address must be str')
-        if not Wallet.validate_address(address):
-            raise ValueError('cannot parse an invalid address')
+        type_assert(type(address) is str, 'address must be str')
+        value_assert(Wallet.validate_address(address),
+            'cannot parse an invalid address')
         return bytes.fromhex(address)[:-4]
 
     @property
@@ -194,13 +191,13 @@ class Wallet(HashedModel):
         """The root seed of the wallet. Accessing raises ValueError if
             the wallet is locked.
         """
-        if self.is_locked:
-            raise ValueError('cannot read the seed from a locked wallet')
+        value_assert(not self.is_locked,
+            'cannot read the seed from a locked wallet')
         return xor(self._key, self.data['seed'])
     @seed.setter
     def self(self, val: str):
-        if self.is_locked:
-            raise ValueError('cannot set the seed of a locked wallet')
+        value_assert(not self.is_locked,
+            'cannot set the seed of a locked wallet')
         self.data['seed'] = xor(self._key, val)
 
     def get_seed(self, nonce: int, child_nonce: int|None = None) -> bytes:

@@ -1,3 +1,4 @@
+from .errors import type_assert, value_assert
 from hashlib import sha256
 from sqloquent import HashedModel, Default, RelatedCollection, RelatedModel
 from tapehash import tapehash3, work, calculate_difficulty
@@ -58,8 +59,7 @@ class Coin(HashedModel):
         return packify.unpack(self.data['details'])
     @details.setter
     def details(self, val: dict):
-        if not type(val) is dict:
-            raise TypeError('details must be dict')
+        type_assert(type(val) is dict, 'details must be dict')
         self.data['details'] = packify.pack(val)
 
     @property
@@ -108,8 +108,8 @@ class Coin(HashedModel):
         net_id: bytes|None = None, nonce_offset: int = 0
     ) -> 'Coin':
         """Mines a coin with the `amount` of value."""
-        if amount < _min_coin_mint_size:
-            raise ValueError(f'amount must be >= {_min_coin_mint_size}')
+        value_assert(amount >= _min_coin_mint_size,
+            f'amount must be >= {_min_coin_mint_size}')
         coin = cls.create(lock, amount, net_id, nonce_offset)
         # calculate mint Txn fee overhead
         overhead = len(coin.preimage(coin.data)) + 3 + 32
