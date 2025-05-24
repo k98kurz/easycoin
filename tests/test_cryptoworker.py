@@ -160,16 +160,19 @@ class TestCryptoWorker(unittest.TestCase):
         assert result is None
 
         total_target = 555555
-        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, 5)
+        total_coins = 5
+        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, total_coins)
         result = run(cryptoworker.work_mine_job())
         assert type(result) is tuple
         assert len(result) == 2
         assert type(result[0]) is cryptoworker.JobMessage
         assert type(result[1]) is list
+        assert len(result[1]) == total_coins, (len(result[1]), total_coins)
         jm, coins = result
         for c in coins:
-            assert c.mint_value() >= c.amount
-        assert sum([c.amount for c in coins]) >= total_target
+            assert c.mint_value() >= c.amount, (c.mint_value(), c.amount)
+        total_actual = sum([c.amount for c in coins])
+        assert total_actual >= total_target
 
     async def mine_with_task_and_queues(self):
         task = create_task(cryptoworker.work())
@@ -177,7 +180,8 @@ class TestCryptoWorker(unittest.TestCase):
         assert result is None
 
         total_target = 555555
-        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, 5)
+        total_coins = 5
+        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, total_coins)
 
         # wait for the jobs to complete
         await sleep(1.5)
@@ -185,9 +189,11 @@ class TestCryptoWorker(unittest.TestCase):
         coins = cryptoworker.get_mined_coins()
         assert coins is not None
         assert type(coins) is list
+        assert len(coins) == total_coins, (len(coins), total_coins)
         for c in coins:
-            assert c.mint_value() >= c.amount
-        assert sum([c.amount for c in coins]) >= total_target
+            assert c.mint_value() >= c.amount, (c.mint_value(), c.amount)
+        total_actual = sum([c.amount for c in coins])
+        assert total_actual >= total_target
 
         # now test a job that raises an exception (mining less than min mint size)
         total_target = 555
