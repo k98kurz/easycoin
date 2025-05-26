@@ -4,6 +4,7 @@ from typing import Callable
 
 _lambda_id = lambda x: x
 _lambda_add = lambda x: x+x
+_lambda_sub = lambda x: x-x
 _lambda_mult = lambda x: x*x
 _lambda_div = lambda x: 1/x
 _lambda_sum = lambda x: sum(x)
@@ -34,6 +35,7 @@ def microbench() -> dict:
     res = {
         'lambda': sum(benchmark(30, _lambda_id, [1]))/30,
         'add': sum(benchmark(30, _lambda_add, [1.0]))/30,
+        'sub': sum(benchmark(30, _lambda_sub, [1.0]))/30,
         'mult': sum(benchmark(30, _lambda_mult, [1.0]))/30,
         'div': sum(benchmark(30, _lambda_div, [1.0]))/30,
         'sum': sum(benchmark(30, _lambda_sum, [[i/1.0 for i in range(30)]]))/30,
@@ -44,14 +46,17 @@ def microbench() -> dict:
         'if': (sum(benchmark(15, _branch, [0])) + sum(benchmark(15, _branch, [1])))/30,
     }
     res['add'] -= res['lambda']
+    res['sub'] -= res['lambda']
     res['mult'] -= res['lambda']
     res['div'] -= res['lambda']
+    res['sum'] -= res['lambda']
     res['dict'] -= res['lambda']
     res['offset'] = 30 * (
-        res['lambda'] + res['add'] * 5 + res['mult'] + res['div'] + res['sum'] +
-        res['dict'] + res['pc'] + res['tm'] + res['call'] * 31 + res['if']
-    ) + res['add'] * 18 + res['mult'] * 6 + res['div'] * 9 + res['call'] + \
-    res['dict'] * 24
+        res['lambda'] + res['add'] + res['sub'] + res['mult'] + res['div'] +
+        res['sum'] + res['dict'] + res['pc'] + res['tm'] + res['if'] +
+        res['call']
+    ) + res['sub'] * 6 + res['add'] * 15 + res['mult'] * 8 + res['div'] * 11 + \
+    res['call'] + res['dict'] * 24
     return res
 
 def calc_microbench_offset(ops: dict = {}) -> float:
