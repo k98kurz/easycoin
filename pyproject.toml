@@ -9,10 +9,13 @@ authors = [
   { name="k98kurz", email="k98kurz@gmail.com" },
 ]
 dependencies = [
+  "merkleasy >= 0.1.2",
+  "musig >= 0.0.1",
   "packify >= 0.3.1",
   "sqloquent >= 0.7.0",
-  "tapescript >= 0.7.1",
+  "tapescript >= 0.7.2",
   "tapehash >= 0.1.0",
+  "crossconfig >= 0.0.1",
 ]
 description = "Proof-of-concept + proof-of-work - consensus = easycoin."
 readme = "readme.md"
