@@ -17,7 +17,7 @@ DB_FILEPATH = 'tests/test.db'
 MIGRATIONS_PATH = 'tests/migrations'
 ANYONE_CAN_SPEND_LOCK = Script.from_src('true')
 SKEY = os.urandom(32)
-MINT_LOCK = make_single_sig_lock(SigningKey(SKEY).verify_key)
+SINGLE_SIG_LOCK = make_single_sig_lock(SigningKey(SKEY).verify_key)
 
 
 def make_hashlock(preimage: bytes):
@@ -200,16 +200,18 @@ class TestTxn(unittest.TestCase):
 
     def test_validate_accepts_valid_mint_and_spend(self):
         # first mine a coin and add it to the UTXO set
-        c1 = models.Coin.mine(ANYONE_CAN_SPEND_LOCK)
+        c1 = models.Coin.mine(SINGLE_SIG_LOCK)
         c1.save()
         t = models.Txn({'output_ids': c1.id, 'input_ids': ''})
-        assert t.validate
+        assert t.validate()
         t.save()
         # now spend it
-        c2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, c1.amount - 500)
+        c2 = models.Coin.create(SINGLE_SIG_LOCK, c1.amount - 500)
         c2.save()
         t = models.Txn({'input_ids': c1.id, 'output_ids': c2.id})
-        t.witness = {c1.id_bytes: b''}
+        t.witness = {
+            c1.id_bytes: make_single_sig_witness(SKEY, t.runtime_cache(c1)).bytes
+        }
         assert t.validate()
 
     def test_basic_stamp_creation_and_spend_validate(self):
@@ -241,12 +243,12 @@ class TestTxn(unittest.TestCase):
 
         series_details = {
             'm': {'name': '$HIT Coin (test)'},
-            'L': MINT_LOCK.bytes,
+            'L': SINGLE_SIG_LOCK.bytes,
             '$': models.Txn.std_series_covenant().bytes,
         }
         second_series_details = {
             'm': {'name': 'fAuxUSD (test)'},
-            'L': MINT_LOCK.bytes,
+            'L': SINGLE_SIG_LOCK.bytes,
             '$': models.Txn.std_series_covenant().bytes,
         }
 
@@ -277,10 +279,12 @@ class TestTxn(unittest.TestCase):
 
         # mixing stamps of different series in a transaction should fail
         sX = models.Coin.stamp(
-            ANYONE_CAN_SPEND_LOCK, s1.amount - 1200, 420, second_series_details
+            ANYONE_CAN_SPEND_LOCK, s1.amount - 1530, 420, second_series_details
         )
         sX.save()
         tX = models.Txn({'input_ids': s1.id + ',' + sX.id, 'output_ids': s2.id})
+        assert tX.minimum_fee(tX) + sX.amount < s1.amount, \
+            'test fails to reflect correct fee calculation'
         assert not tX.validate(), 'mixing stamps with different msh should not validate'
 
         # simple transfer should work
