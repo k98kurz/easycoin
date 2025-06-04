@@ -1,19 +1,25 @@
 from __future__ import annotations
+from .errors import type_assert, value_assert
 from hashlib import sha256
 from sqloquent import HashedModel, RelatedCollection
 from tapescript import run_auth_scripts, Script
 import packify
 
 
+
+_witfee_mult = 1
+_witfee_exp = 1
+_outcountfee_mult = 32
+_outcountfee_exp = 1
+_outfee_mult = 1
+_outfee_exp = 1
+_infee_mult = 1
+_infee_exp = 1
+_outscriptfee_mult = 1
+_outscriptfee_exp = 1
+_max_txn_size = 32*1024
+
 _empty = packify.pack({})
-
-def type_assert(condition: bool, message: str = 'invalid type'):
-    if not condition:
-        raise TypeError(message)
-
-def value_assert(condition: bool, message: str = 'invalid value'):
-    if not condition:
-        raise ValueError(message)
 
 
 class Txn(HashedModel):
@@ -115,10 +121,18 @@ class Txn(HashedModel):
     def minimum_fee(txn: Txn) -> int:
         """Calculates the minimum burn required for the transaction."""
         witlen = len(txn.data.get('witness', _empty) or b'')
+        witfee = int(witlen * _witfee_mult)
+        witfee = int(witfee ** _witfee_exp)
         out_count = len(txn.output_ids)
+        outcountfee = int(out_count * _outcountfee_mult)
+        outcountfee = int(outcountfee ** _outcountfee_exp)
         out_len = sum([len(o.preimage(o.data)) for o in txn.outputs])
+        outfee = int(out_len * _outfee_mult)
+        outfee = int(outfee ** _outfee_exp)
         in_len = sum([len(i.preimage(i.data)) for i in txn.inputs])
-        return witlen + out_count * 32 + out_len + in_len
+        infee = int(in_len * _infee_mult)
+        infee = int(infee ** _infee_exp)
+        return witfee + outcountfee + outfee + infee
 
     def validate(self, debug: bool = False, reload: bool = True) -> bool:
         """Runs the transaction validation logic. Returns False if a
@@ -135,7 +149,7 @@ class Txn(HashedModel):
             self.outputs().reload()
 
         # reject large txns
-        if len(self.pack()) > 32*1024:
+        if len(self.pack()) > _max_txn_size:
             return False
 
         # minting Txn is a special case
@@ -274,9 +288,10 @@ class Txn(HashedModel):
             "so_det": so_det,
             "so_msh": so_msh,
             "so_n": so_n,
-            "sigfield1": coin.id_bytes,
-            "sigfield2": sha256(b''.join(sorted([i.id_bytes for i in self.inputs]))).digest(),
-            "sigfield3": sha256(b''.join(sorted([o.id_bytes for o in self.outputs]))).digest(),
+            "sigfield1": b'Txn',
+            "sigfield2": coin.id_bytes,
+            "sigfield3": sha256(b''.join(sorted([i.id_bytes for i in self.inputs]))).digest(),
+            "sigfield4": sha256(b''.join(sorted([o.id_bytes for o in self.outputs]))).digest(),
         }
         return cache
 
