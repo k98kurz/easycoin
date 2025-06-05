@@ -182,10 +182,36 @@ class TestTxn(unittest.TestCase):
         mf2 = models.Txn.minimum_fee(t)
         assert mf2 > mf1
 
+    def test_validate_rejects_txn_over_max_size_or_with_excessive_stamp_details(self):
+        big_n = '0' * 1024
+        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 100000).save()
+        c2 = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 100, '0' + big_n).save()
+        #print(f'{c1.amount=} {c2.amount=}')
+        t = models.Txn({
+            'input_ids': c1.id,
+            'output_ids': c2.id,
+        })
+        t.inputs = [c1]
+        t.outputs = [c2]
+        t.witness = {c1.id_bytes: b''}
+        # case 1: txn size too large, but each individual coin is acceptable size
+        assert t.validate(debug='line 198', reload=False)
+        outputs = [c2]
+        for i in range(1, 32):
+            c = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 100, str(i) + big_n).save()
+            outputs.append(c)
+        t.outputs = outputs
+        assert not t.validate(debug='line 204', reload=False)
+        # case 2: txn size is okay, but the output coin is too large
+        t.outputs = [c2]
+        assert t.validate(debug='line 207', reload=False)
+        c2.data['details'] = packify.pack({'n': big_n * 12})
+        assert not t.validate(debug='line 209', reload=False)
+
     def test_validate_rejects_mint_txn_that_fails_difficulty_threshold(self):
         c = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 999999999999999)
         while c.mint_value() >= c.amount:
-            c = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 999999999999999)
+            c.nonce += 1
         c.save()
         t = models.Txn({'output_ids': c.id, 'input_ids': ''})
         #print(f'1 {c.mint_value()=}, {c.amount=}')
@@ -203,7 +229,7 @@ class TestTxn(unittest.TestCase):
         c1 = models.Coin.mine(SINGLE_SIG_LOCK)
         c1.save()
         t = models.Txn({'output_ids': c1.id, 'input_ids': ''})
-        assert t.validate()
+        assert t.validate(debug='line 232')
         t.save()
         # now spend it
         c2 = models.Coin.create(SINGLE_SIG_LOCK, c1.amount - 500)
@@ -242,12 +268,12 @@ class TestTxn(unittest.TestCase):
         c1.save()
 
         series_details = {
-            'm': {'name': '$HIT Coin (test)'},
+            'd': {'type': 'token', 'name': '$HIT Coin (test)'},
             'L': SINGLE_SIG_LOCK.bytes,
             '$': models.Txn.std_series_covenant().bytes,
         }
         second_series_details = {
-            'm': {'name': 'fAuxUSD (test)'},
+            'd': {'type': 'token', 'name': 'fAuxUSD (test)'},
             'L': SINGLE_SIG_LOCK.bytes,
             '$': models.Txn.std_series_covenant().bytes,
         }
@@ -279,7 +305,7 @@ class TestTxn(unittest.TestCase):
 
         # mixing stamps of different series in a transaction should fail
         sX = models.Coin.stamp(
-            ANYONE_CAN_SPEND_LOCK, s1.amount - 1530, 420, second_series_details
+            ANYONE_CAN_SPEND_LOCK, s1.amount - 1630, 420, second_series_details
         )
         sX.save()
         tX = models.Txn({'input_ids': s1.id + ',' + sX.id, 'output_ids': s2.id})
@@ -289,7 +315,7 @@ class TestTxn(unittest.TestCase):
 
         # simple transfer should work
         s2 = models.Coin.stamp(
-            ANYONE_CAN_SPEND_LOCK, s1.amount - 1100, 1000, series_details
+            ANYONE_CAN_SPEND_LOCK, s1.amount - 1200, 1000, series_details
         )
         # NB: fee was 1023 when this test was written
         s2.save()

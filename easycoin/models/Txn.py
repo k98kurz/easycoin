@@ -32,7 +32,7 @@ class Txn(HashedModel):
     input_ids: str
     output_ids: str
     details: bytes|None
-    witness: bytes
+    witness: bytes|None
     wallet_id: str|None
     inputs: RelatedCollection
     outputs: RelatedCollection
@@ -134,7 +134,7 @@ class Txn(HashedModel):
         infee = int(infee ** _infee_exp)
         return witfee + outcountfee + outfee + infee
 
-    def validate(self, debug: bool = False, reload: bool = True) -> bool:
+    def validate(self, debug: bool|str = False, reload: bool = True) -> bool:
         """Runs the transaction validation logic. Returns False if a
             mint Txn has a coin amount that is greater than the mint
             value; or if the total amount in outputs is greater than the
@@ -150,13 +150,25 @@ class Txn(HashedModel):
 
         # reject large txns
         if len(self.pack()) > _max_txn_size:
+            print(f'txn > _max_txn_size ({debug})') if debug else ''
             return False
 
         # minting Txn is a special case
         if len(self.inputs) == 0 and len(self.outputs) == 1:
             coin = self.outputs[0]
-            print('mint requires amount <= mint_value and no coin.details') if debug else ''
-            return coin.amount + Txn.minimum_fee(self) <= coin.mint_value() and not coin.details
+            res = coin.amount + Txn.minimum_fee(self) <= coin.mint_value()
+            res = res and not coin.details
+            if debug and not res:
+                print(f'mint: amount <= mint_value and not coin.details ({debug})')
+            return res
+
+        # reject large coins
+        for coin in [*self.inputs, *self.outputs]:
+            try:
+                coin.details = coin.details
+            except ValueError:
+                print(f'ValueError raised from large coin.details ({debug})') if debug else ''
+                return False
 
         # ensure total spent is less than total funding of EC⁻¹
         total_out = Txn.minimum_fee(self)
@@ -166,13 +178,13 @@ class Txn(HashedModel):
         for coin in self.inputs:
             total_in += coin.amount
         if total_out > total_in:
-            print('total_out > total_in') if debug else ''
+            print(f'total_out > total_in ({debug})') if debug else ''
             return False
 
         # validate tapescript auth
         for coin in self.inputs:
             if coin.id_bytes not in self.witness:
-                print('missing witness; adding empty script') if debug else ''
+                print(f'missing witness; adding empty script ({debug})') if debug else ''
                 #return False
                 self.witness[coin.id_bytes] = b''
             scripts = []
@@ -187,14 +199,15 @@ class Txn(HashedModel):
                     scripts.append(coin.details['$'])
                 else:
                     scripts.append(Txn.std_stamp_covenant())
-            if debug:
-                print('run_auth_scripts(')
-                for s in scripts:
-                    s = Script.from_bytes(s) if type(s) is bytes else s
-                    print(',\t' + '\n\t'.join(s.src.split('\n')))
-                print(')')
             if not run_auth_scripts(scripts, self.runtime_cache(coin)):
-                print('witness validation failed for a lock') if debug else ''
+                if debug:
+                    print(f'witness validation failed for a lock ({debug}):')
+                    print('run_auth_scripts([')
+                    for s in scripts:
+                        s = Script.from_bytes(s) if type(s) is bytes else s
+                        print(',\t' + '\n\t'.join(s.src.split('\n')))
+                    print('])')
+
                 return False
 
         # handle new stamping constraints
@@ -202,15 +215,16 @@ class Txn(HashedModel):
             if coin.details:
                 if 'L' not in coin.details:
                     continue
-                if coin.details['msh'] in (
-                    c.details['msh'] for c in self.inputs if c.details
+                if coin.details['dsh'] in (
+                    c.details['dsh'] for c in self.inputs if c.details
                 ):
                     continue
                 if not run_auth_scripts(
                     [self.witness.get(coin.id_bytes, b''), coin.details['L']],
                     self.runtime_cache(coin)
                 ):
-                    print('stamp creation constraint failed validation') if debug else ''
+                    if debug:
+                        print(f'stamp creation constraint failed validation ({debug})')
                     return False
         # all other stamp constraints must be embedded in the scripts
 
@@ -229,7 +243,7 @@ class Txn(HashedModel):
         so_det = [
             sha256(packify.pack({
                 k: v for k,v in o.details.items()
-                if k not in ('id', 'msh')
+                if k not in ('id', 'dsh')
             })).digest()
             for o in self.outputs
             if o.details
@@ -237,14 +251,14 @@ class Txn(HashedModel):
         si_det = [
             sha256(packify.pack({
                 k: v for k,v in i.details.items()
-                if k not in ('id', 'msh')
+                if k not in ('id', 'dsh')
             })).digest()
             for i in self.inputs
             if i.details
         ]
         ii_det = sha256(packify.pack({
             k: v for k,v in coin.details.items()
-            if k not in ('id', 'msh')
+            if k not in ('id', 'dsh')
         })).digest()
 
         # stamp nonces/numbers/notes
@@ -256,7 +270,7 @@ class Txn(HashedModel):
         so_msh = [
             sha256(packify.pack({
                 k: v for k,v in o.details.items()
-                if k in ('m', 'L', '_', '$')
+                if k in ('d', 'L', '_', '$')
             })).digest()
             for o in self.outputs
             if o.details
@@ -264,14 +278,14 @@ class Txn(HashedModel):
         si_msh = [
             sha256(packify.pack({
                 k: v for k,v in i.details.items()
-                if k in ('m', 'L', '_', '$')
+                if k in ('d', 'L', '_', '$')
             })).digest()
             for i in self.inputs
             if i.details
         ]
         ii_msh = sha256(packify.pack({
             k: v for k, v in coin.details.items()
-            if k in ('m', 'L', '_', '$')
+            if k in ('d', 'L', '_', '$')
         })).digest()
 
         cache = {
