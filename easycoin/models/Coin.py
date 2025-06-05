@@ -9,6 +9,7 @@ import packify
 
 _mint_difficulty = 200
 _min_coin_mint_size = 100000
+_max_stamp_size = 10 * 1024
 
 
 class Coin(HashedModel):
@@ -17,7 +18,7 @@ class Coin(HashedModel):
     id_column: str = 'id'
     columns: tuple[str] = (
         'id', 'timestamp', 'lock', 'amount', 'details', 'nonce',
-        'net_id', 'wallet_id', 'key_index1', 'key_index2'
+        'net_id', 'net_state', 'wallet_id', 'key_index1', 'key_index2'
     )
     columns_excluded_from_hash = ('wallet_id', 'key_index1', 'key_index2')
     id: str
@@ -27,12 +28,29 @@ class Coin(HashedModel):
     details: bytes|None
     nonce: int|Default[0]
     net_id: str|None
+    net_state: bytes|None
     wallet_id: str|None
     key_index1: int|None
     key_index2: int|None
     origins: RelatedCollection
     spends: RelatedCollection
     wallet: RelatedModel
+
+    @classmethod
+    def commitment(cls, data: dict) -> bytes:
+        return super().generate_id({
+            k: v
+            for k,v in data.items()
+            if k not in ('net_id', 'net_state')
+        })
+
+    @classmethod
+    def generate_id(cls, data: dict) -> str:
+        return sha256(packify.pack([
+            data.get('net_id', None),
+            data.get('net_state', None),
+            cls.commitment(data),
+        ])).digest().hex()
 
     @property
     def id_bytes(self) -> bytes:
@@ -54,13 +72,16 @@ class Coin(HashedModel):
 
     @property
     def details(self) -> dict:
-        if self.data['details'] is None:
+        if self.data.get('details', None) is None:
             return {}
         return packify.unpack(self.data['details'])
     @details.setter
     def details(self, val: dict):
         type_assert(type(val) is dict, 'details must be dict')
-        self.data['details'] = packify.pack(val)
+        val = packify.pack(val)
+        value_assert(len(val) <= _max_stamp_size,
+            f'serialized details exceed limit of {_max_stamp_size}')
+        self.data['details'] = val
 
     @property
     def net_id_bytes(self) -> bytes:
@@ -83,16 +104,18 @@ class Coin(HashedModel):
         val = calculate_difficulty(val)
         if val < _mint_difficulty:
             return 0
-        if val * 1000 < _min_coin_mint_size:
+        if (val - _mint_difficulty) * 1000 < _min_coin_mint_size:
             return 0
         return (val - _mint_difficulty) * 1000
 
     @classmethod
     def create(
         cls, lock: bytes|Script, amount: int, net_id: bytes|None = None,
-        nonce_offset: int = 0
+        net_state: bytes|None = None, nonce_offset: int = 0
     ) -> 'Coin':
-        """Creates a new coin that must be funded or mined."""
+        """Creates a new coin that must be funded or mined. Raises
+            `TypeError` or `ValueError` for invalid parameters.
+        """
         ts = int(time())
         return cls({
             'timestamp': ts,
@@ -100,14 +123,22 @@ class Coin(HashedModel):
             'amount': amount,
             'nonce': nonce_offset,
             'net_id': net_id,
+            'net_state': net_state,
         })
 
     @classmethod
     def mine(
         cls, lock: bytes|Script, amount: int = _min_coin_mint_size,
-        net_id: bytes|None = None, nonce_offset: int = 0
+        net_id: bytes|None = None, net_state: bytes|None = None,
+        nonce_offset: int = 0
     ) -> 'Coin':
-        """Mines a coin with the `amount` of value."""
+        """Mines a coin with the `amount` of value. Raises `TypeError`
+            or `ValueError` for invalid parameters.
+        """
+        type_assert(net_id is None or type(net_id) is str,
+            'net_id must be str|None')
+        type_assert(type(net_state) in (str, type(None)),
+            'net_state must be bytes|None')
         value_assert(amount >= _min_coin_mint_size,
             f'amount must be >= {_min_coin_mint_size}')
         coin = cls.create(lock, amount, net_id, nonce_offset)
@@ -120,18 +151,21 @@ class Coin(HashedModel):
     @classmethod
     def stamp(
         cls, lock: bytes, amount: int, n: str|bytes|int,
-        optional: dict[str, str|int|bool|bytes] = {}
+        optional: dict[str, str|int|bool|bytes] = {},
+        net_id: bytes|None = None, net_state: bytes|None = None,
     ):
         """Create a Stamp."""
-        coin = cls.create(lock, amount)
+        coin = cls.create(lock, amount, net_id, net_state)
         details = {'n': n, **optional}
+        if 'd' in details:
+            type_assert(type(details['d']) is dict, 'd value must be dict')
         details['id'] = sha256(packify.pack({
             k: v for k, v in details.items()
-            if k not in ('id', 'msh')
+            if k not in ('id', 'dsh')
         })).digest()
-        details['msh'] = sha256(packify.pack({
+        details['dsh'] = sha256(packify.pack({
             k: v for k, v in details.items()
-            if k in ('m', 'L', '_', '$')
+            if k in ('d', 'L', '_', '$')
         })).digest()
         coin.details = details
         return coin

@@ -85,6 +85,11 @@ class TestCoin(unittest.TestCase):
         with self.assertRaises(TypeError):
             c.details = "Not a dict"
 
+    def test_details_property_raises_ValueError_for_details_over_max_size(self):
+        c = models.Coin()
+        with self.assertRaises(ValueError):
+            c.details = {'1': '0' * 10240}
+
     def test_create_result_id_depends_on_arguments(self):
         c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 9999)
         c2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1111)
