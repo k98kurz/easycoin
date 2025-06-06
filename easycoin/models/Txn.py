@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .Coin import Coin
 from .errors import type_assert, value_assert
 from hashlib import sha256
 from sqloquent import HashedModel, RelatedCollection
@@ -115,7 +116,13 @@ class Txn(HashedModel):
 
     @classmethod
     def unpack(cls, data: bytes, inject: dict = {}) -> 'Txn':
-        return cls(packify.unpack(data, inject))
+        unpacked = packify.unpack(data, inject)
+        txn = cls(unpacked)
+        if 'inputs' in unpacked:
+            txn.inputs = [Coin.unpack(c) for c in unpacked['inputs']]
+        if 'outputs' in unpacked:
+            txn.outputs = [Coin.unpack(c) for c in unpacked['outputs']]
+        return txn
 
     @staticmethod
     def minimum_fee(txn: Txn) -> int:
