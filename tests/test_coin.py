@@ -17,15 +17,11 @@ ANYONE_CAN_SPEND_LOCK = Script.from_src('true')
 class TestCoin(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        models.Coin.connection_info = DB_FILEPATH
-        models.Txn.connection_info = DB_FILEPATH
-        models.Input.connection_info = DB_FILEPATH
-        models.Output.connection_info = DB_FILEPATH
-        models.Wallet.connection_info = DB_FILEPATH
-        sqloquent.DeletedModel.connection_info = DB_FILEPATH
+        models.set_connection_info(DB_FILEPATH)
         if isfile(DB_FILEPATH):
             os.remove(DB_FILEPATH)
-        cls.automigrate()
+        models.publish_migrations(MIGRATIONS_PATH)
+        models.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
         super().setUpClass()
 
     @classmethod
@@ -38,27 +34,14 @@ class TestCoin(unittest.TestCase):
         super().tearDownClass()
 
     def setUp(self):
-        models.Coin.query().delete()
-        models.Txn.query().delete()
-        models.Input.query().delete()
-        models.Output.query().delete()
-        models.Wallet.query().delete()
-        sqloquent.DeletedModel.query().delete()
+        for m in [
+            models.Coin, models.Txn, models.Wallet, models.Input, models.Output,
+            models.TrustNet, models.Attestation, models.Confirmation,
+            models.Snapshot, models.Chunk,
+            sqloquent.DeletedModel,
+        ]:
+            m.query().delete()
         super().setUp()
-
-    @classmethod
-    def automigrate(self):
-        sqloquent.tools.publish_migrations(MIGRATIONS_PATH)
-        tomigrate = [ 
-            models.Coin, models.Txn, models.Wallet,
-            models.Input, models.Output,
-        ]
-        for model in tomigrate:
-            name = model.__name__
-            m = sqloquent.tools.make_migration_from_model(model, name)
-            with open(f'{MIGRATIONS_PATH}/create_{name}.py', 'w') as f:
-                f.write(m)
-        sqloquent.tools.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
 
     def test_lock_property_serializes_properly(self):
         c = models.Coin()

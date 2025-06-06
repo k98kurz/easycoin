@@ -16,44 +16,14 @@ PASSWORD = 'testp4ssword'
 ANYONE_CAN_SPEND_LOCK = Script.from_src('true')
 
 
-def automigrate():
-    sqloquent.tools.publish_migrations(MIGRATIONS_PATH)
-    tomigrate = [ 
-        models.Coin, models.Txn, models.Wallet,
-        models.Input, models.Output, models.TrustNet,
-    ]
-    for model in tomigrate:
-        name = model.__name__
-        m = sqloquent.tools.make_migration_from_model(model, name)
-        with open(f'{MIGRATIONS_PATH}/create_{name}.py', 'w') as f:
-            f.write(m)
-    sqloquent.tools.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
-
-def setup_class():
-    models.Coin.connection_info = DB_FILEPATH
-    models.Txn.connection_info = DB_FILEPATH
-    models.Input.connection_info = DB_FILEPATH
-    models.Output.connection_info = DB_FILEPATH
-    models.TrustNet.connection_info = DB_FILEPATH
-    models.Wallet.connection_info = DB_FILEPATH
-    sqloquent.DeletedModel.connection_info = DB_FILEPATH
-    if isfile(DB_FILEPATH):
-        os.remove(DB_FILEPATH)
-    automigrate()
-
-def setup():
-    models.Coin.query().delete()
-    models.Txn.query().delete()
-    models.Input.query().delete()
-    models.Output.query().delete()
-    models.TrustNet.query().delete()
-    models.Wallet.query().delete()
-
-
 class TestUTXOClasses(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        setup_class()
+        models.set_connection_info(DB_FILEPATH)
+        if isfile(DB_FILEPATH):
+            os.remove(DB_FILEPATH)
+        models.publish_migrations(MIGRATIONS_PATH)
+        models.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
         super().setUpClass()
 
     @classmethod
@@ -66,7 +36,13 @@ class TestUTXOClasses(unittest.TestCase):
         super().tearDownClass()
 
     def setUp(self):
-        setup()
+        for m in [
+            models.Coin, models.Txn, models.Wallet, models.Input, models.Output,
+            models.TrustNet, models.Attestation, models.Confirmation,
+            models.Snapshot, models.Chunk,
+            sqloquent.DeletedModel,
+        ]:
+            m.query().delete()
         super().setUp()
 
     def test_Input_e2e(self):
