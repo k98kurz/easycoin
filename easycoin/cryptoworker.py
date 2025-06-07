@@ -37,6 +37,7 @@ class JobMessage:
     """Object for communicating jobs and results via queues."""
     job_type: JobType = field()
     job_data: bytes = field(default=b'')
+    debug: str|bool = field(default=False)
     result: bool|list[Coin|Exception]|Exception|None = field(default=None)
     queue: deque = field(default=None)
 
@@ -51,7 +52,7 @@ class JobMessage:
 
 
 # communication with the worker
-def submit_txn_job(txn: Txn, output_q: deque|None = None):
+def submit_txn_job(txn: Txn, output_q: deque|None = None, debug: str|bool = False):
     """Queues a job to validate the given `Txn`. If `output_q` is
         provided, the result will be appended to that queue. `Txn`
         validation jobs will be completed in batches of up to 16 at a
@@ -59,7 +60,7 @@ def submit_txn_job(txn: Txn, output_q: deque|None = None):
         result queue. (Without `output_q`, use `get_txn_job_result()` to
         retrieve ready results from completed txn validation jobs.)
     """
-    jm = JobMessage(JobType.VALIDATE_TXN, txn.pack())
+    jm = JobMessage(JobType.VALIDATE_TXN, txn.pack(), debug)
     if output_q:
         jm.queue = output_q
     _validate_txn_jobs.append(jm)
@@ -77,6 +78,7 @@ def get_txn_job_result() -> JobMessage|None:
 
 def submit_mine_job(
     lock: bytes|Script, total_amount: int, number_of_coins: int,
+    net_id: int|None = None, net_state: bytes|None = None,
     output_q: deque|None = None
 ):
     """Queues a mining job to mine `total_amount` of EC⁻¹ across
@@ -86,7 +88,9 @@ def submit_mine_job(
         `lock`.
     """
     lock = lock.bytes if type(lock) is Script else lock
-    jm = JobMessage(JobType.MINE_COINS, packify.pack([lock, total_amount, number_of_coins]))
+    jm = JobMessage(JobType.MINE_COINS, packify.pack([
+        lock, total_amount, number_of_coins, net_id, net_state
+    ]))
     if output_q:
         jm.queue = output_q
     _mine_coins_jobs.append(jm)
@@ -114,7 +118,7 @@ async def work():
 
 def _validate(jm: JobMessage) -> tuple[JobMessage, bool]:
     try:
-        return (jm, Txn.unpack(jm.job_data).validate())
+        return (jm, Txn.unpack(jm.job_data).validate(debug=jm.debug, reload=False))
     except Exception as e:
         return (jm, e)
 
@@ -181,13 +185,14 @@ async def work_mine_job() -> tuple[JobMessage, list[Coin]]|None:
         if len(_mine_coins_jobs):
             # get and parse a job message
             jm: JobMessage = _mine_coins_jobs.popleft()
-            lock, total_amount, number_of_coins = packify.unpack(jm.job_data)
+            data = packify.unpack(jm.job_data)
+            lock, total_amount, number_of_coins, net_id, net_state = data
 
             # calculate job values
             amt_per_coin = total_amount // number_of_coins
             amt_per_coin += 1 if total_amount % number_of_coins else 0
             jobs = [
-                (lock, amt_per_coin, None, i*1_000_000)
+                (lock, amt_per_coin, net_id, net_state, i*1_000_000)
                 for i in range(number_of_coins)
             ]
 

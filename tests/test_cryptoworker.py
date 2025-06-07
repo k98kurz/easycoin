@@ -17,15 +17,11 @@ ANYONE_CAN_SPEND_LOCK = Script.from_src('true')
 class TestCryptoWorker(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        models.Coin.connection_info = DB_FILEPATH
-        models.Txn.connection_info = DB_FILEPATH
-        models.Input.connection_info = DB_FILEPATH
-        models.Output.connection_info = DB_FILEPATH
-        models.Wallet.connection_info = DB_FILEPATH
-        sqloquent.DeletedModel.connection_info = DB_FILEPATH
+        models.set_connection_info(DB_FILEPATH)
         if isfile(DB_FILEPATH):
             os.remove(DB_FILEPATH)
-        cls.automigrate()
+        models.publish_migrations(MIGRATIONS_PATH)
+        models.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
         super().setUpClass()
 
     @classmethod
@@ -38,98 +34,109 @@ class TestCryptoWorker(unittest.TestCase):
         super().tearDownClass()
 
     def setUp(self):
-        models.Coin.query().delete()
-        models.Txn.query().delete()
-        models.Input.query().delete()
-        models.Output.query().delete()
-        models.Wallet.query().delete()
-        sqloquent.DeletedModel.query().delete()
+        for m in [
+            models.Coin, models.Txn, models.Wallet, models.Input, models.Output,
+            models.TrustNet, models.Attestation, models.Confirmation,
+            models.Snapshot, models.Chunk,
+            sqloquent.DeletedModel,
+        ]:
+            m.query().delete()
         super().setUp()
-
-    @classmethod
-    def automigrate(self):
-        sqloquent.tools.publish_migrations(MIGRATIONS_PATH)
-        tomigrate = [ 
-            models.Coin, models.Txn, models.Wallet,
-            models.Input, models.Output,
-        ]
-        for model in tomigrate:
-            name = model.__name__
-            m = sqloquent.tools.make_migration_from_model(model, name)
-            with open(f'{MIGRATIONS_PATH}/create_{name}.py', 'w') as f:
-                f.write(m)
-        sqloquent.tools.automigrate(MIGRATIONS_PATH, DB_FILEPATH)
 
     def test_txn_validation_jobs_e2e(self):
         result = run(cryptoworker.work_txn_validation_jobs())
         assert result is None
 
-        c0_1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 99999).save()
-        c0_2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 11111).save()
-        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1111).save()
-        c2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 2222).save()
-        c3 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 3333).save()
+        # do not save anything because this must all work with ephemeral data
+        c0_1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 99999)
+        c0_1.id = c0_1.generate_id(c0_1.data)
+        c0_2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 11111)
+        c0_2.id = c0_2.generate_id(c0_2.data)
+        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1111)
+        c1.id = c1.generate_id(c1.data)
+        c2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 2222)
+        c2.id = c2.generate_id(c2.data)
+        c3 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 3333)
+        c3.id = c3.generate_id(c3.data)
         txn1 = models.Txn({
             'input_ids': c0_1.id,
             'output_ids': ','.join([c1.id, c2.id])
         })
         txn1.id = txn1.generate_id(txn1.data)
+        txn1.inputs = [c0_1]
+        txn1.outputs = [c1, c2]
         txn2 = models.Txn({
             'input_ids': c0_2.id,
             'output_ids': c3.id
         })
         txn2.id = txn2.generate_id(txn2.data)
+        txn2.inputs = [c0_2]
+        txn2.outputs = [c3]
         txn3 = models.Txn({
             'input_ids': '',
             'output_ids': ','.join([c1.id, c2.id])
         })
         txn3.id = txn3.generate_id(txn3.data)
+        txn3.inputs = []
+        txn3.outputs = [c1, c2]
 
-        cryptoworker.submit_txn_job(txn1)
-        cryptoworker.submit_txn_job(txn2)
-        cryptoworker.submit_txn_job(txn3)
+        cryptoworker.submit_txn_job(txn1, debug='txn1 (1)')
+        cryptoworker.submit_txn_job(txn2, debug='txn2 (1)')
+        cryptoworker.submit_txn_job(txn3, debug='txn3 (1)')
 
         result = run(cryptoworker.work_txn_validation_jobs())
         assert type(result) is list
         assert len(result) == 3
         for jm in result:
-            tid = models.Txn.unpack(jm.job_data).id
-            if tid == txn1.id:
-                assert jm.result is True
-            elif tid == txn2.id:
-                assert jm.result is True
-            elif tid == txn3.id:
-                assert jm.result is False
+            txn = models.Txn.unpack(jm.job_data)
+            if txn.id == txn1.id:
+                assert jm.result is True, (txn.inputs, txn.outputs, jm)
+            elif txn.id == txn2.id:
+                assert jm.result is True, (txn.inputs, txn.outputs, jm)
+            elif txn.id == txn3.id:
+                assert jm.result is False, (txn.inputs, txn.outputs, jm)
 
     async def validate_with_task_and_queues(self):
         result = cryptoworker.get_txn_job_result()
         assert result is None
         task = create_task(cryptoworker.work())
 
-        c0_1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 99999).save()
-        c0_2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 11111).save()
-        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1111).save()
-        c2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 2222).save()
-        c3 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 3333).save()
+        # do not save anything because this must all work with ephemeral data
+        c0_1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 99999)
+        c0_1.id = c0_1.generate_id(c0_1.data)
+        c0_2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 11111)
+        c0_2.id = c0_2.generate_id(c0_2.data)
+        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1111)
+        c1.id = c1.generate_id(c1.data)
+        c2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 2222)
+        c2.id = c2.generate_id(c2.data)
+        c3 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 3333)
+        c3.id = c3.generate_id(c3.data)
         txn1 = models.Txn({
             'input_ids': c0_1.id,
             'output_ids': ','.join([c1.id, c2.id])
         })
         txn1.id = txn1.generate_id(txn1.data)
+        txn1.inputs = [c0_1]
+        txn1.outputs = [c1, c2]
         txn2 = models.Txn({
             'input_ids': c0_2.id,
             'output_ids': c3.id
         })
         txn2.id = txn2.generate_id(txn2.data)
+        txn2.inputs = [c0_2]
+        txn2.outputs = [c3]
         txn3 = models.Txn({
             'input_ids': '',
             'output_ids': ','.join([c1.id, c2.id])
         })
         txn3.id = txn3.generate_id(txn3.data)
+        txn3.inputs = []
+        txn3.outputs = [c1, c2]
 
-        cryptoworker.submit_txn_job(txn1)
-        cryptoworker.submit_txn_job(txn2)
-        cryptoworker.submit_txn_job(txn3)
+        cryptoworker.submit_txn_job(txn1, debug='txn1 (2)')
+        cryptoworker.submit_txn_job(txn2, debug='txn2 (2)')
+        cryptoworker.submit_txn_job(txn3, debug='txn3 (2)')
 
         # wait for worker to finish
         await sleep(0.5)
@@ -184,13 +191,14 @@ class TestCryptoWorker(unittest.TestCase):
         cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, total_coins)
 
         # wait for the jobs to complete
-        await sleep(1.5)
+        await sleep(3)
 
         coins = cryptoworker.get_mined_coins()
         assert coins is not None
         assert type(coins) is list
         assert len(coins) == total_coins, (len(coins), total_coins)
         for c in coins:
+            assert type(c) is models.Coin, (type(c), c)
             assert c.mint_value() >= c.amount, (c.mint_value(), c.amount)
         total_actual = sum([c.amount for c in coins])
         assert total_actual >= total_target
