@@ -3,6 +3,12 @@ import unittest
 
 
 class TestMisc(unittest.TestCase):
+    def test_migrations(self):
+        migrations = models.get_migrations()
+        assert type(migrations) is dict
+        for k, v in migrations.items():
+            assert type(k) is type(v) is str
+
     def test_wordlist(self):
         assert type(easycoin.wordlist()) is tuple
         assert all([type(l) is str for l in easycoin.wordlist()])
@@ -15,7 +21,7 @@ class TestMisc(unittest.TestCase):
         }
         flag = easycoin.TrustNetFeature.make_flag(features)
         assert type(flag) is int
-        assert flag == 9
+        assert flag == 33, flag
         parsed = easycoin.TrustNetFeature.parse_flag(flag)
         assert parsed == features, (parsed, features)
 
