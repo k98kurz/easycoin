@@ -9,7 +9,9 @@ of Bitcoin and the earlier "Making a Mint" paper published by the NSA, using the
 the emphasis on the "fun" part of "functional demonstration".)
 
 ❌ Bitcoin uses proof-of-work consensus.
+
 ❌ Ethereum uses proof-of-stake consensus.
+
 ✅ EasyCoin uses proof-of-concept consensus: the 1st valid spend seen is the
 right one -- no actual consensus, just endless forks. Like I said, it is just
 proof-of-concept until I implement something else.
@@ -43,7 +45,7 @@ lock, an amount, a Unix epoch timestamp, and a nonce. The difficulty target will
 be (coin amount + txn fee overhead) divided by 1000 + a minimum difficulty
 parameter (currently 128). This fresh coin is then broadcast to the network;
 each receiving node validates 1) that the timestamp is not more than a small
-threshold in the past; 2) the PoW meets the threshold; and 3) that the coin has
+threshold in the past, 2) the PoW meets the threshold, and 3) that the coin has
 not already been spent; and the hash of the coin (its ID) is added to the set of
 UTXOs. Once the trust net features are added, nodes will create and broadcast an
 attestation/countersignature claiming that the txn is valid, and the trust net
@@ -82,13 +84,22 @@ funded output:
 coin.details = {
     'id': b'32 bytes sha256 of all other details except msh', # equivalent to "so_det" in runtime
     'n': "Stamp note/name/nonce", # str|int|bytes
-    'msh': b'32 bytes sha256 of metadata and scripts (automatically derived)',
+    'dsh': b'32 bytes sha256 of data and scripts (automatically derived)',
     # all the rest are optional
-    'm': {'metadata': 'dictionary'}, # dict[str, str|int|bool|bytes]
+    'd': {'data': 'dictionary'}, # dict[str, str|int|bool|bytes]
     'L': tapescript.Script.from_src("<tapescript lock for new Stamps">).bytes,
     '_': tapescript.Script.from_src("<tapescript coin lock prefix">).bytes,
     '$': tapescript.Script.from_src("<tapescript coin lock postfix">).bytes,
 }
+```
+
+This can be done with the `Coin.stamp` method:
+
+```python
+details = {
+    'd': {'type': 'token', 'name': '$HIT coin'}
+}
+stamp = Coin.stamp(lock, amount, n, details, net_id, net_state)
 ```
 
 #### Stamped details carry covenants.
