@@ -10,17 +10,17 @@ class TrustNet(HashedModel):
     table: str = 'trust_nets'
     id_column: str = 'id'
     columns: tuple[str] = (
-        'id', 'name', 'lock', 'params', 'delegate_script', 'root', 'members', 'quorum',
+        'id', 'name', 'lock', 'params', 'delegate_scripts', 'root', 'members', 'quorum',
         'root_witness', 'active'
     )
     columns_excluded_from_hash = (
-        'delegate_script', 'root', 'members', 'quorum', 'root_witness', 'active'
+        'delegate_scripts', 'root', 'members', 'quorum', 'root_witness', 'active'
     )
     id: str
     name: str
     lock: bytes
     params: bytes
-    delegate_script: bytes|None
+    delegate_scripts: bytes|None
     root: bytes|None
     members: bytes|None
     quorum: int|None
@@ -36,10 +36,36 @@ class TrustNet(HashedModel):
         if not self.data.get('params', None):
             return {}
         return packify.unpack(self.data['params'])
+    @params.setter
+    def params(self, val: dict):
+        type_assert(type(val) is dict, 'params must be a dict')
+        self.data['params'] = packify.pack(val)
+
+    @property
+    def delegate_scripts(self) -> dict:
+        if not self.data.get('delegate_scripts', None):
+            return {}
+        return packify.unpack(self.data['delegate_scripts'])
+    @delegate_scripts.setter
+    def delegate_scripts(self, val: dict[str, bytes]):
+        type_assert(type(val) is dict, 'delegate_scripts must be dict[str, bytes]')
+        for k, v in val.items():
+            type_assert(type(k) is str, 'delegate_scripts must be dict[str, bytes]')
+            type_assert(type(v) is bytes, 'delegate_scripts must be dict[str, bytes]')
+        self.data['delegate_scripts'] = packify.pack(val)
 
     @property
     def features(self) -> set[TrustNetFeature]:
         return TrustNetFeature.parse_flag(self.params.get('features', 0))
+    @features.setter
+    def features(self, val: int|set[TrustNetFeature]):
+        type_assert(type(val) in (int, set), 'features must be int|set[TrustNetFeature]')
+        if type(val) is int:
+            self.data['features'] = val
+            return
+        type_assert(all([type(v) is TrustNetFeature for v in val]),
+            'features must be int|set[TrustNetFeature]')
+        self.data['features'] = TrustNetFeature.make_flag(val)
 
     @property
     def members(self) -> list[bytes]:

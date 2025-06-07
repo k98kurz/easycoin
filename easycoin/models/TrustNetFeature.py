@@ -6,11 +6,14 @@ class TrustNetFeature(IntEnum):
     SNAPSHOT_OUTPUTS = 1
     SNAPSHOT_INPUTS = 2
     SNAPSHOT_TXNS = 4
-    LOCK_SNAPSHOT = 8
-    LOCK_ATTEST = 16
-    LOCK_CONFIRM = 32
-    LOCK_MEMBERS = 64
-    RESERVED128 = 128
+    SNAPSHOT_PROOFS = 8
+    SNAPSHOT_MUTATIONS = 16
+    LOCK_SNAPSHOT = 32
+    LOCK_ATTEST = 64
+    LOCK_CONFIRM = 128
+    LOCK_MEMBERS = 256
+    RESERVED9 = 512
+    RESERVED10 = 1024
 
     @classmethod
     def make_flag(cls, features: set[TrustNetFeature]) -> int:
