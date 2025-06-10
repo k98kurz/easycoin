@@ -17,7 +17,7 @@ SKEY = os.urandom(32)
 SINGLE_SIG_LOCK = make_single_sig_lock(SigningKey(SKEY).verify_key)
 
 
-class TestChunksAndSnapshots(unittest.TestCase):
+class TestTrustNetsChunksAndSnapshots(unittest.TestCase):
     trustnet: models.TrustNet
 
     @classmethod
@@ -59,6 +59,24 @@ class TestChunksAndSnapshots(unittest.TestCase):
         self.osize = len(models.Output.from_coin(c).pack_compact())
         c.delete()
         super().setUp()
+
+    def test_Snapshot_e2e(self):
+        trustnet1 = models.TrustNet({
+            'name': 'Test', 'lock': ANYONE_CAN_SPEND_LOCK.bytes,
+        }).save()
+        assert trustnet1.features == set()
+        assert len(trustnet1.params.keys()) == 0
+        trustnet2 = models.TrustNet({
+            'name': 'Test', 'lock': ANYONE_CAN_SPEND_LOCK.bytes,
+        })
+        trustnet2.features = {
+            models.TrustNetFeature.SNAPSHOT_OUTPUTS,
+            models.TrustNetFeature.LOCK_SNAPSHOT,
+            models.TrustNetFeature.LOCK_MEMBERS,
+        }
+        trustnet2.save()
+        assert 'features' in trustnet2.params
+        assert trustnet1.id != trustnet2.id
 
     def test_Chunk_create_e2e(self):
         leaves = lambda l, s: [

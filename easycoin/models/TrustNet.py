@@ -32,6 +32,10 @@ class TrustNet(HashedModel):
     inputs: RelatedCollection
 
     @property
+    def id_bytes(self) -> bytes:
+        return bytes.fromhex(self.id)
+
+    @property
     def params(self) -> dict:
         if not self.data.get('params', None):
             return {}
@@ -61,11 +65,11 @@ class TrustNet(HashedModel):
     def features(self, val: int|set[TrustNetFeature]):
         type_assert(type(val) in (int, set), 'features must be int|set[TrustNetFeature]')
         if type(val) is int:
-            self.data['features'] = val
+            self.params = {**self.params, 'features': val}
             return
         type_assert(all([type(v) is TrustNetFeature for v in val]),
             'features must be int|set[TrustNetFeature]')
-        self.data['features'] = TrustNetFeature.make_flag(val)
+        self.params = {**self.params, 'features': TrustNetFeature.make_flag(val)}
 
     @property
     def members(self) -> list[bytes]:

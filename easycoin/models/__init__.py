@@ -8,7 +8,7 @@ from .TrustNetFeature import TrustNetFeature
 from .Attestation import Attestation
 from .Confirmation import Confirmation
 from .Snapshot import Snapshot
-from .Chunk import Chunk
+from .Chunk import Chunk, ChunkKind
 from sqloquent import contains, within, belongs_to, has_many, has_one, DeletedModel
 from typing import Callable
 import sqloquent.tools
