@@ -178,16 +178,18 @@ class TestTxn(unittest.TestCase):
         t.outputs = [c2]
         t.witness = {c1.id_bytes: b''}
         # case 1: txn size too large, but each individual coin is acceptable size
-        assert t.validate(debug='line 198', reload=False)
+        t.set_timestamp()
+        assert t.validate(debug='line 182', reload=False)
         outputs = [c2]
         for i in range(1, 32):
             c = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 100, str(i) + big_n).save()
             outputs.append(c)
         t.outputs = outputs
-        assert not t.validate(debug='line 204', reload=False)
+        t.set_timestamp()
+        assert not t.validate(debug='line 189', reload=False)
         # case 2: txn size is okay, but the output coin is too large
         t.outputs = [c2]
-        assert t.validate(debug='line 207', reload=False)
+        assert t.validate(debug='line 192', reload=False)
         c2.data['details'] = packify.pack({'n': big_n * 12})
         assert not t.validate(debug='line 209', reload=False)
 
@@ -212,7 +214,8 @@ class TestTxn(unittest.TestCase):
         c1 = models.Coin.mine(SINGLE_SIG_LOCK)
         c1.save()
         t = models.Txn({'output_ids': c1.id, 'input_ids': ''})
-        assert t.validate(debug='line 232')
+        t.set_timestamp()
+        assert t.validate(debug='line 218')
         t.save()
         # now spend it
         c2 = models.Coin.create(SINGLE_SIG_LOCK, c1.amount - 500)
@@ -221,6 +224,7 @@ class TestTxn(unittest.TestCase):
         t.witness = {
             c1.id_bytes: make_single_sig_witness(SKEY, t.runtime_cache(c1)).bytes
         }
+        t.set_timestamp()
         assert t.validate()
 
     def test_basic_stamp_creation_and_spend_validate(self):
@@ -232,12 +236,14 @@ class TestTxn(unittest.TestCase):
         t = models.Txn()
         t.input_ids = [coin.id]
         t.output_ids = [s1.id]
+        t.set_timestamp()
         assert t.validate()
         s2 = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, s1.amount - 1000, s1.details['n'])
         s2.save()
         t = models.Txn()
         t.input_ids = [s1.id]
         t.output_ids = [s2.id]
+        t.set_timestamp()
         #print(f'{s1.details=} hash={sha256(packify.pack(s1.details)).digest().hex()}')
         #print(f'{s2.details=} hash={sha256(packify.pack(s2.details)).digest().hex()}')
         assert t.validate()
@@ -273,6 +279,7 @@ class TestTxn(unittest.TestCase):
             c1.id_bytes: b'',
             s1.id_bytes: make_single_sig_witness(SKEY, t1.runtime_cache(s1)).bytes,
         }
+        t1.set_timestamp()
         assert t1.validate(), 'stamping of new series from unstamped coin should work'
 
         # creating new stamp n-units during transaction should fail
@@ -284,6 +291,7 @@ class TestTxn(unittest.TestCase):
         t2.witness = {
             s1.id_bytes: b'',
         }
+        t2.set_timestamp()
         assert not t2.validate(), 'creating new stamp n-units during txn should fail'
 
         # mixing stamps of different series in a transaction should fail
@@ -292,6 +300,7 @@ class TestTxn(unittest.TestCase):
         )
         sX.save()
         tX = models.Txn({'input_ids': s1.id + ',' + sX.id, 'output_ids': s2.id})
+        tX.set_timestamp()
         assert tX.minimum_fee(tX) + sX.amount < s1.amount, \
             'test fails to reflect correct fee calculation'
         assert not tX.validate(), 'mixing stamps with different msh should not validate'
@@ -306,6 +315,7 @@ class TestTxn(unittest.TestCase):
         t2.witness = {
             s1.id_bytes: b'',
         }
+        t2.set_timestamp()
         while t2.minimum_fee(t2) + s2.amount > s1.amount:
             print('Warning: fee estimation changed; recalculating s2.amount')
             s2.delete()

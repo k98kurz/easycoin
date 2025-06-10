@@ -65,6 +65,7 @@ class TestCryptoWorker(unittest.TestCase):
         txn1.id = txn1.generate_id(txn1.data)
         txn1.inputs = [c0_1]
         txn1.outputs = [c1, c2]
+        txn1.set_timestamp()
         txn2 = models.Txn({
             'input_ids': c0_2.id,
             'output_ids': c3.id
@@ -72,6 +73,7 @@ class TestCryptoWorker(unittest.TestCase):
         txn2.id = txn2.generate_id(txn2.data)
         txn2.inputs = [c0_2]
         txn2.outputs = [c3]
+        txn2.set_timestamp()
         txn3 = models.Txn({
             'input_ids': '',
             'output_ids': ','.join([c1.id, c2.id])
@@ -79,6 +81,7 @@ class TestCryptoWorker(unittest.TestCase):
         txn3.id = txn3.generate_id(txn3.data)
         txn3.inputs = []
         txn3.outputs = [c1, c2]
+        txn3.set_timestamp()
 
         cryptoworker.submit_txn_job(txn1, debug='txn1 (1)')
         cryptoworker.submit_txn_job(txn2, debug='txn2 (1)')
@@ -119,6 +122,7 @@ class TestCryptoWorker(unittest.TestCase):
         txn1.id = txn1.generate_id(txn1.data)
         txn1.inputs = [c0_1]
         txn1.outputs = [c1, c2]
+        txn1.set_timestamp()
         txn2 = models.Txn({
             'input_ids': c0_2.id,
             'output_ids': c3.id
@@ -126,6 +130,7 @@ class TestCryptoWorker(unittest.TestCase):
         txn2.id = txn2.generate_id(txn2.data)
         txn2.inputs = [c0_2]
         txn2.outputs = [c3]
+        txn2.set_timestamp()
         txn3 = models.Txn({
             'input_ids': '',
             'output_ids': ','.join([c1.id, c2.id])
@@ -133,6 +138,7 @@ class TestCryptoWorker(unittest.TestCase):
         txn3.id = txn3.generate_id(txn3.data)
         txn3.inputs = []
         txn3.outputs = [c1, c2]
+        txn3.set_timestamp()
 
         cryptoworker.submit_txn_job(txn1, debug='txn1 (2)')
         cryptoworker.submit_txn_job(txn2, debug='txn2 (2)')

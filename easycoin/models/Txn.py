@@ -4,8 +4,8 @@ from .errors import type_assert, value_assert
 from hashlib import sha256
 from sqloquent import HashedModel, RelatedCollection
 from tapescript import run_auth_scripts, Script
+from time import time
 import packify
-
 
 
 _witfee_mult = 1
@@ -20,6 +20,7 @@ _outscriptfee_mult = 1
 _outscriptfee_exp = 1
 _max_txn_size = 32*1024
 
+
 _empty = packify.pack({})
 
 
@@ -27,9 +28,13 @@ class Txn(HashedModel):
     connection_info: str = ''
     table: str = 'txns'
     id_column: str = 'id'
-    columns: tuple[str] = ('id', 'input_ids', 'output_ids', 'details', 'witness', 'wallet_id')
+    columns: tuple[str] = (
+        'id', 'timestamp', 'input_ids', 'output_ids', 'details', 'witness',
+        'wallet_id',
+    )
     columns_excluded_from_hash = ('wallet_id',)
     id: str
+    timestamp: int
     input_ids: str
     output_ids: str
     details: bytes|None
@@ -107,6 +112,14 @@ class Txn(HashedModel):
             'witness keys must each be 32-byte hash')
         self.data['witness'] = packify.pack(val)
 
+    def set_timestamp(self):
+        self.timestamp = max([0, *[c.timestamp for c in self.outputs]]) or int(time())
+
+    def save(self) -> Txn:
+        if 'timestamp' not in self.data:
+            self.set_timestamp()
+        return super().save()
+
     def pack(self) -> bytes:
         return packify.pack({
             **self.data,
@@ -145,11 +158,13 @@ class Txn(HashedModel):
         """Runs the transaction validation logic. Returns False if a
             mint Txn has a coin amount that is greater than the mint
             value; or if the total amount in outputs is greater than the
-            total amount in inputs; or if an input lock is not fulfilled
-            by a witness script; or if a new stamp is not authorized by
-            an 'L' script; or if a transferred stamp does not validate
-            against its covenants; or if the serialized txn size is
-            greater than 32 KiB. Returns True if all checks pass.
+            total amount in inputs; or if the timestamp of an input is
+            greater than the timestamp of any output; or if an input lock
+            is not fulfilled by a witness script; or if a new stamp is
+            not authorized by an 'L' script; or if a transferred stamp
+            does not validate against its covenants; or if the serialized
+            txn size is greater than 32 KiB. Returns True if all checks
+            pass.
         """
         if reload:
             self.inputs().reload()
@@ -186,6 +201,20 @@ class Txn(HashedModel):
             total_in += coin.amount
         if total_out > total_in:
             print(f'total_out > total_in ({debug})') if debug else ''
+            return False
+
+        # reject invalid causal ordering
+        in_timestamps = [c.timestamp for c in self.inputs]
+        out_timestamps = [c.timestamp for c in self.outputs]
+        for in_ts in in_timestamps:
+            if any([in_ts > out_ts for out_ts in out_timestamps]):
+                print(f'input timestamp > output timestamp ({debug})') if debug else ''
+                return False
+        if not self.timestamp:
+            print(f'txn missing timestamp ({debug})') if debug else ''
+            return False
+        if any([out_ts > self.timestamp for out_ts in out_timestamps]):
+            print(f'output timestamp > txn timestamp ({debug})') if debug else ''
             return False
 
         # validate tapescript auth
