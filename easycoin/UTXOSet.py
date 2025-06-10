@@ -1,16 +1,7 @@
-from .models import Coin, Input, Output
+from __future__ import annotations
+from .models import Coin, Input, Output, Txn
 from dataclasses import dataclass, field
 from typing import Protocol
-
-
-class TxnProtocol(Protocol):
-    @property
-    def input_ids(self) -> list[str|bytes]:
-        ...
-
-    @property
-    def output_ids(self) -> list[str|bytes]:
-        ...
 
 
 @dataclass
@@ -20,7 +11,7 @@ class UTXOSet:
     add_inputs: set = field(default_factory=set)
     sub_inputs: set = field(default_factory=set)
 
-    def copy(self) -> 'UTXOSet':
+    def copy(self) -> UTXOSet:
         """Build a copy of the current UTXOSet with no changes."""
         return UTXOSet(
             self.add_outputs.copy(),
@@ -29,7 +20,7 @@ class UTXOSet:
             self.sub_inputs.copy(),
         )
 
-    def before(self, txn: TxnProtocol) -> 'UTXOSet':
+    def before(self, txn: Txn) -> UTXOSet:
         """Build a copy of the current UTXOSet that has ephemerally
             reversed the given transaction.
         """
@@ -41,7 +32,7 @@ class UTXOSet:
             u.sub_outputs.add(oid)
         return u
 
-    def after(self, txn: TxnProtocol) -> 'UTXOSet':
+    def after(self, txn: Txn) -> UTXOSet:
         """Build a copy of the current UTXOSet that has ephemerally
             applied the given transaction.
         """
@@ -54,7 +45,7 @@ class UTXOSet:
             u.sub_inputs.add(oid)
         return u
 
-    def can_apply(self, txn: TxnProtocol, debug: bool = False) -> bool:
+    def can_apply(self, txn: Txn, debug: bool = False) -> bool:
         """Determine if a txn can be applied to the current UTXOSet.
             This returns False if a `txn.input_ids[i]` is not an unspent
             output or if a `txn.output_ids[i]` is already an input
@@ -99,7 +90,7 @@ class UTXOSet:
 
         return True
 
-    def can_reverse(self, txn: TxnProtocol, debug: bool = False) -> bool:
+    def can_reverse(self, txn: Txn, debug: bool = False) -> bool:
         """Determine if a txn can be reversed in the current UTXOSet.
             This returns False if a `txn.output_ids[i]` is not an unspent
             output or if a `txn.input_ids[i]` is not an input (spent);
@@ -129,7 +120,7 @@ class UTXOSet:
 
         return True
 
-    def apply(self, txn: TxnProtocol, coins: dict[str, Coin] = {}):
+    def apply(self, txn: Txn, coins: dict[str, Coin] = {}):
         """Attempt to apply the transaction, persisting the changes to
             the database. Raises `ValueError` if it cannot be applied or
             if there is ephemeral data in the `UTXOSet` instance.
@@ -163,7 +154,7 @@ class UTXOSet:
                     outputs.append({'id': i})
             Output.insert_many(outputs)
 
-    def reverse(self, txn: TxnProtocol, coins: dict[str, Coin] = {}):
+    def reverse(self, txn: Txn, coins: dict[str, Coin] = {}):
         """Attempt to reverse (or un-apply) the transaction, persisting
             the changes to the database. Raises `ValueError` if it
             cannot be reversed or if there is ephemeral data in the
