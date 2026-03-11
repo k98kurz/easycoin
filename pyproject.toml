@@ -12,10 +12,10 @@ dependencies = [
   "merkleasy >= 0.1.2",
   "musig >= 0.0.1",
   "packify >= 0.3.1",
-  "sqloquent >= 0.7.0",
+  "sqloquent >= 0.7.3",
   "tapescript >= 0.7.2",
-  "tapehash >= 0.1.0",
-  "crossconfig >= 0.0.1",
+  "tapehash >= 0.1.1",
+  "crossconfig >= 0.0.3",
 ]
 description = "Proof-of-concept + proof-of-work - consensus = easycoin."
 readme = "readme.md"
@@ -35,11 +35,11 @@ classifiers = [
 
 [project.optional-dependencies]
 node = [
-  "netaio >= 0.0.7",
+  "netaio >= 0.0.9",
 ]
 cui = [
-  "textual >= 3.2.0",
-  "netaio >= 0.0.7",
+  "textual >= 8.1.1",
+  "netaio >= 0.0.9",
 ]
 
 [project.scripts]
