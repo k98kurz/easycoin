@@ -1,0 +1,1 @@
+"""BaseScreen: all screens inherit from this, providing common functionality: state manager subscription, wallet info/mining status/network status change handlers, escape binding for back navigation."""

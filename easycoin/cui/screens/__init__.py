@@ -1,0 +1,1 @@
+"""EasyCoin CUI screens package."""

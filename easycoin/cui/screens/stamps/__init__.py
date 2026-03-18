@@ -1,0 +1,1 @@
+"""Stamps screens package."""
