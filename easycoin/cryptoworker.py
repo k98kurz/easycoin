@@ -16,6 +16,11 @@ _mine_coins_results: deque[JobMessage] = deque([], 100)
 _mining_pool = ProcessPoolExecutor(max_workers=4)
 _txn_validation_pool = ProcessPoolExecutor(max_workers=4)
 
+def set_mining_pool_size(max_workers: int):
+    _mining_pool._max_workers = int(max_workers)
+    #global _mining_pool
+    #_mining_pool = ProcessPoolExecutor(max_workers=int(max_workers))
+
 
 class JobType(Enum):
     """Enum specifying the job type: VALIDATE_TXN or MINE_COINS."""
@@ -77,10 +82,10 @@ def get_txn_job_result() -> JobMessage|None:
         pass
 
 def submit_mine_job(
-    lock: bytes|Script, total_amount: int, number_of_coins: int,
-    net_id: int|None = None, net_state: bytes|None = None,
-    output_q: deque|None = None
-):
+        lock: bytes|Script, total_amount: int, number_of_coins: int,
+        net_id: int|None = None, net_state: bytes|None = None,
+        output_q: deque|None = None
+    ):
     """Queues a mining job to mine `total_amount` of EC⁻¹ across
         `number_of_coins` Coins. If `output_q` is specified, the result
         of the mining job (with `JobMessage.result: list[Coin]`) will be

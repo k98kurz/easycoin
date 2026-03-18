@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .errors import type_assert, value_assert
 from hashlib import sha256
 from sqloquent import HashedModel, Default, RelatedCollection, RelatedModel
@@ -110,9 +111,9 @@ class Coin(HashedModel):
 
     @classmethod
     def create(
-        cls, lock: bytes|Script, amount: int, net_id: bytes|None = None,
-        net_state: bytes|None = None, nonce_offset: int = 0
-    ) -> 'Coin':
+            cls, lock: bytes|Script, amount: int, net_id: bytes|None = None,
+            net_state: bytes|None = None, nonce_offset: int = 0
+        ) -> Coin:
         """Creates a new coin that must be funded or mined. Raises
             `TypeError` or `ValueError` for invalid parameters.
         """
@@ -128,10 +129,10 @@ class Coin(HashedModel):
 
     @classmethod
     def mine(
-        cls, lock: bytes|Script, amount: int = _min_coin_mint_size,
-        net_id: bytes|None = None, net_state: bytes|None = None,
-        nonce_offset: int = 0
-    ) -> 'Coin':
+            cls, lock: bytes|Script, amount: int = _min_coin_mint_size,
+            net_id: bytes|None = None, net_state: bytes|None = None,
+            nonce_offset: int = 0
+        ) -> Coin:
         """Mines a coin with the `amount` of value. Raises `TypeError`
             or `ValueError` for invalid parameters.
         """
@@ -150,10 +151,10 @@ class Coin(HashedModel):
 
     @classmethod
     def stamp(
-        cls, lock: bytes, amount: int, n: str|bytes|int,
-        optional: dict[str, str|int|bool|bytes] = {},
-        net_id: bytes|None = None, net_state: bytes|None = None,
-    ):
+            cls, lock: bytes, amount: int, n: str|bytes|int,
+            optional: dict[str, str|int|bool|bytes] = {},
+            net_id: bytes|None = None, net_state: bytes|None = None,
+        ) -> Coin:
         """Create a Stamp."""
         coin = cls.create(lock, amount, net_id, net_state)
         details = {'n': n, **optional}

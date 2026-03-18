@@ -84,3 +84,7 @@ def run():
 
     print("Select a mode (use --help or -h for help text).")
 
+
+if __name__ == "__main__":
+    run()
+

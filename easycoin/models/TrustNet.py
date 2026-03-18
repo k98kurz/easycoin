@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .errors import type_assert, value_assert
 from .TrustNetFeature import TrustNetFeature
 from merkleasy import Tree
@@ -10,8 +11,8 @@ class TrustNet(HashedModel):
     table: str = 'trust_nets'
     id_column: str = 'id'
     columns: tuple[str] = (
-        'id', 'name', 'lock', 'params', 'delegate_scripts', 'root', 'members', 'quorum',
-        'root_witness', 'active'
+        'id', 'name', 'lock', 'params', 'delegate_scripts', 'root', 'members',
+        'quorum', 'root_witness', 'active'
     )
     columns_excluded_from_hash = (
         'delegate_scripts', 'root', 'members', 'quorum', 'root_witness', 'active'
@@ -52,10 +53,13 @@ class TrustNet(HashedModel):
         return packify.unpack(self.data['delegate_scripts'])
     @delegate_scripts.setter
     def delegate_scripts(self, val: dict[str, bytes]):
-        type_assert(type(val) is dict, 'delegate_scripts must be dict[str, bytes]')
+        type_assert(type(val) is dict,
+            'delegate_scripts must be dict[str, bytes]')
         for k, v in val.items():
-            type_assert(type(k) is str, 'delegate_scripts must be dict[str, bytes]')
-            type_assert(type(v) is bytes, 'delegate_scripts must be dict[str, bytes]')
+            type_assert(type(k) is str,
+                'delegate_scripts must be dict[str, bytes]')
+            type_assert(type(v) is bytes,
+                'delegate_scripts must be dict[str, bytes]')
         self.data['delegate_scripts'] = packify.pack(val)
 
     @property
@@ -63,7 +67,8 @@ class TrustNet(HashedModel):
         return TrustNetFeature.parse_flag(self.params.get('features', 0))
     @features.setter
     def features(self, val: int|set[TrustNetFeature]):
-        type_assert(type(val) in (int, set), 'features must be int|set[TrustNetFeature]')
+        type_assert(type(val) in (int, set),
+            'features must be int|set[TrustNetFeature]')
         if type(val) is int:
             self.params = {**self.params, 'features': val}
             return
@@ -91,4 +96,17 @@ class TrustNet(HashedModel):
     def root(self) -> bytes|None:
         return self.data.get('root', None)
 
+    def pack(self) -> bytes:
+        """Serialize public info to bytes for transmission across the network."""
+        data = {
+            k: v
+            for k, v in self.data.items()
+            if k in self.columns and k not in self.columns_excluded_from_hash
+        }
+        return packify.pack(data)
+
+    @classmethod
+    def unpack(cls, data: bytes) -> TrustNet:
+        """Deserialize info from bytes."""
+        return cls(packify.unpack(data))
 

@@ -128,7 +128,7 @@ class Txn(HashedModel):
         })
 
     @classmethod
-    def unpack(cls, data: bytes, inject: dict = {}) -> 'Txn':
+    def unpack(cls, data: bytes, inject: dict = {}) -> Txn:
         unpacked = packify.unpack(data, inject)
         txn = cls(unpacked)
         if 'inputs' in unpacked:
@@ -266,7 +266,7 @@ class Txn(HashedModel):
 
         return True
 
-    def runtime_cache(self, coin: 'Coin'):
+    def runtime_cache(self, coin: Coin):
         """Construct the tapescript runtime cache for evaluating the
             lock of a given coin within the transaction.
         """

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from hashlib import sha256
 from sqloquent import SqlModel, RelatedModel, RelatedCollection
 import packify
@@ -67,7 +68,9 @@ class Input(SqlModel):
         ))
 
     @classmethod
-    def unpack(cls, data: bytes, net_id: str|None = None, inject: dict = {}) -> 'Output':
+    def unpack(
+            cls, data: bytes, net_id: str|None = None, inject: dict = {}
+        ) -> Input:
         """Deserialize from bytes. Raises ValueError or TypeError for
             invalid arguments or unpackable bytes. If the serialization
             format was compact, the provided `net_id` (or None) will be

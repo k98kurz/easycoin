@@ -186,6 +186,54 @@ class Wallet(HashedModel):
             'cannot parse an invalid address')
         return bytes.fromhex(address)[:-4]
 
+    @staticmethod
+    def get_lock_type(lock: Script|bytes) -> str:
+        """Get lock type string from lock bytes."""
+        # ensure it is compiled and decompiled
+        if isinstance(lock, Script):
+            lock = lock.bytes
+        lock = Script.from_bytes(lock)
+
+        tokens = lock.src.split()
+
+        if  (   len(tokens) == 5
+                and tokens[:2] == ['OP_PUSH1', 'd32']
+                and tokens[3] == 'OP_CHECK_SIG'
+            ):
+            return "P2PK" # public key
+        elif (  len(tokens) == 9
+                and tokens[:2] == ['OP_DUP', 'OP_SHAKE256']
+                and tokens[-3:-1] == ['OP_EQUAL_VERIFY', 'OP_CHECK_SIG']
+            ):
+            return "P2PKH" # public key hash
+        elif (  len(tokens) == 5
+                and tokens[:2] == ['OP_PUSH1', 'd32']
+                and tokens[-2] == 'OP_TAPROOT'
+            ):
+            return "P2TR" # taproot
+        elif (  len(tokens) == 8
+                and tokens[:2] == ['OP_DUP', 'OP_SHAKE256']
+                and tokens[-2:] == ['OP_EQUAL_VERIFY', 'OP_EVAL']
+            ):
+            return "P2SH" # script hash
+        elif (  len(tokens) == 25
+                and tokens[:2] == ['OP_PUSH1', 'd32']
+                and tokens[3:23] == [
+                    'OP_WRITE_CACHE', 'x6b', 'd1', 'OP_IF', '{', 'OP_DUP', 'OP_SWAP',
+                    'd1', 'd2', 'OP_READ_CACHE', 'x6b', 'OP_CHECK_SIG_STACK',
+                    'OP_VERIFY', 'OP_EVAL', '}', 'ELSE', '{', 'OP_READ_CACHE', 'x6b',
+                    'OP_CHECK_SIG'
+                ]
+            ):
+            return "P2GR" # graftroot
+        elif (  len(tokens) >= 8
+                and 'OP_PUSH1' in tokens
+                and 'OP_CHECK_MULTISIG' in tokens
+            ):
+            return "MultiSig"
+        else:
+            return "Unknown"
+
     @property
     def seed(self) -> bytes:
         """The root seed of the wallet. Accessing raises ValueError if
@@ -226,8 +274,8 @@ class Wallet(HashedModel):
         return vkey
 
     def get_p2pk_lock(
-        self, nonce: int, child_nonce: int|None = None, sigflags = 'fa'
-    ) -> Script:
+            self, nonce: int, child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
         """Generate the pay-to-pubkey lock for the given nonce and
             child_nonce. Raises ValueError if the wallet is locked and
             the necessary pubkey has not yet been generated. Default
@@ -239,9 +287,9 @@ class Wallet(HashedModel):
         )
 
     def get_p2pk_witness(
-        self, nonce: int, txn: 'Txn', coin: 'Coin',
-        child_nonce: int|None = None, sigflags = 'fa'
-    ) -> Script:
+            self, nonce: int, txn: 'Txn', coin: 'Coin',
+            child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
         """Generates a valid pay-to-pubkey witness for the given nonce
             and child_nonce. Raises ValueError if the wallet is locked.
             Default sigflags commit to just sigfield1 (input hash) and
@@ -254,8 +302,8 @@ class Wallet(HashedModel):
         )
 
     def get_p2pkh_lock(
-        self, nonce: int, child_nonce: int|None = None, sigflags = 'fa'
-    ) -> Script:
+            self, nonce: int, child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
         """Generate the pay-to-pubkey-hash lock for the given nonce and
             child_nonce. Raises ValueError if the wallet is locked and
             the necessary pubkey has not yet been generated. Default
@@ -267,9 +315,9 @@ class Wallet(HashedModel):
         )
 
     def get_p2pkh_witness(
-        self, nonce: int, txn: 'Txn', coin: 'Coin',
-        child_nonce: int|None = None, sigflags = 'fa'
-    ) -> Script:
+            self, nonce: int, txn: 'Txn', coin: 'Coin',
+            child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
         """Generates a valid pay-to-pubkey-hash witness for the given
             nonce and child_nonce. Raises ValueError if the wallet is
             locked. Default sigflags commit to just sigfield1 (input
@@ -282,9 +330,9 @@ class Wallet(HashedModel):
         )
 
     def get_p2tr_lock(
-        self, nonce: int, script: Script|None = None,
-        child_nonce: int|None = None, sigflags = 'fa'
-    ) -> Script:
+            self, nonce: int, script: Script|None = None,
+            child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
         """Generate the pay-to-taproot lock for the given nonce and
             child_nonce. If script is not supplied, an unspendable
             locking script is generated, which will allow only the
@@ -300,9 +348,9 @@ class Wallet(HashedModel):
         )
 
     def get_p2tr_witness_keyspend(
-        self, nonce: int, txn: 'Txn', coin: 'Coin', script: Script|None = None,
-        child_nonce: int|None = None, sigflags = 'fa'
-    ) -> Script:
+            self, nonce: int, txn: 'Txn', coin: 'Coin', script: Script|None = None,
+            child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
         """Generate the pay-to-taproot keyspend witness for the given
             nonce and child_nonce. If script is not supplied, an
             unspendable locking script is generated and used instead.
@@ -320,9 +368,9 @@ class Wallet(HashedModel):
         )
 
     def get_p2tr_witness_scriptspend(
-        self, nonce: int, script: Script,
-        child_nonce: int|None = None
-    ) -> Script:
+            self, nonce: int, script: Script,
+            child_nonce: int|None = None
+        ) -> Script:
         """Generate the pay-to-taproot keyspend witness for the given
             nonce and child_nonce. Raises ValueError if the wallet is
             locked. Default sigflags commit to just sigfield1 (input

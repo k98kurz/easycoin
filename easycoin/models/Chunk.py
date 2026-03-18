@@ -80,9 +80,9 @@ class Chunk(HashedModel):
 
     @classmethod
     def create(
-        cls, net_id: str, idx: int, kind: ChunkKind, leaves: list[bytes],
-        parents: list[str] = []
-    ) -> Chunk:
+            cls, net_id: str, idx: int, kind: ChunkKind, leaves: list[bytes],
+            parents: list[str] = []
+        ) -> Chunk:
         """Create a Chunk from the required columns/fields. Raises
             `TypeError` for invalid arguments.
         """

@@ -60,6 +60,13 @@ class TestTrustNetsChunksAndSnapshots(unittest.TestCase):
         c.delete()
         super().setUp()
 
+    def test_TrustNet_serialization(self):
+        packed = self.trustnet.pack()
+        assert type(packed) is bytes
+        unpacked = models.TrustNet.unpack(packed)
+        assert type(unpacked) is models.TrustNet
+        assert unpacked.id == self.trustnet.id
+
     def test_Snapshot_e2e(self):
         trustnet1 = models.TrustNet({
             'name': 'Test', 'lock': ANYONE_CAN_SPEND_LOCK.bytes,

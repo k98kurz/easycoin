@@ -34,9 +34,9 @@ class Snapshot(HashedModel):
 
     @classmethod
     def create(
-        cls, net_id: str, chunks: list[str] = [], params: bytes = b'',
-        timestamp: int = 0
-    ) -> Snapshot:
+            cls, net_id: str, chunks: list[str] = [], params: bytes = b'',
+            timestamp: int = 0
+        ) -> Snapshot:
         """"""
         type_assert(type(net_id) is str, 'net_id must be str')
         type_assert(type(chunks) is list, 'chunks must be list[str]')

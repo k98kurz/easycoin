@@ -4,7 +4,9 @@ from hashlib import sha256
 from nacl.signing import VerifyKey, SigningKey
 from sqlite3 import OperationalError
 from tapehash import calculate_difficulty, tapehash3
-from tapescript import Script, run_auth_scripts
+from tapescript import (
+    Script, run_auth_scripts, make_graftroot_lock, make_multisig_lock
+)
 import os
 import sqloquent
 import unittest
@@ -86,6 +88,33 @@ class TestWallet(unittest.TestCase):
         assert lock == ANYONE_CAN_SPEND_LOCK.bytes
         assert not models.Wallet.validate_address(address + 'st')
         assert not models.Wallet.validate_address(address + 'ab')
+
+    def test_lock_type_methods_e2e(self):
+        wallet = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        wallet.unlock(PASSWORD)
+        p2pk_lock = wallet.get_p2pk_lock(1)
+        p2pkh_lock = wallet.get_p2pkh_lock(1)
+        p2tr_lock = wallet.get_p2tr_lock(1, script=p2pk_lock)
+        p2gr_lock = make_graftroot_lock(wallet.get_pubkey(1), sigflags='fa')
+        multisig_lock = make_multisig_lock(
+            [wallet.get_pubkey(1), wallet.get_pubkey(2), wallet.get_pubkey(3)],
+            2, sigflags='fa'
+        )
+        assert models.Wallet.get_lock_type(p2pk_lock) == 'P2PK', (
+            models.Wallet.get_lock_type(p2pk_lock),
+            Script.from_bytes(p2pk_lock.bytes).src.split())
+        assert models.Wallet.get_lock_type(p2pkh_lock) == 'P2PKH', (
+            models.Wallet.get_lock_type(p2pkh_lock),
+            Script.from_bytes(p2pkh_lock.bytes).src.split())
+        assert models.Wallet.get_lock_type(p2tr_lock) == 'P2TR', (
+            models.Wallet.get_lock_type(p2tr_lock),
+            Script.from_bytes(p2tr_lock.bytes).src.split())
+        assert models.Wallet.get_lock_type(p2gr_lock) == 'P2GR', (
+            models.Wallet.get_lock_type(p2gr_lock),
+            Script.from_bytes(p2gr_lock.bytes).src.split())
+        assert models.Wallet.get_lock_type(multisig_lock) == 'MultiSig', (
+            models.Wallet.get_lock_type(multisig_lock),
+            Script.from_bytes(multisig_lock.bytes).src.split())
 
     def test_get_seed_from_unlocked_Wallet_returns_new_seed(self):
         w = models.Wallet.create(SEED_PHRASE, PASSWORD)
