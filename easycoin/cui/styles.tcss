@@ -1,0 +1,242 @@
+/* Main Layout */
+#main_layout {
+    layout: horizontal;
+}
+
+#main_content {
+    width: 1fr;
+}
+
+#right_sidebar {
+    width: 400px;
+}
+
+#right_sidebar.hidden {
+    width: 0;
+    display: none;
+}
+
+/* Panels */
+.panel-title {
+    text-style: bold;
+    text-align: center;
+    background: $primary;
+    padding: 1;
+    color: $text;
+}
+
+.panel-content {
+    padding: 1;
+    border: solid $primary;
+}
+
+.card {
+    border: solid $primary;
+    padding: 1;
+    margin: 1 0;
+}
+
+.card-title {
+    text-style: bold;
+    background: $panel-lighten-1;
+    padding: 0 1;
+}
+
+/* Balance Display */
+.balance {
+    text-align: center;
+    text-style: bold;
+    text-size: 200%;
+    color: $success;
+}
+
+.balance-label {
+    text-align: center;
+    color: $text-muted;
+    text-style: italic;
+}
+
+/* Status Indicators */
+.status-ok {
+    color: $success;
+}
+
+.status-warning {
+    color: $warning;
+}
+
+.status-error {
+    color: $error;
+}
+
+.status-idle {
+    color: $text-muted;
+}
+
+/* DataTable */
+DataTable {
+    height: 1fr;
+}
+
+DataTable > DataTableHeader {
+    background: $primary;
+    text-style: bold;
+}
+
+DataTable > DataTableCursor {
+    background: $primary;
+}
+
+DataTable > DataTableFooter {
+    text-style: italic;
+    color: $text-muted;
+}
+
+/* Column-specific styles */
+DataTable .highlight-column-name {
+    text-style: bold;
+}
+
+/* Buttons */
+Button {
+    margin: 1;
+    min-width: 16;
+}
+
+Button.primary {
+    background: $primary;
+}
+
+Button.success {
+    background: $success;
+}
+
+Button.warning {
+    background: $warning;
+}
+
+Button.error {
+    background: $error;
+}
+
+Button:disabled {
+    opacity: 0.5;
+    text-style: dim;
+}
+
+/* Modals */
+.modal-title {
+    text-style: bold;
+    text-align: center;
+    background: $primary;
+    padding: 1;
+}
+
+#modal_actions {
+    height: 3;
+    margin-top: 1;
+    dock: bottom;
+}
+
+#modal_actions Button {
+    width: 1fr;
+}
+
+/* Modal Container */
+.modal-container {
+    width: 80;
+    height: 1fr;
+    border: solid $primary;
+}
+
+/* Forms */
+.form-row {
+    height: 3;
+    margin: 1 0;
+}
+
+.form-label {
+    width: 20;
+    text-style: bold;
+}
+
+.form-input {
+    width: 1fr;
+}
+
+/* Config Sections */
+.config-section {
+    border: solid $primary;
+    padding: 1;
+    margin: 1 0;
+}
+
+.config-label {
+    text-style: bold;
+    color: $primary;
+}
+
+/* Validation */
+.input-valid {
+    border-style: solid;
+    border-color: $success;
+}
+
+.input-invalid {
+    border-style: solid;
+    border-color: $error;
+}
+
+/* Utility Classes */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-bold {
+    text-style: bold;
+}
+
+.text-italic {
+    text-style: italic;
+}
+
+.text-muted {
+    color: $text-muted;
+}
+
+.truncate {
+    overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Header */
+.app-header {
+    height: 3;
+    background: $primary;
+    dock: top;
+    padding: 0 1;
+}
+
+.app-title {
+    text-style: bold;
+    text-size: 150%;
+}
+
+.app-subtitle {
+    text-style: italic;
+    color: $text-muted;
+}
+
+/* Footer */
+.app-footer {
+    height: 2;
+    background: $panel-lighten-2;
+    dock: bottom;
+    padding: 0 1;
+    text-style: italic;
+    color: $text-muted;
+}
