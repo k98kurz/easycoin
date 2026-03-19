@@ -95,3 +95,41 @@ def some_other_function(x: int, y: int, z: int) -> list[float]:
     """
     ...
 ```
+
+### Imports
+
+- Imports must always be at the top of the file, never in function/method bodies
+- Group all `from package import whatever` before all `import package` statements
+- Then group imports: stdlib first, then external dependencies, then easycoin internal modules
+- Order imports alphabetically within each group
+- No blank lines between import statements
+- Imports come after file-level docstrings
+
+Example:
+```python
+"""
+This is a file-level docstring example. Below, the inline comments are
+to explain the import pattern to agents; agents should not replicate
+the inline comments in actual code.
+"""
+
+from hashlib import sha256 # stdlib
+from sys import argv # stdlib
+from sqloquent import SqlModel # external package
+from sqloquent.tools import automigrate # external package
+from easycoin.models import Coin # internal module
+import json # stdlib
+import os # stdlib
+import packify # external package
+```
+
+### Testing Style
+
+- Use `assert` with descriptive error messages instead of `self.assertEqual` etc.
+- For database tests: use `setUpClass`/`tearDownClass` for migrations, `setUp` to clean all model data
+- Define module-level constants: `DB_FILEPATH`, `MIGRATIONS_PATH`, test data (`SEED_PHRASE`, `PASSWORD`, etc.)
+- Prefer real objects over mocking; only mock external dependencies
+- Use `# setup`, `# p2pk`, etc. inline comments for complex test logic
+- Include "e2e" suffix in test names for end-to-end workflow tests
+- Import from `context.py` first for shared test setup
+```
