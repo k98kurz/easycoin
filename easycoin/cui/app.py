@@ -36,6 +36,7 @@ class EasyCoinApp(App):
     def __init__(self):
         """Initialize the application."""
         super().__init__()
+        self.logger = logging.getLogger("easycoin")
         self.config = ConfigManager("easycoin")
         self.state = StateManager(self)
         self._sidebar_visible = True
