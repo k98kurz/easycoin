@@ -1,6 +1,5 @@
 from crossconfig import get_config
 from enum import Enum
-from typing import Optional
 
 
 class MiningMode(Enum):
@@ -59,7 +58,9 @@ class ConfigManager:
     def set_coin_size(self, size: int) -> None:
         valid_sizes = [100_000, 500_000, 1_000_000]
         if size not in valid_sizes:
-            raise ValueError(f"Invalid coin size: {size}. Must be one of {valid_sizes}")
+            raise ValueError(
+                f"Invalid coin size: {size}. Must be one of {valid_sizes}"
+            )
         self.config.set("coin_size", size)
 
     def get_auto_topup_goal(self) -> int:
@@ -94,11 +95,12 @@ class ConfigManager:
     def set_network_port(self, port: int) -> None:
         if not isinstance(port, int) or port < 1 or port > 65535:
             raise ValueError(
-                f"Invalid network port: {port}. Must be an integer between 1 and 65535"
+                f"Invalid network port: {port}. Must be an integer between 1 "
+                "and 65535"
             )
         self.config.set("network_port", port)
 
-    def get_current_wallet_id(self) -> Optional[str]:
+    def get_current_wallet_id(self) -> str | None:
         value = self.config.get("current_wallet_id")
         if isinstance(value, str):
             return value
@@ -107,7 +109,7 @@ class ConfigManager:
     def set_current_wallet_id(self, wallet_id: str) -> None:
         self.config.set("current_wallet_id", wallet_id)
 
-    def get_active_trustnet_id(self) -> Optional[str]:
+    def get_active_trustnet_id(self) -> str | None:
         value = self.config.get("active_trustnet_id")
         if isinstance(value, str):
             return value
