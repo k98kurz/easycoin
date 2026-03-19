@@ -1,5 +1,6 @@
-from crossconfig import get_config
 from enum import Enum
+from crossconfig import get_config
+from easycoin.cryptoworker import set_mining_pool_size
 
 
 class MiningMode(Enum):
@@ -45,8 +46,6 @@ class ConfigManager:
                 f"Invalid mining processes: {count}. Must be one of {valid_counts}"
             )
         self.config.set("mining_processes", count)
-        from easycoin.cryptoworker import set_mining_pool_size
-
         set_mining_pool_size(count)
 
     def get_coin_size(self) -> int:

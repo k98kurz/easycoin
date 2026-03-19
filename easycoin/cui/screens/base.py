@@ -1,5 +1,4 @@
 from textual.screen import Screen
-
 from easycoin.cui.widgets.event_log import EventLog, LogLevel
 from easycoin.models.Coin import Coin
 

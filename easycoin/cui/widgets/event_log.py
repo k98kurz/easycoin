@@ -1,9 +1,9 @@
-from textual.widgets import RichLog
-from rich.text import Text
-from enum import Enum
 from datetime import datetime
-import logging
+from enum import Enum
 from pathlib import Path
+from rich.text import Text
+from textual.widgets import RichLog
+import logging
 
 
 class LogLevel(Enum):

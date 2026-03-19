@@ -1,10 +1,9 @@
 """RightSidebar: toggleable sidebar container for event log and controls."""
 
+from datetime import datetime
+from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Input, OptionList, Static
-from textual.app import ComposeResult
-from datetime import datetime
-
 from .event_log import EventLog, LogLevel
 
 
