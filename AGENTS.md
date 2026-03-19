@@ -24,6 +24,15 @@ as they are very long.
 - Soft max of 80 for normal lines
 - Hard max of 85 for code and 72 for docstrings
 
+### Annotations
+
+- This project uses Python 3.10+ style annotations.
+- Do NOT use `Union`: use `type1 | type2`
+- Do NOT use `Optional`: use `sometype | None`
+- Use built-in generic types: `list[type]`, `dict[key, value]`, `set[type]`,
+`tuple[type, ...]` instead of `List[type]`, `Dict[key, value]`, etc. (no import
+needed)
+
 ### Multi-line function/method signatures
 
 - If a function/method signature is long enough to be more than 80 chars, break it
