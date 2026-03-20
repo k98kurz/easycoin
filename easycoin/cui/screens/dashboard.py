@@ -26,14 +26,12 @@ class DashboardScreen(BaseScreen):
                 yield Button(
                     "Send Transaction",
                     id="btn_send",
-                    variant="primary",
-                    disabled=self.app.wallet_locked
+                    variant="primary"
                 )
                 yield Button(
                     "Mine Coins",
                     id="btn_mine",
-                    variant="success",
-                    disabled=self.app.wallet_locked
+                    variant="success"
                 )
                 yield Button("View Wallets", id="btn_wallets", variant="default")
                 yield Button("Network Settings", id="btn_network", variant="default")
@@ -66,17 +64,6 @@ class DashboardScreen(BaseScreen):
     def on_mount(self) -> None:
         """Update top tabs to highlight Dashboard and set button states."""
         super().on_mount()
-        self._update_button_states()
-        self.app.register_lock_change_callback(self._on_wallet_lock_changed)
-
-    def on_unmount(self) -> None:
-        """Unregister lock change callback when screen is unmounted."""
-        self.app.unregister_lock_change_callback(self._on_wallet_lock_changed)
-        super().on_unmount()
-
-    def _on_wallet_lock_changed(self, locked: bool) -> None:
-        """Handle wallet lock state changes."""
-        self._update_button_states()
 
     def on_wallet_info_changed(self, wallet_info: dict) -> None:
         """Handle wallet info updates.
@@ -111,11 +98,9 @@ class DashboardScreen(BaseScreen):
         app = self.app
 
         if event.button.id == "btn_send":
-            if app.ensure_wallet_unlocked():
-                app.switch_screen("transactions")
+            app.switch_screen("transactions")
         elif event.button.id == "btn_mine":
-            if app.ensure_wallet_unlocked():
-                app.switch_screen("coins")
+            app.switch_screen("coins")
         elif event.button.id == "btn_wallets":
             app.switch_screen("wallet")
         elif event.button.id == "btn_network":
@@ -139,17 +124,6 @@ class DashboardScreen(BaseScreen):
         if self.app.state.mining_active:
             return f"Active ({self.app.state.mining_progress}%)"
         return "Idle"
-
-    def _update_button_states(self) -> None:
-        """Update button enabled/disabled state based on wallet lock."""
-        locked = self.app.wallet_locked
-
-        for button_id in ["btn_send", "btn_mine"]:
-            try:
-                button = self.query_one(f"#{button_id}")
-                button.disabled = locked
-            except NoMatches:
-                self.log_event(f"Button {button_id} not found in _update_button_states", "DEBUG")
 
     def refresh_data(self) -> None:
         """Refresh screen data."""

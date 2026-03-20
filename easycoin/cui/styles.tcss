@@ -136,20 +136,42 @@ Button:disabled {
 }
 
 #modal_actions {
-    height: 3;
+    height: 4;
     margin-top: 1;
-    dock: bottom;
 }
 
-#modal_actions Button {
-    width: 1fr;
+/* Center modals */
+Screen {
+    align: center middle;
 }
 
 /* Modal Container */
 .modal-container {
-    width: 80;
-    height: 1fr;
+    height: auto;
+    width: 50%;
     border: solid $primary;
+    padding: 1;
+    background: $panel-darken-1;
+}
+
+/* Create Wallet Modal */
+CreateWalletModal {
+    background: $background 50%;
+}
+
+/* Unlock Wallet Modal */
+UnlockWalletModal {
+    background: $background 50%;
+}
+
+/* Confirmation Modal */
+ConfirmationModal {
+    background: $background 50%;
+}
+
+/* Wallet Detail Modal */
+WalletDetailModal {
+    background: $background 50%;
 }
 
 /* Forms */

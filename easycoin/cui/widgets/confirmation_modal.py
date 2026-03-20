@@ -28,6 +28,7 @@ class ConfirmationModal(Screen):
             with Horizontal(id="modal_actions"):
                 yield Button("Confirm", id="btn_confirm", variant="success")
                 yield Button("Cancel", id="btn_cancel", variant="default")
+            yield Static("")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button clicks."""

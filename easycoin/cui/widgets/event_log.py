@@ -1,9 +1,7 @@
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from rich.text import Text
 from textual.widgets import RichLog
-import logging
 
 
 class LogLevel(Enum):
@@ -20,54 +18,69 @@ class EventLog(RichLog):
     _filter_level: LogLevel
     _search_query: str
     _all_entries: list[tuple[LogLevel, str, datetime]]
+    _app_log_count: int
 
-    def __init__(
-            self, log_file: str | None = None, max_lines: int = 1000, **kwargs
-        ):
-        """Initialize EventLog with optional file logging."""
+    def __init__(self, max_lines: int = 1000, **kwargs):
+        """Initialize EventLog."""
         super().__init__(max_lines=max_lines, auto_scroll=True, **kwargs)
         self._filter_level = LogLevel.INFO
         self._search_query = ""
         self._all_entries = []
+        self._app_log_count = 0
 
-        if log_file:
-            self.log_file = Path(log_file)
-            self._setup_file_logging()
+    def on_mount(self) -> None:
+        """Subscribe to app state."""
+        if hasattr(self.app, 'state'):
+            self.app.state.subscribe(self)
+        self._load_all_entries()
 
-    def _setup_file_logging(self):
-        """Setup file-based logging for ERROR and CRITICAL."""
-        self.logger = logging.getLogger("easycoin")
-        self.logger.setLevel(logging.DEBUG)
+    def on_unmount(self) -> None:
+        """Unsubscribe from app state."""
+        if hasattr(self.app, 'state'):
+            self.app.state.unsubscribe(self)
 
-        if self.logger.handlers:
-            self.logger.handlers.clear()
+    def _load_all_entries(self) -> None:
+        """Load all log entries from app state on mount."""
+        if (
+            hasattr(self.app, 'state')
+            and hasattr(self.app.state._state, 'log_entries')
+        ):
+            for entry in self.app.state._state.log_entries:
+                try:
+                    level = LogLevel[entry.level]
+                    self._display_entry(entry.message, level, entry.timestamp)
+                    self._all_entries.append((level, entry.message, entry.timestamp))
+                    self._app_log_count += 1
+                except KeyError:
+                    pass
 
-        file_handler = logging.FileHandler(self.log_file)
-        file_handler.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
+    def on_log_entry_added(self, entry) -> None:
+        """Handle new log entry added to app state."""
+        try:
+            level = LogLevel[entry.level]
+            self._display_entry(entry.message, level, entry.timestamp)
+            self._all_entries.append((level, entry.message, entry.timestamp))
+            self._app_log_count += 1
+        except KeyError:
+            pass
+
+    def _display_entry(
+            self, message: str, level: LogLevel, timestamp: datetime
+        ) -> None:
+        """Display a single log entry."""
+        if self._should_display(level, message):
+            self._write_colored(message, level, timestamp)
 
     def write_log(
             self, message: str, level: LogLevel = LogLevel.INFO,
             persistent: bool = False
         ):
-        """Write a log entry with severity level."""
+        """Write a log entry with severity level. Deprecated: use app.log_event."""
         timestamp = datetime.now()
         self._all_entries.append((level, message, timestamp))
 
         if self._should_display(level, message):
             self._write_colored(message, level, timestamp)
-
-        if persistent or level.value in ("ERROR", "CRITICAL"):
-            log_levels = {
-                LogLevel.DEBUG: logging.DEBUG,
-                LogLevel.INFO: logging.INFO,
-                LogLevel.WARNING: logging.WARNING,
-                LogLevel.ERROR: logging.ERROR,
-                LogLevel.CRITICAL: logging.CRITICAL
-            }
-            self.logger.log(log_levels[level], message)
 
     def _should_display(self, level: LogLevel, message: str) -> bool:
         """Check if entry should be displayed based on filter and search."""

@@ -35,8 +35,7 @@ class BaseScreen(Screen):
             with Horizontal(id="screen_content"):
                 yield from self._compose_content()
 
-            log_file = self.config.get_log_path()
-            sidebar = RightSidebar(log_file=log_file, id="right_sidebar")
+            sidebar = RightSidebar(id="right_sidebar")
             if not self.app.sidebar_visible:
                 sidebar.add_class("hidden")
             yield sidebar
@@ -143,13 +142,7 @@ class BaseScreen(Screen):
         """Log an event to the app's event log. `level` is one of
             (DEBUG, INFO, WARNING, ERROR, CRITICAL).
         """
-        try:
-            if hasattr(self.app, 'query_one'):
-                log_widget = self.app.query_one("#event_log", EventLog)
-                log_widget.write_log(message, LogLevel[level], persistent=False)
-        except Exception as e:
-            import logging
-            logging.getLogger("easycoin").error(f"Failed to log event: {e}")
+        self.app.log_event(message, level)
 
     def refresh_data(self) -> None:
         """Refresh screen data. Override in subclasses to implement

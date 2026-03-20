@@ -44,10 +44,9 @@ class RightSidebar(Vertical):
     }
     """
 
-    def __init__(self, log_file: str | None = None, **kwargs):
-        """Initialize RightSidebar with optional log file."""
+    def __init__(self, **kwargs):
+        """Initialize RightSidebar."""
         super().__init__(**kwargs)
-        self.log_file = log_file
 
     def compose(self) -> ComposeResult:
         """Compose sidebar widgets."""
@@ -64,16 +63,11 @@ class RightSidebar(Vertical):
 
         yield Input(placeholder="Search logs...", id="log_search")
 
-        yield EventLog(id="event_log", log_file=self.log_file)
+        yield EventLog(id="event_log")
 
         with Horizontal(classes="log-actions"):
             yield Button("Clear", id="clear_btn", variant="default")
             yield Button("Export", id="export_btn", variant="success")
-
-    def on_mount(self) -> None:
-        """Initialize log widget with config."""
-        log_widget = self.query_one("#event_log", EventLog)
-        log_widget.write_log("EasyCoin CUI started", LogLevel.INFO, persistent=True)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle search input changes."""
@@ -104,7 +98,7 @@ class RightSidebar(Vertical):
 
         if event.button.id == "clear_btn":
             log_widget.clear()
-            log_widget.write_log("Log cleared", LogLevel.INFO)
+            self.app.log_event("Log cleared", "INFO")
         elif event.button.id == "export_btn":
             self.export_log()
 

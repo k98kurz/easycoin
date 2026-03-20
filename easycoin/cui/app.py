@@ -4,10 +4,8 @@ from textual.reactive import reactive
 from textual.widgets import Static
 from easycoin.config import ConfigManager
 from easycoin.cui.state import StateManager
-from typing import Callable
 from easycoin.cui.screens.dashboard import DashboardScreen
 from easycoin.cui.screens.wallet.wallet_list import WalletListScreen
-from easycoin.cui.screens.wallet.wallet_screen import WalletScreen
 from easycoin.cui.screens.coins.placeholder import CoinsScreen
 from easycoin.cui.screens.transactions.placeholder import TransactionsScreen
 from easycoin.cui.screens.network.placeholder import NetworkScreen
@@ -40,8 +38,6 @@ class EasyCoinApp(App):
         ("q", "quit", "Quit"),
     ]
 
-    current_wallet_id = reactive(None)
-    wallet_locked = reactive(True)
     network_connected = reactive(False)
     active_trustnet_id = reactive(None)
     active_trustnet_state = reactive(None)
@@ -50,10 +46,25 @@ class EasyCoinApp(App):
     def __init__(self):
         """Initialize the application."""
         super().__init__()
-        self.logger = logging.getLogger("easycoin")
         self.config = ConfigManager("easycoin")
         self.state = StateManager(self)
-        self._lock_change_callbacks = []
+        self.wallet = None
+        self.logger = logging.getLogger("easycoin")
+        self._setup_file_logging()
+
+    def _setup_file_logging(self) -> None:
+        """Setup file-based logging for all log levels."""
+        log_file = self.config.get_log_path()
+        self.logger.setLevel(logging.DEBUG)
+
+        if self.logger.handlers:
+            self.logger.handlers.clear()
+
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
 
     def compose(self) -> ComposeResult:
         """Compose the main application layout."""
@@ -64,21 +75,15 @@ class EasyCoinApp(App):
         try:
             self.config.load()
 
-            self.current_wallet_id = self.config.get_current_wallet_id()
             self.active_trustnet_id = self.config.get_active_trustnet_id()
             self.sidebar_visible = self.config.get_sidebar_visible()
 
             self.notify("EasyCoin CUI started")
+            self.log_event("EasyCoin CUI started", "INFO")
             self.push_screen("dashboard")
         except Exception as e:
             self.logger.error(f"Failed to initialize app: {e}")
             self.notify(f"Initialization error: {e}", severity="error")
-
-    def watch_current_wallet_id(
-            self, old_value: str | None, new_value: str | None
-        ) -> None:
-        """Watch `current_wallet_id` for changes."""
-        pass
 
     def watch_active_trustnet_id(
             self, old_value: str | None, new_value: str | None
@@ -86,49 +91,10 @@ class EasyCoinApp(App):
         """Watch `active_trustnet_id` for changes."""
         pass
 
-    def watch_wallet_locked(self, old_value: bool, new_value: bool) -> None:
-        """Call all registered callbacks when wallet lock state
-            changes.
-        """
-        self.notify(f"Wallet {'unlocked' if not new_value else 'locked'}")
-        for callback in self._lock_change_callbacks:
-            try:
-                callback(new_value)
-            except Exception as e:
-                self.logger.warning(f"Lock change callback failed: {e}")
-
     def watch_sidebar_visible(self, old_value: bool, new_value: bool) -> None:
         """Watch `sidebar_visible` for changes and persist to config."""
         self.config.set_sidebar_visible(new_value)
         self.config.save()
-
-    def register_lock_change_callback(
-            self, callback: Callable[[bool], None]
-        ) -> None:
-        """Register callback to be called when wallet lock state
-            changes.
-        """
-        self._lock_change_callbacks.append(callback)
-
-    def unregister_lock_change_callback(
-            self, callback: Callable[[bool], None]
-        ) -> None:
-        """Unregister a previously registered lock change callback."""
-        try:
-            self._lock_change_callbacks.remove(callback)
-        except ValueError:
-            self.logger.debug("Callback not found in _lock_change_callbacks")
-
-    def ensure_wallet_unlocked(self) -> bool:
-        """Check if wallet is unlocked; show unlock modal if not.
-            Returns:
-                True if wallet is unlocked, False otherwise.
-        """
-        if not self.wallet_locked:
-            return True
-
-        self.notify("Wallet is locked - unlock required", severity="warning")
-        return False
 
     def action_switch_to_dashboard(self) -> None:
         """Switch to dashboard screen."""
@@ -151,13 +117,16 @@ class EasyCoinApp(App):
 #        self.notify("Refreshing screen", severity="information")
 
     def log_event(self, message: str, level: str = "INFO") -> None:
-        """Log an event to the event log. Args:
+        """Append log entry to state. Args:
             message: Log message
             level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         """
-        try:
-            from easycoin.cui.widgets.event_log import EventLog, LogLevel
-            log_widget = self.query_one("#event_log", EventLog)
-            log_widget.write_log(message, LogLevel[level], persistent=False)
-        except Exception as e:
-            self.logger.error(f"Failed to log event: {e}")
+        log_levels = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL
+        }
+        self.logger.log(log_levels[level], message)
+        self.state.add_log_entry(message, level)

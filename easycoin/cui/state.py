@@ -4,10 +4,19 @@ pattern for cross-screen updates.
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Callable
 
 from easycoin.cryptoworker import JobMessage
 from easycoin.models import Coin
+
+
+@dataclass
+class LogEntry:
+    """Single log entry in event log."""
+    message: str
+    level: str
+    timestamp: datetime
 
 
 @dataclass
@@ -23,6 +32,8 @@ class AppState:
     mining_progress: int = 0
     network_height: int = 0
     peer_count: int = 0
+    log_entries: list[LogEntry] = field(default_factory=list)
+    log_entry_count: int = 0
 
 
 class StateManager:
@@ -127,6 +138,18 @@ class StateManager:
         coin_count = sum(1 for c in coins if not isinstance(c, Exception))
         self._state.coins_count += coin_count
         self._notify_listeners("coins_mined", coins)
+
+    def add_log_entry(self, message: str, level: str) -> None:
+        """Add a log entry to state and notify listeners."""
+        from datetime import datetime
+        entry = LogEntry(
+            message=message,
+            level=level,
+            timestamp=datetime.now()
+        )
+        self._state.log_entries.append(entry)
+        self._state.log_entry_count += 1
+        self._notify_listeners("log_entry_added", entry)
 
     def _notify_listeners(self, event: str, *args) -> None:
         """Notify all listeners of state change. Looks for `on_{event}`
