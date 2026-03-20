@@ -1,4 +1,7 @@
 from sys import argv
+from easycoin.config import ConfigManager
+from easycoin import models
+import os
 
 
 def print_help():
@@ -31,6 +34,15 @@ def daemon():
 
 
 def interactive():
+    config = ConfigManager("easycoin")
+    config.load()
+    db_path = config.get_db_path()
+    migrations_path = config.path('migrations')
+    os.makedirs(migrations_path, exist_ok=True)
+    models.set_connection_info(db_path)
+    models.publish_migrations(migrations_path)
+    models.automigrate(migrations_path, db_path)
+
     try:
         from .cui import EasyCoinApp
     except ImportError:

@@ -2,11 +2,12 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
-from easycoin.cui.config import ConfigManager
+from easycoin.config import ConfigManager
 from easycoin.cui.state import StateManager
 from typing import Callable
 from easycoin.cui.screens.dashboard import DashboardScreen
-from easycoin.cui.screens.wallet.placeholder import WalletScreen
+from easycoin.cui.screens.wallet.wallet_list import WalletListScreen
+from easycoin.cui.screens.wallet.wallet_screen import WalletScreen
 from easycoin.cui.screens.coins.placeholder import CoinsScreen
 from easycoin.cui.screens.transactions.placeholder import TransactionsScreen
 from easycoin.cui.screens.network.placeholder import NetworkScreen
@@ -23,7 +24,7 @@ class EasyCoinApp(App):
 
     SCREENS = {
         "dashboard": DashboardScreen,
-        "wallet": WalletScreen,
+        "wallet": WalletListScreen,
         "coins": CoinsScreen,
         "transactions": TransactionsScreen,
         "network": NetworkScreen,
@@ -59,12 +60,17 @@ class EasyCoinApp(App):
 
     def on_mount(self) -> None:
         """Initialize application on mount."""
-        self.config.load()
-        self.current_wallet_id = self.config.get_current_wallet_id()
-        self.active_trustnet_id = self.config.get_active_trustnet_id()
+        try:
+            self.config.load()
 
-        self.notify("EasyCoin CUI started")
-        self.push_screen("dashboard")
+            self.current_wallet_id = self.config.get_current_wallet_id()
+            self.active_trustnet_id = self.config.get_active_trustnet_id()
+
+            self.notify("EasyCoin CUI started")
+            self.push_screen("dashboard")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize app: {e}")
+            self.notify(f"Initialization error: {e}", severity="error")
 
     def watch_current_wallet_id(self, old_value: str | None, new_value: str | None) -> None:
         """Watch current_wallet_id for changes."""
@@ -128,3 +134,17 @@ class EasyCoinApp(App):
     def action_command_palette(self) -> None:
         """Show command palette (placeholder for now)."""
         self.notify("Command palette not yet implemented", severity="information")
+
+    def log_event(self, message: str, level: str = "INFO") -> None:
+        """Log an event to the event log.
+
+        Args:
+            message: Log message
+            level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        """
+        try:
+            from easycoin.cui.widgets.event_log import EventLog, LogLevel
+            log_widget = self.query_one("#event_log", EventLog)
+            log_widget.write_log(message, LogLevel[level], persistent=False)
+        except Exception:
+            pass

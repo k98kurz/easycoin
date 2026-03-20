@@ -6,7 +6,7 @@ from textual.widgets import Footer
 from easycoin.cui.widgets.event_log import EventLog, LogLevel
 from easycoin.models.Coin import Coin
 from easycoin.cui.widgets.right_sidebar import RightSidebar
-from easycoin.cui.config import ConfigManager
+from easycoin.config import ConfigManager
 
 
 class BaseScreen(Screen):

@@ -20,6 +20,9 @@ class ConfigManager:
     def save(self) -> None:
         self.config.save()
 
+    def path(self, file_or_subdir: str | list[str] | None = None) -> str:
+        return self.config.path(file_or_subdir)
+
     def get_db_path(self) -> str:
         return self.config.path("easycoin.db")
 
