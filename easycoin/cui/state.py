@@ -31,8 +31,43 @@ class StateManager:
     def __init__(self, app):
         """Initialize StateManager with app reference."""
         self.app = app
-        self.state = AppState()
+        self._state = AppState()
         self._listeners = []
+
+    @property
+    def wallet_info(self) -> dict:
+        """Current wallet info dict with balance, coins, and stamps."""
+        return self._state.wallet_info
+
+    @property
+    def coins_count(self) -> int:
+        """Total number of coins owned."""
+        return self._state.coins_count
+
+    @property
+    def transactions_count(self) -> int:
+        """Total number of transactions."""
+        return self._state.transactions_count
+
+    @property
+    def mining_active(self) -> bool:
+        """Whether mining is currently active."""
+        return self._state.mining_active
+
+    @property
+    def mining_progress(self) -> int:
+        """Current mining progress percentage (0-100)."""
+        return self._state.mining_progress
+
+    @property
+    def network_height(self) -> int:
+        """Current network blockchain height."""
+        return self._state.network_height
+
+    @property
+    def peer_count(self) -> int:
+        """Number of connected peers."""
+        return self._state.peer_count
 
     def subscribe(self, listener: Callable):
         """Subscribe to state changes."""
@@ -49,8 +84,8 @@ class StateManager:
 
     def update_balance(self, balance: int) -> None:
         """Update wallet balance in wallet_info dict."""
-        self.state.wallet_info["balance"] = balance
-        self._notify_listeners("wallet_info_changed", self.state.wallet_info)
+        self._state.wallet_info["balance"] = balance
+        self._notify_listeners("wallet_info_changed", self._state.wallet_info)
 
     def update_wallet_info(
             self, *,
@@ -59,23 +94,23 @@ class StateManager:
         ) -> None:
         """Update wallet info fields."""
         if balance is not None:
-            self.state.wallet_info["balance"] = balance
+            self._state.wallet_info["balance"] = balance
         if coins is not None:
-            self.state.wallet_info["coins"] = coins
+            self._state.wallet_info["coins"] = coins
         if stamps is not None:
-            self.state.wallet_info["stamps"] = stamps
-        self._notify_listeners("wallet_info_changed", self.state.wallet_info)
+            self._state.wallet_info["stamps"] = stamps
+        self._notify_listeners("wallet_info_changed", self._state.wallet_info)
 
     def update_mining_status(self, active: bool, progress: int = 0) -> None:
         """Update mining status."""
-        self.state.mining_active = active
-        self.state.mining_progress = progress
+        self._state.mining_active = active
+        self._state.mining_progress = progress
         self._notify_listeners("mining_status_changed", active, progress)
 
     def update_network_status(self, height: int, peers: int) -> None:
         """Update network status."""
-        self.state.network_height = height
-        self.state.peer_count = peers
+        self._state.network_height = height
+        self._state.peer_count = peers
         self._notify_listeners("network_status_changed", height, peers)
 
     def on_txn_validated(self, result: JobMessage) -> None:
@@ -90,7 +125,7 @@ class StateManager:
             should handle both cases.
         """
         coin_count = sum(1 for c in coins if not isinstance(c, Exception))
-        self.state.coins_count += coin_count
+        self._state.coins_count += coin_count
         self._notify_listeners("coins_mined", coins)
 
     def _notify_listeners(self, event: str, *args) -> None:

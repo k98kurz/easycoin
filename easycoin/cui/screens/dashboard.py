@@ -1,1 +1,154 @@
-"""DashboardScreen: main hub screen with summary widgets and quick actions."""
+from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
+from textual.widgets import Button, Static
+from .base import BaseScreen
+from easycoin.cui.widgets.top_tabs import TopTabs
+
+
+class DashboardScreen(BaseScreen):
+    """Main dashboard screen with summary widgets and quick actions."""
+
+    TAB_ID = "tab_dashboard"
+
+    BINDINGS = [
+        ("f5", "refresh_data", "Refresh"),
+    ]
+
+    def compose(self):
+        """Compose dashboard layout."""
+        yield TopTabs(id="top_tabs")
+
+        with Horizontal(id="dashboard_layout"):
+            with Vertical(id="quick_actions"):
+                yield Static("Quick Actions", classes="panel-title")
+                yield Button(
+                    "Send Transaction",
+                    id="btn_send",
+                    variant="primary",
+                    disabled=self.app.wallet_locked
+                )
+                yield Button(
+                    "Mine Coins",
+                    id="btn_mine",
+                    variant="success",
+                    disabled=self.app.wallet_locked
+                )
+                yield Button("View Wallets", id="btn_wallets", variant="default")
+                yield Button("Network Settings", id="btn_network", variant="default")
+                yield Button("TrustNet Settings", id="btn_trustnets", variant="default")
+
+            with Vertical(id="dashboard"):
+                yield Static("Wallet Info", classes="panel-title")
+                yield Static(
+                    self._format_wallet_info(),
+                    id="wallet_info_display",
+                    classes="wallet_info"
+                )
+
+                yield Static("Network Status", classes="panel-title")
+                yield Static(
+                    f"Peers: {self.app.state.peer_count}",
+                    id="peer_count"
+                )
+                yield Static(
+                    f"Height: {self.app.state.network_height}",
+                    id="network_height"
+                )
+
+                yield Static("Mining Status", classes="panel-title")
+                yield Static(
+                    self._mining_status(),
+                    id="mining_status"
+                )
+
+    def on_mount(self) -> None:
+        """Update top tabs to highlight Dashboard and set button states."""
+        super().on_mount()
+        self._update_button_states()
+        self.app.register_lock_change_callback(self._on_wallet_lock_changed)
+
+    def on_unmount(self) -> None:
+        """Unregister lock change callback when screen is unmounted."""
+        self.app.unregister_lock_change_callback(self._on_wallet_lock_changed)
+        super().on_unmount()
+
+    def _on_wallet_lock_changed(self, locked: bool) -> None:
+        """Handle wallet lock state changes."""
+        self._update_button_states()
+
+    def on_wallet_info_changed(self, wallet_info: dict) -> None:
+        """Handle wallet info updates.
+
+        Args:
+            wallet_info: Dict with keys 'balance' (int), 'coins' (int),
+                         and 'stamps' (dict[str, int]).
+        """
+        self.query_one("#wallet_info_display").update(self._format_wallet_info())
+
+    def on_mining_status_changed(self, active: bool, progress: int) -> None:
+        """Handle mining status updates.
+
+        Args:
+            active: Whether mining is currently active
+            progress: Mining progress percentage (0-100)
+        """
+        self.query_one("#mining_status").update(self._mining_status())
+
+    def on_network_status_changed(self, height: int, peers: int) -> None:
+        """Handle network status updates.
+
+        Args:
+            height: Current network height
+            peers: Number of connected peers
+        """
+        self.query_one("#peer_count").update(f"Peers: {peers}")
+        self.query_one("#network_height").update(f"Height: {height}")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button clicks."""
+        app = self.app
+
+        if event.button.id == "btn_send":
+            if app.ensure_wallet_unlocked():
+                app.push_screen("transactions")
+        elif event.button.id == "btn_mine":
+            if app.ensure_wallet_unlocked():
+                app.push_screen("coins")
+        elif event.button.id == "btn_wallets":
+            app.push_screen("wallet")
+        elif event.button.id == "btn_network":
+            app.push_screen("network")
+        elif event.button.id == "btn_trustnets":
+            app.push_screen("trustnet")
+
+    def _format_wallet_info(self) -> str:
+        """Format wallet info for display."""
+        info = self.app.state.wallet_info
+        text = f"{info['balance']:,} EC⁻¹\n"
+        text += f"{info['coins']:,} coins\n"
+        if len(info['stamps']):
+            text += "Stamps:\n"
+        for label, count in info['stamps'].items():
+            text += f"- <{label}>: {count}\n"
+        return text
+
+    def _mining_status(self) -> str:
+        """Get mining status text."""
+        if self.app.state.mining_active:
+            return f"Active ({self.app.state.mining_progress}%)"
+        return "Idle"
+
+    def _update_button_states(self) -> None:
+        """Update button enabled/disabled state based on wallet lock."""
+        locked = self.app.wallet_locked
+
+        for button_id in ["btn_send", "btn_mine"]:
+            try:
+                button = self.query_one(f"#{button_id}")
+                button.disabled = locked
+            except NoMatches:
+                pass
+
+    def refresh_data(self) -> None:
+        """Refresh screen data."""
+        self.log_event("Dashboard refreshed", "INFO")

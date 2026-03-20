@@ -7,10 +7,6 @@
     width: 1fr;
 }
 
-#right_sidebar {
-    width: 400px;
-}
-
 #right_sidebar.hidden {
     width: 0;
     display: none;
@@ -46,7 +42,6 @@
 .balance {
     text-align: center;
     text-style: bold;
-    text-size: 200%;
     color: $success;
 }
 
@@ -120,8 +115,7 @@ Button.error {
 }
 
 Button:disabled {
-    opacity: 0.5;
-    text-style: dim;
+    opacity: 0.7;
 }
 
 /* Modals */
@@ -178,13 +172,11 @@ Button:disabled {
 
 /* Validation */
 .input-valid {
-    border-style: solid;
-    border-color: $success;
+    border: solid $success;
 }
 
 .input-invalid {
-    border-style: solid;
-    border-color: $error;
+    border: solid $error;
 }
 
 /* Utility Classes */
@@ -210,7 +202,6 @@ Button:disabled {
 
 .truncate {
     overflow: ellipsis;
-    white-space: nowrap;
 }
 
 /* Header */
@@ -223,7 +214,6 @@ Button:disabled {
 
 .app-title {
     text-style: bold;
-    text-size: 150%;
 }
 
 .app-subtitle {
@@ -239,4 +229,27 @@ Button:disabled {
     padding: 0 1;
     text-style: italic;
     color: $text-muted;
+}
+
+/* Screen Container */
+.screen-container {
+    height: 1fr;
+    width: 1fr;
+    overflow-y: auto;
+}
+
+#dashboard_layout {
+    height: 1fr;
+    width: 1fr;
+}
+
+#dashboard {
+    height: 1fr;
+    width: 4fr;
+}
+
+#quick_actions {
+    height: 1fr;
+    width: 1fr;
+    padding: 0 1;
 }

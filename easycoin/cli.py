@@ -32,13 +32,13 @@ def daemon():
 
 def interactive():
     try:
-        from .cui import NodeApp
+        from .cui import EasyCoinApp
     except ImportError:
         print("Error: the optional cui dependency is missing.")
         print("Install it with `pip install easycoin[cui]`.")
         exit(4)
 
-    app = NodeApp()
+    app = EasyCoinApp()
     app.run()
 
 
@@ -76,7 +76,7 @@ def run():
         exit()
 
     if '--version' in argv:
-        version()
+        print_version()
         exit()
 
     if len(argv) > 1:

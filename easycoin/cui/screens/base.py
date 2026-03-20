@@ -1,4 +1,5 @@
 from textual.screen import Screen
+from textual.css.query import NoMatches
 from easycoin.cui.widgets.event_log import EventLog, LogLevel
 from easycoin.models.Coin import Coin
 
@@ -11,6 +12,9 @@ class BaseScreen(Screen):
         ("ctrl+r", "app.toggle_right_sidebar", "Toggle Sidebar"),
     ]
 
+    # Subclasses should override this to specify their tab ID
+    TAB_ID: str | None = None
+
     def __init__(self, **kwargs):
         """Initialize BaseScreen."""
         super().__init__(**kwargs)
@@ -19,6 +23,22 @@ class BaseScreen(Screen):
         """Subscribe to state manager when screen is mounted."""
         if hasattr(self.app, 'state'):
             self.app.state.subscribe(self)
+        self._update_active_tab()
+
+    def on_unmount(self) -> None:
+        """Unsubscribe from state manager when screen is unmounted."""
+        if hasattr(self.app, 'state'):
+            self.app.state.unsubscribe(self)
+
+    def _update_active_tab(self) -> None:
+        """Update top tabs to highlight the current screen."""
+        if self.TAB_ID is None:
+            return
+        try:
+            tabs = self.query_one("#top_tabs")
+            tabs.active = self.TAB_ID
+        except NoMatches:
+            pass
 
     def on_wallet_info_changed(self, wallet_info: dict) -> None:
         """Handle wallet info updates.

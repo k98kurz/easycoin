@@ -12,7 +12,6 @@ class RightSidebar(Vertical):
 
     DEFAULT_CSS = """
     RightSidebar {
-        width: 400px;
         background: $surface-lighten-1;
         border: solid $primary;
     }

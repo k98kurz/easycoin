@@ -1,5 +1,5 @@
 """EasyCoin Console User Interface (CUI) module."""
 
-from .app import NodeApp
+from .app import EasyCoinApp
 
-__all__ = ["NodeApp"]
+__all__ = ["EasyCoinApp"]

@@ -6,6 +6,10 @@ The environment has been set up in venv/.
 Use `source venv/bin/activate` before running any python commands that require the
 local environment.
 
+## Git
+
+Do NOT stage changes unless explicitly instructed to.
+
 ## Documentation
 
 Before assuming something about the system, check the available documentation in the
@@ -125,6 +129,7 @@ import packify # external package
 
 ### Testing Style
 
+- This project uses unittest from the stdlib, NOT pytest
 - Use `assert` with descriptive error messages instead of `self.assertEqual` etc.
 - For database tests: use `setUpClass`/`tearDownClass` for migrations, `setUp` to clean all model data
 - Define module-level constants: `DB_FILEPATH`, `MIGRATIONS_PATH`, test data (`SEED_PHRASE`, `PASSWORD`, etc.)
