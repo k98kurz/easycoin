@@ -2,6 +2,7 @@ from textual.screen import Screen
 from textual.app import ComposeResult
 from textual.css.query import NoMatches
 from textual.containers import Horizontal
+from textual.widgets import Footer
 from easycoin.cui.widgets.event_log import EventLog, LogLevel
 from easycoin.models.Coin import Coin
 from easycoin.cui.widgets.right_sidebar import RightSidebar
@@ -36,6 +37,8 @@ class BaseScreen(Screen):
             if not self._sidebar_visible:
                 sidebar.add_class("hidden")
             yield sidebar
+
+        yield Footer()
 
     def _compose_content(self) -> ComposeResult:
         """Override this method in subclasses to provide screen-specific content.

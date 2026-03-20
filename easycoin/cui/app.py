@@ -31,7 +31,6 @@ class EasyCoinApp(App):
     }
 
     BINDINGS = [
-        ("ctrl+p", "command_palette", "Command Palette"),
         ("ctrl+1", "switch_to_dashboard", "Dashboard"),
         ("ctrl+2", "switch_to_wallet", "Identity/Wallet"),
         ("ctrl+3", "switch_to_coins", "Coins"),
