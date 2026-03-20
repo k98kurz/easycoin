@@ -25,4 +25,4 @@ class TopTabs(Tabs):
         }
         screen_name = screen_map.get(tab_id)
         if screen_name:
-            self.app.push_screen(screen_name)
+            self.app.switch_screen(screen_name)

@@ -80,7 +80,7 @@ class StateManager:
         try:
             self._listeners.remove(listener)
         except ValueError:
-            pass
+            self.app.logger.debug("Listener not found in _listeners")
 
     def update_balance(self, balance: int) -> None:
         """Update wallet balance in wallet_info dict."""

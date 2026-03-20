@@ -32,10 +32,10 @@ class EasyCoinApp(App):
     }
 
     BINDINGS = [
-        ("ctrl+1", "switch_to_dashboard", "Dashboard"),
-        ("ctrl+2", "switch_to_wallet", "Identity/Wallet"),
-        ("ctrl+3", "switch_to_coins", "Coins"),
-        ("ctrl+4", "switch_to_transactions", "Transactions"),
+        ("1", "switch_to_dashboard", "Dashboard"),
+        ("2", "switch_to_wallet", "Identity/Wallet"),
+        ("3", "switch_to_coins", "Coins"),
+        ("4", "switch_to_transactions", "Transactions"),
         ("f5", "refresh", "Refresh"),
         ("q", "quit", "Quit"),
     ]
@@ -98,7 +98,7 @@ class EasyCoinApp(App):
         try:
             self._lock_change_callbacks.remove(callback)
         except ValueError:
-            pass
+            self.logger.debug("Callback not found in _lock_change_callbacks")
 
     def ensure_wallet_unlocked(self) -> bool:
         """Check if wallet is unlocked; show unlock modal if not.
@@ -113,27 +113,23 @@ class EasyCoinApp(App):
 
     def action_switch_to_dashboard(self) -> None:
         """Switch to dashboard screen."""
-        self.push_screen("dashboard")
+        self.switch_screen("dashboard")
 
     def action_switch_to_wallet(self) -> None:
         """Switch to wallet screen."""
-        self.push_screen("wallet")
+        self.switch_screen("wallet")
 
     def action_switch_to_coins(self) -> None:
         """Switch to coins screen."""
-        self.push_screen("coins")
+        self.switch_screen("coins")
 
     def action_switch_to_transactions(self) -> None:
         """Switch to transactions screen."""
-        self.push_screen("transactions")
+        self.switch_screen("transactions")
 
-    def action_refresh(self) -> None:
-        """Refresh current screen."""
-        self.notify("Refreshing screen", severity="information")
-
-    def action_command_palette(self) -> None:
-        """Show command palette (placeholder for now)."""
-        self.notify("Command palette not yet implemented", severity="information")
+#    def action_refresh(self) -> None:
+#        """Refresh current screen."""
+#        self.notify("Refreshing screen", severity="information")
 
     def log_event(self, message: str, level: str = "INFO") -> None:
         """Log an event to the event log.
@@ -146,5 +142,5 @@ class EasyCoinApp(App):
             from easycoin.cui.widgets.event_log import EventLog, LogLevel
             log_widget = self.query_one("#event_log", EventLog)
             log_widget.write_log(message, LogLevel[level], persistent=False)
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.error(f"Failed to log event: {e}")

@@ -7,6 +7,10 @@ class TrustNetScreen(BaseScreen):
 
     def compose(self):
         """Compose placeholder layout."""
+        yield from super().compose()
+
+    def _compose_content(self):
+        """Compose placeholder content."""
         yield Static(
             "[bold]TrustNet Screen[/bold]\n\n"
             "This screen is not yet implemented.\n\n"

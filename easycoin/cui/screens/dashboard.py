@@ -3,7 +3,6 @@ from textual.containers import Horizontal, Vertical, Container
 from textual.css.query import NoMatches
 from textual.widgets import Button, Static
 from .base import BaseScreen
-from easycoin.cui.widgets.top_tabs import TopTabs
 
 
 class DashboardScreen(BaseScreen):
@@ -16,8 +15,7 @@ class DashboardScreen(BaseScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        """Compose dashboard layout with top tabs and sidebar."""
-        yield TopTabs(id="top_tabs")
+        """Compose dashboard layout."""
         yield from super().compose()
 
     def _compose_content(self) -> ComposeResult:
@@ -114,16 +112,16 @@ class DashboardScreen(BaseScreen):
 
         if event.button.id == "btn_send":
             if app.ensure_wallet_unlocked():
-                app.push_screen("transactions")
+                app.switch_screen("transactions")
         elif event.button.id == "btn_mine":
             if app.ensure_wallet_unlocked():
-                app.push_screen("coins")
+                app.switch_screen("coins")
         elif event.button.id == "btn_wallets":
-            app.push_screen("wallet")
+            app.switch_screen("wallet")
         elif event.button.id == "btn_network":
-            app.push_screen("network")
+            app.switch_screen("network")
         elif event.button.id == "btn_trustnets":
-            app.push_screen("trustnet")
+            app.switch_screen("trustnet")
 
     def _format_wallet_info(self) -> str:
         """Format wallet info for display."""
@@ -151,7 +149,7 @@ class DashboardScreen(BaseScreen):
                 button = self.query_one(f"#{button_id}")
                 button.disabled = locked
             except NoMatches:
-                pass
+                self.log_event(f"Button {button_id} not found in _update_button_states", "DEBUG")
 
     def refresh_data(self) -> None:
         """Refresh screen data."""

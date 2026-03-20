@@ -1,5 +1,12 @@
+from .confirmation_modal import ConfirmationModal
 from .event_log import EventLog, LogLevel
 from .right_sidebar import RightSidebar
 from .top_tabs import TopTabs
 
-__all__ = ["EventLog", "LogLevel", "RightSidebar", "TopTabs"]
+__all__ = [
+    "ConfirmationModal",
+    "EventLog",
+    "LogLevel",
+    "RightSidebar",
+    "TopTabs",
+]
