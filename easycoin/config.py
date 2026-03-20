@@ -119,3 +119,18 @@ class ConfigManager:
 
     def set_active_trustnet_id(self, trustnet_id: str) -> None:
         self.config.set("active_trustnet_id", trustnet_id)
+
+    def get_sidebar_visible(self) -> bool:
+        """Get sidebar visibility preference. Returns `True` if visible,
+            `False` if hidden.
+        """
+        value = self.config.get("sidebar_visible", False)
+        if isinstance(value, bool):
+            return value
+        return False
+
+    def set_sidebar_visible(self, visible: bool) -> None:
+        """Set sidebar visibility preference. Args:
+            visible: `True` for visible, `False` for hidden.
+        """
+        self.config.set("sidebar_visible", visible)

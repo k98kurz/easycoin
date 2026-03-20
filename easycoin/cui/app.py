@@ -45,6 +45,7 @@ class EasyCoinApp(App):
     network_connected = reactive(False)
     active_trustnet_id = reactive(None)
     active_trustnet_state = reactive(None)
+    sidebar_visible = reactive(False)
 
     def __init__(self):
         """Initialize the application."""
@@ -65,6 +66,7 @@ class EasyCoinApp(App):
 
             self.current_wallet_id = self.config.get_current_wallet_id()
             self.active_trustnet_id = self.config.get_active_trustnet_id()
+            self.sidebar_visible = self.config.get_sidebar_visible()
 
             self.notify("EasyCoin CUI started")
             self.push_screen("dashboard")
@@ -72,16 +74,22 @@ class EasyCoinApp(App):
             self.logger.error(f"Failed to initialize app: {e}")
             self.notify(f"Initialization error: {e}", severity="error")
 
-    def watch_current_wallet_id(self, old_value: str | None, new_value: str | None) -> None:
-        """Watch current_wallet_id for changes."""
+    def watch_current_wallet_id(
+            self, old_value: str | None, new_value: str | None
+        ) -> None:
+        """Watch `current_wallet_id` for changes."""
         pass
 
-    def watch_active_trustnet_id(self, old_value: str | None, new_value: str | None) -> None:
-        """Watch active_trustnet_id for changes."""
+    def watch_active_trustnet_id(
+            self, old_value: str | None, new_value: str | None
+        ) -> None:
+        """Watch `active_trustnet_id` for changes."""
         pass
 
     def watch_wallet_locked(self, old_value: bool, new_value: bool) -> None:
-        """Call all registered callbacks when wallet lock state changes."""
+        """Call all registered callbacks when wallet lock state
+            changes.
+        """
         self.notify(f"Wallet {'unlocked' if not new_value else 'locked'}")
         for callback in self._lock_change_callbacks:
             try:
@@ -89,11 +97,22 @@ class EasyCoinApp(App):
             except Exception as e:
                 self.logger.warning(f"Lock change callback failed: {e}")
 
-    def register_lock_change_callback(self, callback: Callable[[bool], None]) -> None:
-        """Register callback to be called when wallet lock state changes."""
+    def watch_sidebar_visible(self, old_value: bool, new_value: bool) -> None:
+        """Watch `sidebar_visible` for changes and persist to config."""
+        self.config.set_sidebar_visible(new_value)
+        self.config.save()
+
+    def register_lock_change_callback(
+            self, callback: Callable[[bool], None]
+        ) -> None:
+        """Register callback to be called when wallet lock state
+            changes.
+        """
         self._lock_change_callbacks.append(callback)
 
-    def unregister_lock_change_callback(self, callback: Callable[[bool], None]) -> None:
+    def unregister_lock_change_callback(
+            self, callback: Callable[[bool], None]
+        ) -> None:
         """Unregister a previously registered lock change callback."""
         try:
             self._lock_change_callbacks.remove(callback)
@@ -102,8 +121,8 @@ class EasyCoinApp(App):
 
     def ensure_wallet_unlocked(self) -> bool:
         """Check if wallet is unlocked; show unlock modal if not.
-        Returns:
-            True if wallet is unlocked, False otherwise.
+            Returns:
+                True if wallet is unlocked, False otherwise.
         """
         if not self.wallet_locked:
             return True
@@ -132,9 +151,7 @@ class EasyCoinApp(App):
 #        self.notify("Refreshing screen", severity="information")
 
     def log_event(self, message: str, level: str = "INFO") -> None:
-        """Log an event to the event log.
-
-        Args:
+        """Log an event to the event log. Args:
             message: Log message
             level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         """

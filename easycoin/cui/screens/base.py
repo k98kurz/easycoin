@@ -11,7 +11,9 @@ from easycoin.config import ConfigManager
 
 
 class BaseScreen(Screen):
-    """Base screen with common functionality for all EasyCoin CUI screens."""
+    """Base screen with common functionality for all EasyCoin CUI
+        screens.
+    """
 
     BINDINGS = [
         ("ctrl+r", "toggle_right_sidebar", "Toggle Sidebar"),
@@ -24,7 +26,6 @@ class BaseScreen(Screen):
         """Initialize BaseScreen."""
         super().__init__(**kwargs)
         self.config = ConfigManager("easycoin")
-        self._sidebar_visible = False
 
     def compose(self) -> ComposeResult:
         """Compose screen with top tabs, main content and sidebar."""
@@ -36,7 +37,7 @@ class BaseScreen(Screen):
 
             log_file = self.config.get_log_path()
             sidebar = RightSidebar(log_file=log_file, id="right_sidebar")
-            if not self._sidebar_visible:
+            if not self.app.sidebar_visible:
                 sidebar.add_class("hidden")
             yield sidebar
 
@@ -44,7 +45,7 @@ class BaseScreen(Screen):
 
     def _compose_content(self) -> ComposeResult:
         """Override this method in subclasses to provide screen-specific
-            content. This is similar to compose() but for the main
+            content. This is similar to `compose()` but for the main
             content area only.
         """
         if False:
@@ -54,7 +55,14 @@ class BaseScreen(Screen):
         """Subscribe to state manager when screen is mounted."""
         if hasattr(self.app, 'state'):
             self.app.state.subscribe(self)
+
+    def on_screen_resume(self, event) -> None:
+        """Handle screen resume event to update active tab and
+            sidebar.
+        """
         self._update_active_tab()
+        self._update_sidebar_visibility()
+        event.stop()
 
     def on_unmount(self) -> None:
         """Unsubscribe from state manager when screen is unmounted."""
@@ -62,7 +70,7 @@ class BaseScreen(Screen):
             self.app.state.unsubscribe(self)
 
     def _update_active_tab(self) -> None:
-        """Update top tabs to highlight the current screen."""
+        """Update `top tabs` to highlight the current screen."""
         if self.TAB_ID is None:
             return
         try:
@@ -73,12 +81,26 @@ class BaseScreen(Screen):
                 "Tabs widget not found in _update_active_tab", "DEBUG"
             )
 
-    def action_toggle_right_sidebar(self) -> None:
-        """Toggle event log sidebar visibility."""
-        self._sidebar_visible = not self._sidebar_visible
+    def _update_sidebar_visibility(self) -> None:
+        """Update sidebar visibility based on app state."""
+        if not hasattr(self.app, 'sidebar_visible'):
+            return
         try:
             sidebar = self.query_one("#right_sidebar")
-            if self._sidebar_visible:
+            if self.app.sidebar_visible:
+                sidebar.remove_class("hidden")
+            else:
+                sidebar.add_class("hidden")
+        except NoMatches:
+            pass
+
+    def action_toggle_right_sidebar(self) -> None:
+        """Toggle event log sidebar visibility."""
+        new_visibility = not self.app.sidebar_visible
+        self.app.sidebar_visible = new_visibility
+        try:
+            sidebar = self.query_one("#right_sidebar")
+            if new_visibility:
                 sidebar.remove_class("hidden")
             else:
                 sidebar.add_class("hidden")
@@ -94,8 +116,8 @@ class BaseScreen(Screen):
         pass
 
     def on_mining_status_changed(self, active: bool, progress: int) -> None:
-        """Handle mining status updates. Override in subclasses that
-            need to react to mining changes.
+        """Handle mining status updates. Override in subclasses
+            that need to react to mining changes.
         """
         pass
 
@@ -106,8 +128,8 @@ class BaseScreen(Screen):
         pass
 
     def on_txn_validated(self, result) -> None:
-        """Handle transaction validation result. Override in subclasses
-            that need to react to validation results.
+        """Handle transaction validation result. Override in
+            subclasses that need to react to validation results.
         """
         pass
 
