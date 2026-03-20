@@ -1,4 +1,5 @@
-from textual.containers import Horizontal, Vertical
+from textual.app import ComposeResult
+from textual.containers import Horizontal, Vertical, Container
 from textual.css.query import NoMatches
 from textual.widgets import Button, Static
 from .base import BaseScreen
@@ -14,10 +15,13 @@ class DashboardScreen(BaseScreen):
         ("f5", "refresh_data", "Refresh"),
     ]
 
-    def compose(self):
-        """Compose dashboard layout."""
+    def compose(self) -> ComposeResult:
+        """Compose dashboard layout with top tabs and sidebar."""
         yield TopTabs(id="top_tabs")
+        yield from super().compose()
 
+    def _compose_content(self) -> ComposeResult:
+        """Compose dashboard content area."""
         with Horizontal(id="dashboard_layout"):
             with Vertical(id="quick_actions"):
                 yield Static("Quick Actions", classes="panel-title")

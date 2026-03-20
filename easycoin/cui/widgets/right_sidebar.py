@@ -14,6 +14,7 @@ class RightSidebar(Vertical):
     RightSidebar {
         background: $surface-lighten-1;
         border: solid $primary;
+        width: 1fr;
     }
 
     RightSidebar.hidden {
@@ -21,15 +22,8 @@ class RightSidebar(Vertical):
         display: none;
     }
 
-    .log-header {
-        height: 3;
-        text-align: center;
-        text-style: bold;
-        background: $primary;
-    }
-
     .log-controls {
-        height: 3;
+        height: auto;
         dock: top;
     }
 
@@ -38,11 +32,15 @@ class RightSidebar(Vertical):
     }
 
     #level_filter {
-        height: 10;
+        height: 5;
     }
 
     .log-actions {
-        height: 3;
+        height: auto;
+    }
+
+    .log-actions Button {
+        width: 1fr;
     }
     """
 
@@ -53,12 +51,7 @@ class RightSidebar(Vertical):
 
     def compose(self) -> ComposeResult:
         """Compose sidebar widgets."""
-        with Vertical(classes="log-header"):
-            yield Static("Event Log")
-
-        with Horizontal(classes="log-controls"):
-            yield Input(placeholder="Search logs...", id="log_search")
-            yield Button("🔍", id="search_btn", variant="primary")
+        yield Static("Event Log", classes="panel-title")
 
         yield OptionList(
             "DEBUG",
@@ -68,6 +61,8 @@ class RightSidebar(Vertical):
             "CRITICAL",
             id="level_filter"
         )
+
+        yield Input(placeholder="Search logs...", id="log_search")
 
         yield EventLog(id="event_log", log_file=self.log_file)
 
@@ -112,9 +107,6 @@ class RightSidebar(Vertical):
             log_widget.write_log("Log cleared", LogLevel.INFO)
         elif event.button.id == "export_btn":
             self.export_log()
-        elif event.button.id == "search_btn":
-            search_input = self.query_one("#log_search", Input)
-            log_widget.search(search_input.value)
 
     def export_log(self) -> None:
         """Export log entries to a file."""

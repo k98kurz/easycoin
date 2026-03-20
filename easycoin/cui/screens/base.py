@@ -1,7 +1,11 @@
 from textual.screen import Screen
+from textual.app import ComposeResult
 from textual.css.query import NoMatches
+from textual.containers import Horizontal
 from easycoin.cui.widgets.event_log import EventLog, LogLevel
 from easycoin.models.Coin import Coin
+from easycoin.cui.widgets.right_sidebar import RightSidebar
+from easycoin.cui.config import ConfigManager
 
 
 class BaseScreen(Screen):
@@ -9,7 +13,7 @@ class BaseScreen(Screen):
 
     BINDINGS = [
         ("escape", "app.pop_screen", "Back"),
-        ("ctrl+r", "app.toggle_right_sidebar", "Toggle Sidebar"),
+        ("ctrl+r", "toggle_right_sidebar", "Toggle Sidebar"),
     ]
 
     # Subclasses should override this to specify their tab ID
@@ -18,6 +22,27 @@ class BaseScreen(Screen):
     def __init__(self, **kwargs):
         """Initialize BaseScreen."""
         super().__init__(**kwargs)
+        self.config = ConfigManager("easycoin")
+        self._sidebar_visible = False
+
+    def compose(self) -> ComposeResult:
+        """Compose screen with main content and sidebar."""
+        with Horizontal(id="screen_layout"):
+            with Horizontal(id="screen_content"):
+                yield from self._compose_content()
+
+            log_file = self.config.get_log_path()
+            sidebar = RightSidebar(log_file=log_file, id="right_sidebar")
+            if not self._sidebar_visible:
+                sidebar.add_class("hidden")
+            yield sidebar
+
+    def _compose_content(self) -> ComposeResult:
+        """Override this method in subclasses to provide screen-specific content.
+        This is similar to compose() but for the main content area only.
+        """
+        if False:
+            yield
 
     def on_mount(self) -> None:
         """Subscribe to state manager when screen is mounted."""
@@ -37,6 +62,18 @@ class BaseScreen(Screen):
         try:
             tabs = self.query_one("#top_tabs")
             tabs.active = self.TAB_ID
+        except NoMatches:
+            pass
+
+    def action_toggle_right_sidebar(self) -> None:
+        """Toggle event log sidebar visibility."""
+        self._sidebar_visible = not self._sidebar_visible
+        try:
+            sidebar = self.query_one("#right_sidebar")
+            if self._sidebar_visible:
+                sidebar.remove_class("hidden")
+            else:
+                sidebar.add_class("hidden")
         except NoMatches:
             pass
 

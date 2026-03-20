@@ -12,6 +12,15 @@
     display: none;
 }
 
+/* Screen Layout */
+#screen_layout {
+    layout: horizontal;
+}
+
+#screen_content {
+    width: 3fr;
+}
+
 /* Panels */
 .panel-title {
     text-style: bold;
