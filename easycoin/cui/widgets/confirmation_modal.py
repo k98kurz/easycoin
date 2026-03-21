@@ -24,6 +24,7 @@ class ConfirmationModal(Screen):
         """Compose confirmation modal layout."""
         with Vertical(id="confirm_modal", classes="modal-container"):
             yield Static(self.title, classes="modal-title")
+            yield Static("\n")
             yield Static(self.message)
             with Horizontal(id="modal_actions"):
                 yield Button("Confirm", id="btn_confirm", variant="success")

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .errors import type_assert, value_assert
 from hashlib import sha256, pbkdf2_hmac
 from nacl.bindings import crypto_core_ed25519_scalar_mul, crypto_scalarmult_ed25519
@@ -28,18 +29,23 @@ class Wallet(HashedModel):
     """Hierarchical deterministic wallet. Does not even attempt to
         comply with crypto industry standards, but the functionality
         is conceptually identical. After unlocking the wallet with the
-        correct password
+        correct password, various types of locks and witnesses can be
+        generated.
     """
     connection_info: str = ''
     table: str = 'wallets'
     id_column: str = 'id'
-    columns: tuple[str] = ('id', 'seed', 'checksum', 'nonce', 'pubkeys', 'secrets')
-    columns_excluded_from_hash = ('nonce', 'pubkeys', 'secrets')
+    columns: tuple[str] = (
+        'id', 'name', 'seed', 'checksum', 'nonce', 'pubkeys', 'secrets', 'tags'
+    )
+    columns_excluded_from_hash = ('name', 'nonce', 'pubkeys', 'secrets', 'tags')
     id: str
+    name: str
     seed: bytes
     checksum: bytes
     nonce: int|Default[0]
     pubkeys: bytes|None
+    tags: str|None
     txns: RelatedCollection
     coins: RelatedCollection
     inputs: RelatedCollection
@@ -132,7 +138,9 @@ class Wallet(HashedModel):
         return phrase
 
     @classmethod
-    def create(cls, seed_phrase: list[str], password: str) -> 'Wallet':
+    def create(
+            cls, seed_phrase: list[str], password: str, name: str = ''
+        ) -> Wallet:
         """Create a fresh wallet using the seed phrase protected by the
             given password. Does not save to the database.
         """
@@ -145,6 +153,7 @@ class Wallet(HashedModel):
         return cls({
             'seed': seed,
             'checksum': checksum,
+            'name': name,
         })
 
     @staticmethod
@@ -243,7 +252,7 @@ class Wallet(HashedModel):
             'cannot read the seed from a locked wallet')
         return xor(self._key, self.data['seed'])
     @seed.setter
-    def self(self, val: str):
+    def seed(self, val: str):
         value_assert(not self.is_locked,
             'cannot set the seed of a locked wallet')
         self.data['seed'] = xor(self._key, val)

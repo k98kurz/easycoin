@@ -27,10 +27,13 @@ class UnlockWalletModal(Screen):
 
         with Vertical(id="unlock_modal", classes="modal-container"):
             yield Static("Unlock Wallet", classes="modal-title")
+            yield Static("\n")
             yield Static(
-                f"Wallet: {self._truncate_id(self.wallet_id)}...",
+                f"Wallet: '{self.wallet.name}' "
+                f"({self._truncate_id(self.wallet_id)})",
                 classes="wallet-id"
             )
+            yield Static("\n")
             yield Input(
                 placeholder="Password",
                 password=True,

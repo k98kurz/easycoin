@@ -16,6 +16,7 @@ dependencies = [
   "tapescript >= 0.7.2",
   "tapehash >= 0.1.1",
   "crossconfig >= 0.0.3",
+  "pyperclip >= 1.11.0",
 ]
 description = "Proof-of-concept + proof-of-work - consensus = easycoin."
 readme = "readme.md"

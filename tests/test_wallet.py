@@ -17,6 +17,7 @@ DB_FILEPATH = 'tests/test.db'
 MIGRATIONS_PATH = 'tests/migrations'
 SEED_PHRASE = ['test', 'obviously', 'not', 'secure']
 PASSWORD = 'testp4ssword'
+WALLET_NAME = 'test wallet'
 ANYONE_CAN_SPEND_LOCK = Script.from_src('true')
 
 
@@ -60,20 +61,20 @@ class TestWallet(unittest.TestCase):
         print(f'{phrase2=}')
 
     def test_create_returns_locked_Wallet(self):
-        w = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         assert type(w) is models.Wallet
         assert w.is_locked
         assert len(w.data['seed']) == 32
         assert len(w.checksum) == 32
 
     def test_reading_seed_from_locked_Wallet_raises_ValueError(self):
-        w = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         assert w.is_locked
         with self.assertRaises(ValueError):
             w.seed
 
     def test_locked_Wallet_can_be_unlocked(self):
-        w = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         assert w.is_locked
         w.unlock(PASSWORD)
         assert not w.is_locked
@@ -90,7 +91,7 @@ class TestWallet(unittest.TestCase):
         assert not models.Wallet.validate_address(address + 'ab')
 
     def test_lock_type_methods_e2e(self):
-        wallet = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        wallet = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         wallet.unlock(PASSWORD)
         p2pk_lock = wallet.get_p2pk_lock(1)
         p2pkh_lock = wallet.get_p2pkh_lock(1)
@@ -117,7 +118,7 @@ class TestWallet(unittest.TestCase):
             Script.from_bytes(multisig_lock.bytes).src.split())
 
     def test_get_seed_from_unlocked_Wallet_returns_new_seed(self):
-        w = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         w.unlock(PASSWORD)
         seed1 = w.get_seed(1)
         assert type(seed1) is bytes
@@ -137,7 +138,7 @@ class TestWallet(unittest.TestCase):
         assert seed11 != seed1
 
     def test_get_pubkey_from_locked_Wallet_works_after_it_is_first_generated(self):
-        w = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         with self.assertRaises(ValueError):
             w.get_pubkey(1)
         w.unlock(PASSWORD)
@@ -147,7 +148,7 @@ class TestWallet(unittest.TestCase):
         assert w.get_pubkey(1) == pub1
 
     def test_get_pubkey_validates_signatures_from_same_seed(self):
-        w = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         w.unlock(PASSWORD)
         seed = w.get_seed(420, 69)
         pubk = w.get_pubkey(420, 69)
@@ -157,7 +158,7 @@ class TestWallet(unittest.TestCase):
 
     def test_lock_and_witness_generation_e2e(self):
         # setup
-        w = models.Wallet.create(SEED_PHRASE, PASSWORD)
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         w.unlock(PASSWORD)
         hdw_i = (123, 32)
         coin = models.Coin.mine(ANYONE_CAN_SPEND_LOCK)
@@ -188,7 +189,7 @@ class TestWallet(unittest.TestCase):
 
     def test_Wallet_gen_and_pubkey_saving_e2e(self):
         phrase = models.Wallet.generate_seed_phrase(easycoin.wordlist())
-        w = models.Wallet.create(phrase, PASSWORD)
+        w = models.Wallet.create(phrase, PASSWORD, WALLET_NAME)
         w.unlock(PASSWORD)
         hdw_i = (420, 69)
         assert hdw_i not in w.pubkeys
@@ -201,7 +202,7 @@ class TestWallet(unittest.TestCase):
 
     def test_Wallet_relations_work(self):
         # create records
-        w = models.Wallet.create(SEED_PHRASE, PASSWORD).save()
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME).save()
         c = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 999).save()
         t = models.Txn.insert({'output_ids': c.id})
         i = models.Input.insert({'id': 'some coin ID that was spent'})

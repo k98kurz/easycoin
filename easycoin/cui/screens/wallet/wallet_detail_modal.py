@@ -2,6 +2,7 @@ from textual.screen import Screen
 from textual.app import ComposeResult
 from textual.containers import Vertical, Horizontal
 from textual.widgets import Button, DataTable, Static
+from textual.binding import Binding
 from easycoin.models import Wallet, Coin
 from .unlock_modal import UnlockWalletModal
 
@@ -9,17 +10,34 @@ from .unlock_modal import UnlockWalletModal
 class WalletDetailModal(Screen):
     """Modal for displaying wallet details."""
 
-    def __init__(self, *fuck, **llms):
-        """Initialize with wallet ID."""
+    BINDINGS = [
+        Binding("ctrl+c", "copy_wallet_id", "Copy Wallet ID", show=False),
+    ]
+
+    def __init__(self):
+        """Initialize wallet detail modal."""
         super().__init__()
 
     def compose(self) -> ComposeResult:
         """Compose wallet detail modal layout."""
         with Vertical(id="wallet_detail", classes="modal-container"):
             yield Static("Wallet Details", classes="modal-title")
-            yield Static("ID: Loading...", id="wallet_id_display")
-            yield Static("Balance: Loading...", id="wallet_balance", classes="balance")
-            yield Static("Status: Loading...", id="wallet_status")
+
+            with Vertical(classes="card"):
+                yield Static("Loading...", id="wallet_name_display", classes="text-bold")
+                yield Static("Loading...", id="wallet_id_display", classes="text-muted")
+
+                yield Static("")
+
+                with Horizontal():
+                    with Vertical():
+                        yield Static("Balance:", classes="text-muted")
+                        yield Static("Loading...", id="wallet_balance")
+                    with Vertical():
+                        yield Static("Status:", classes="text-muted")
+                        yield Static("Loading...", id="wallet_status")
+
+            yield Static("\n")
 
             yield Static("Address Book", classes="panel-title")
             yield DataTable(id="address_book")
@@ -27,6 +45,7 @@ class WalletDetailModal(Screen):
             with Horizontal(id="modal_actions"):
                 yield Button("Unlock", id="btn_unlock", variant="primary")
                 yield Button("Lock", id="btn_lock", variant="primary")
+                yield Button("Copy ID", id="btn_copy_id", variant="default")
                 yield Button("Backup Seed", id="btn_backup", variant="default")
                 yield Button("Export Keys", id="btn_export", variant="default")
                 yield Button("Close", id="btn_close", variant="default")
@@ -45,15 +64,23 @@ class WalletDetailModal(Screen):
 
             try:
                 self.query_one("#wallet_id_display", Static).update(
-                    f"ID: {self._truncate_id(self.app.wallet.id)}"
+                    self.app.wallet.id
                 )
             except Exception as e:
                 self.app.log_event(f"Error updating wallet ID display: {e}", "DEBUG")
 
             try:
+                wallet_name = self.app.wallet.name if self.app.wallet.name else "<unnamed>"
+                self.query_one("#wallet_name_display", Static).update(
+                    wallet_name
+                )
+            except Exception as e:
+                self.app.log_event(f"Error updating wallet name display: {e}", "DEBUG")
+
+            try:
                 balance = self._get_wallet_balance(self.app.wallet)
                 self.query_one("#wallet_balance", Static).update(
-                    f"Balance: {balance:,} EC⁻¹"
+                    f"{balance:,} EC⁻¹"
                 )
             except Exception as e:
                 try:
@@ -65,9 +92,15 @@ class WalletDetailModal(Screen):
                 self.app.notify(f"Error calculating balance: {e}", severity="error")
 
             try:
-                self.query_one("#wallet_status", Static).update(
-                    f"Status: {'Locked' if self.app.wallet.is_locked else 'Unlocked'}"
-                )
+                status_static = self.query_one("#wallet_status", Static)
+                if self.app.wallet.is_locked:
+                    status_static.update("Locked")
+                    status_static.remove_class("status-ok")
+                    status_static.add_class("status-warning")
+                else:
+                    status_static.update("Unlocked")
+                    status_static.remove_class("status-warning")
+                    status_static.add_class("status-ok")
             except Exception as e:
                 self.app.log_event(f"Error updating wallet status: {e}", "DEBUG")
 
@@ -96,12 +129,34 @@ class WalletDetailModal(Screen):
             self._unlock()
         elif event.button.id == "btn_lock":
             self._lock()
+        elif event.button.id == "btn_copy_id":
+            self._copy_wallet_id()
         elif event.button.id == "btn_backup":
             self._backup_seed()
         elif event.button.id == "btn_export":
             self._export_keys()
         elif event.button.id == "btn_close":
             self.app.pop_screen()
+
+    def action_copy_wallet_id(self) -> None:
+        """Action handler for Ctrl+C binding."""
+        self._copy_wallet_id()
+
+    def _copy_wallet_id(self) -> None:
+        """Copy wallet ID to clipboard."""
+        if not self.app.wallet:
+            self.app.notify("Wallet not loaded", severity="error")
+            return
+
+        try:
+            import pyperclip
+            pyperclip.copy(self.app.wallet.id)
+            self.app.notify("Wallet ID copied to clipboard", severity="success")
+        except ImportError:
+            self.app.notify("pyperclip not installed", severity="error")
+        except Exception as e:
+            self.app.notify(f"Failed to copy: {e}", severity="error")
+            self.app.log_event(f"Copy wallet ID error: {e}", "ERROR")
 
     def on_key(self, event) -> None:
         """Handle keyboard events."""
@@ -184,7 +239,14 @@ class WalletDetailModal(Screen):
     def _set_status(self, status: str) -> None:
         """Set wallet status display to specific value."""
         try:
-            self.query_one("#wallet_status", Static).update(f"Status: {status}")
+            status_static = self.query_one("#wallet_status", Static)
+            status_static.update(status)
+            if status == "Locked":
+                status_static.remove_class("status-ok")
+                status_static.add_class("status-warning")
+            else:
+                status_static.remove_class("status-warning")
+                status_static.add_class("status-ok")
         except Exception as e:
             self.app.log_event(f"Error setting status: {e}", "ERROR")
 
@@ -213,9 +275,15 @@ class WalletDetailModal(Screen):
             self.query_one("#wallet_balance", Static).update(
                 f"Balance: {balance:,} EC⁻¹"
             )
-            self.query_one("#wallet_status", Static).update(
-                f"Status: {'Locked' if self.app.wallet.is_locked else 'Unlocked'}"
-            )
+            status_static = self.query_one("#wallet_status", Static)
+            if self.app.wallet.is_locked:
+                status_static.update("Locked")
+                status_static.remove_class("status-ok")
+                status_static.add_class("status-warning")
+            else:
+                status_static.update("Unlocked")
+                status_static.remove_class("status-warning")
+                status_static.add_class("status-ok")
         except Exception as e:
             self.app.log_event(f"Error refreshing data: {e}", "ERROR")
 
@@ -225,9 +293,15 @@ class WalletDetailModal(Screen):
             return
 
         try:
-            self.query_one("#wallet_status", Static).update(
-                f"Status: {'Locked' if self.app.wallet.is_locked else 'Unlocked'}"
-            )
+            status_static = self.query_one("#wallet_status", Static)
+            if self.app.wallet.is_locked:
+                status_static.update("Locked")
+                status_static.remove_class("status-ok")
+                status_static.add_class("status-warning")
+            else:
+                status_static.update("Unlocked")
+                status_static.remove_class("status-warning")
+                status_static.add_class("status-ok")
             self._set_button_visibility()
         except Exception as e:
             self.app.log_event(f"Error refreshing status: {e}", "ERROR")

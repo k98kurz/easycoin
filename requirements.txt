@@ -3,6 +3,7 @@ merkleasy==0.1.2
 packify==0.3.1
 netaio==0.0.9
 pycparser==2.22
+pyperclip==1.11.0
 PyNaCl==1.5.0
 sqloquent==0.7.3
 tapehash==0.1.1
