@@ -2,8 +2,10 @@ from textual.screen import Screen
 from textual.app import ComposeResult
 from textual.containers import Vertical, Horizontal
 from textual.widgets import Button, DataTable, Static
+from textual.widgets.data_table import RowKey
 from textual.binding import Binding
-from easycoin.models import Wallet, Coin
+from easycoin.cui.clipboard import universal_copy
+from easycoin.models import Wallet, Address, Coin
 from .unlock_modal import UnlockWalletModal
 
 
@@ -11,12 +13,14 @@ class WalletDetailModal(Screen):
     """Modal for displaying wallet details."""
 
     BINDINGS = [
-        Binding("ctrl+c", "copy_wallet_id", "Copy Wallet ID", show=False),
+        Binding("ctrl+c", "copy_address", "Copy Address", show=False),
     ]
 
     def __init__(self):
         """Initialize wallet detail modal."""
         super().__init__()
+        self.selected_address = None
+        self._row_map = {}
 
     def compose(self) -> ComposeResult:
         """Compose wallet detail modal layout."""
@@ -45,13 +49,15 @@ class WalletDetailModal(Screen):
             with Horizontal(id="modal_actions"):
                 yield Button("Unlock", id="btn_unlock", variant="primary")
                 yield Button("Lock", id="btn_lock", variant="primary")
-                yield Button("Copy ID", id="btn_copy_id", variant="default")
-                yield Button("Backup Seed", id="btn_backup", variant="default")
-                yield Button("Export Keys", id="btn_export", variant="default")
+                yield Button("Copy Address", id="btn_copy_address", variant="default", disabled=True)
+                yield Button("Make Address", id="btn_make_address", variant="default")
+                yield Button("Export Address", id="btn_export_address", variant="default", disabled=True)
                 yield Button("Close", id="btn_close", variant="default")
 
     def on_mount(self) -> None:
         """Populate wallet info and address book table on mount."""
+        table = self.query_one(DataTable)
+        table.cursor_type = "row"
         self._load_wallet_data()
 
     def _load_wallet_data(self) -> None:
@@ -108,15 +114,19 @@ class WalletDetailModal(Screen):
 
             try:
                 table = self.query_one("#address_book", DataTable)
-                table.add_columns("Address", "Balance", "Coins")
+                table.add_columns("Address", "Status", "Coins", "Balance")
 
+                self._row_map = {}
                 address_book = self._get_address_book()
-                for address, data in address_book.items():
-                    table.add_row(
-                        self._truncate_address(address),
-                        str(data['balance']),
-                        str(data['count'])
+                for status, address_hex, balance, count, addr in address_book:
+                    row_key = table.add_row(
+                        self._truncate_address(address_hex),
+                        status,
+                        str(count),
+                        str(balance)
                     )
+                    if addr:
+                        self._row_map[row_key] = addr
             except Exception as e:
                 self.app.notify(f"Error loading address book: {e}", severity="error")
         except Exception as e:
@@ -129,61 +139,128 @@ class WalletDetailModal(Screen):
             self._unlock()
         elif event.button.id == "btn_lock":
             self._lock()
-        elif event.button.id == "btn_copy_id":
-            self._copy_wallet_id()
-        elif event.button.id == "btn_backup":
-            self._backup_seed()
-        elif event.button.id == "btn_export":
-            self._export_keys()
+        elif event.button.id == "btn_copy_address":
+            self._copy_address()
+        elif event.button.id == "btn_make_address":
+            self._make_address()
+        elif event.button.id == "btn_export_address":
+            self._export_address()
         elif event.button.id == "btn_close":
             self.app.pop_screen()
 
-    def action_copy_wallet_id(self) -> None:
+    def action_copy_address(self) -> None:
         """Action handler for Ctrl+C binding."""
-        self._copy_wallet_id()
+        self._copy_address()
 
-    def _copy_wallet_id(self) -> None:
-        """Copy wallet ID to clipboard."""
-        if not self.app.wallet:
-            self.app.notify("Wallet not loaded", severity="error")
+    def _copy_address(self) -> None:
+        """Copy selected address hex to clipboard."""
+        if not self.selected_address:
+            self.app.notify("No address selected", severity="warning")
             return
 
         try:
-            import pyperclip
-            pyperclip.copy(self.app.wallet.id)
-            self.app.notify("Wallet ID copied to clipboard", severity="success")
-        except ImportError:
-            self.app.notify("pyperclip not installed", severity="error")
+            universal_copy(self.selected_address.hex)
+            self.app.notify("Address copied to clipboard", severity="success")
         except Exception as e:
             self.app.notify(f"Failed to copy: {e}", severity="error")
-            self.app.log_event(f"Copy wallet ID error: {e}", "ERROR")
+            self.app.log_event(f"Copy address error: {e}", "ERROR")
 
     def on_key(self, event) -> None:
         """Handle keyboard events."""
         if event.key == "escape":
             self.app.pop_screen()
 
-    def _get_address_book(self) -> dict[str, dict[str, int]]:
-        """Build address book from wallet's coins. Returns a `dict`
-            mapping addresses to balance and coin count.
+    def on_data_table_row_highlighted(
+            self, event: DataTable.RowHighlighted
+        ) -> None:
+        """Handle row highlight in address book table."""
+        self._update_selection_for_cursor(event.row_key)
+
+    def _update_selection_for_cursor(self, row_key: RowKey|None = None) -> None:
+        """Update selection and button states based on cursor position."""
+        try:
+            if row_key is None:
+                table = self.query_one("#address_book", DataTable)
+                cursor = table.cursor_coordinate
+                if cursor is None:
+                    self.selected_address = None
+                    self.query_one(
+                        "#btn_export_address", Button
+                    ).disabled = True
+                    self.query_one(
+                        "#btn_copy_address", Button
+                    ).disabled = True
+                    return
+                row_key = table.coordinate_to_cell_key(cursor).row_key
+
+            is_known = row_key in self._row_map
+            is_unlocked = not self.app.wallet.is_locked
+            if is_known and is_unlocked:
+                self.selected_address = self._row_map[row_key]
+                self.query_one(
+                    "#btn_export_address", Button
+                ).disabled = False
+                self.query_one(
+                    "#btn_copy_address", Button
+                ).disabled = False
+            else:
+                self.selected_address = None
+                self.query_one(
+                    "#btn_export_address", Button
+                ).disabled = True
+                self.query_one(
+                    "#btn_copy_address", Button
+                ).disabled = True
+        except Exception as e:
+            self.app.log_event(f"Error updating selection: {e}", "ERROR")
+
+    def _get_address_book(
+            self
+        ) -> list[tuple[str, str, int, int, Address|None]]:
+        """Build address book from wallet's addresses and coins. Returns
+            a list of (status, address_hex, balance, count, address_or_none)
+            tuples. Known addresses get ✓ status, unrecognized coin locks
+            get ? status with None as the address object.
         """
-        address_book = {}
+        entries = []
+        known_locks = set()
+
+        try:
+            self.app.wallet.addresses().reload()
+            for address in self.app.wallet.addresses:
+                try:
+                    known_locks.add(address.lock)
+                    balance = 0
+                    count = 0
+                    for coin in address.coins().get():
+                        balance += coin.amount
+                        count += 1
+                    entries.append(
+                        ('✓', address.hex, balance, count, address)
+                    )
+                except Exception as e:
+                    self.app.log_event(
+                        f"Error processing address: {e}", "ERROR"
+                    )
+        except Exception as e:
+            self.app.log_event(f"Error querying addresses: {e}", "ERROR")
 
         try:
             for coin in Coin.query({'wallet_id': self.app.wallet.id}).get():
+                if coin.lock in known_locks:
+                    continue
                 try:
-                    address = Wallet.make_address(coin.lock)
-
-                    if address not in address_book:
-                        address_book[address] = {'balance': 0, 'count': 0}
-                    address_book[address]['balance'] += coin.amount
-                    address_book[address]['count'] += 1
+                    known_locks.add(coin.lock)
+                    address_hex = Address({'lock': coin.lock}).hex
+                    entries.append(('?', address_hex, coin.amount, 1, None))
                 except Exception as e:
-                    self.app.log_event(f"Error processing coin: {e}", "ERROR")
+                    self.app.log_event(
+                        f"Error processing coin: {e}", "ERROR"
+                    )
         except Exception as e:
             self.app.log_event(f"Error querying coins: {e}", "ERROR")
 
-        return address_book
+        return entries
 
     def _unlock(self) -> None:
         """Unlock wallet."""
@@ -196,6 +273,7 @@ class WalletDetailModal(Screen):
                 self._set_status("Unlocked")
                 self._set_button_visibility()
                 self._refresh_data()
+                self._update_selection_for_cursor()
             self.app.push_screen(UnlockWalletModal(self.app.wallet.id, on_unlock_success))
         except Exception as e:
             self.app.notify(f"Error toggling lock: {e}", severity="error")
@@ -210,6 +288,9 @@ class WalletDetailModal(Screen):
         try:
             self.app.wallet.lock()
             self.app.log_event("Wallet locked", "INFO")
+            self.selected_address = None
+            self.query_one("#btn_export_address", Button).disabled = True
+            self.query_one("#btn_copy_address", Button).disabled = True
             self._set_button_visibility()
             self._refresh_status()
         except Exception as e:
@@ -251,7 +332,9 @@ class WalletDetailModal(Screen):
             self.app.log_event(f"Error setting status: {e}", "ERROR")
 
     def _set_button_visibility(self) -> None:
-        """Set visibility of lock/unlock buttons based on wallet state."""
+        """Set visibility of lock/unlock buttons and state of address
+            buttons based on wallet lock state.
+        """
         if not self.app.wallet:
             return
 
@@ -259,9 +342,11 @@ class WalletDetailModal(Screen):
             if self.app.wallet.is_locked:
                 self.query_one("#btn_lock", Button).display = "none"
                 self.query_one("#btn_unlock", Button).display = "block"
+                self.query_one("#btn_make_address", Button).disabled = True
             else:
                 self.query_one("#btn_lock", Button).display = "block"
                 self.query_one("#btn_unlock", Button).display = "none"
+                self.query_one("#btn_make_address", Button).disabled = False
         except Exception as e:
             self.app.log_event(f"Error setting button visibility: {e}", "ERROR")
 
@@ -306,10 +391,15 @@ class WalletDetailModal(Screen):
         except Exception as e:
             self.app.log_event(f"Error refreshing status: {e}", "ERROR")
 
-    def _backup_seed(self) -> None:
-        """Placeholder for backup seed functionality."""
-        self.app.notify("Backup Seed not yet implemented", severity="warning")
+    def _make_address(self) -> None:
+        """Open make address modal."""
+        from .make_address_modal import MakeAddressModal
+        self.app.push_screen(MakeAddressModal())
 
-    def _export_keys(self) -> None:
-        """Placeholder for export keys functionality."""
-        self.app.notify("Export Keys not yet implemented", severity="warning")
+    def _export_address(self) -> None:
+        """Open export address modal."""
+        if not self.selected_address:
+            self.app.notify("No address selected", severity="warning")
+            return
+        from .export_address_modal import ExportAddressModal
+        self.app.push_screen(ExportAddressModal(self.selected_address))

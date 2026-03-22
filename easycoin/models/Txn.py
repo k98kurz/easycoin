@@ -87,7 +87,7 @@ class Txn(HashedModel):
             `TypeError` for non-dict values or `packify.UsageError` if a
             type not serializable via packify is used in the dict.
         """
-        return packify.unpack(self.data.get('details', _empty))
+        return packify.unpack(self.data.get('details', None) or _empty)
     @details.setter
     def details(self, val: dict|None):
         type_assert(isinstance(val, dict) or val is None,

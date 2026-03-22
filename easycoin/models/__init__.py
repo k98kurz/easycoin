@@ -1,6 +1,7 @@
 from .Coin import Coin
 from .Txn import Txn
 from .Wallet import Wallet
+from .Address import Address
 from .Input import Input
 from .Output import Output
 from .TrustNet import TrustNet
@@ -19,7 +20,7 @@ def set_connection_info(db_file_path: str):
         sqlite3 database file path.
     """
     models = [
-        Coin, Txn, Wallet, Input, Output,
+        Coin, Txn, Wallet, Address, Input, Output,
         TrustNet, Attestation, Confirmation, Snapshot, Chunk,
         DeletedModel,
     ]
@@ -29,7 +30,7 @@ def set_connection_info(db_file_path: str):
 def get_migrations() -> dict[str, str]:
     """Returns a dict mapping model names to migration file content strs."""
     models = [
-        Coin, Txn, Wallet, Input, Output,
+        Coin, Txn, Wallet, Address, Input, Output,
         TrustNet, Attestation, Confirmation, Snapshot, Chunk,
     ]
     migrations = {}
@@ -61,6 +62,19 @@ def get_migrations() -> dict[str, str]:
     )
     migrations['Wallet'] = migrations['Wallet'].replace(
         "('secrets').index()", "('secrets')"
+    )
+
+    migrations['Address'] = migrations['Address'].replace(
+        "('committed_script').nullable().index()", "('committed_script').nullable()"
+    )
+    migrations['Address'] = migrations['Address'].replace(
+        "('details').nullable().index()", "('details').nullable()"
+    )
+    migrations['Address'] = migrations['Address'].replace(
+        "('child_nonce').nullable().index()", "('child_nonce').nullable()"
+    )
+    migrations['Address'] = migrations['Address'].replace(
+        "...", "t.index(['nonce', 'child_nonce'])"
     )
 
     migrations['Input'] = migrations['Input'].replace(
@@ -137,7 +151,7 @@ def publish_migrations(
     for name, m in migrations.items():
         m2 = migration_callback(name, m) if migration_callback else m
         m = m2 if type(m2) is str and len(m2) > 0 else m
-        with open(f'{migration_folder_path}/create_{name}.py', 'w') as f:
+        with open(f'{migration_folder_path}/001_create_{name}.py', 'w') as f:
             f.write(m)
 
 def automigrate(migration_folder_path: str, db_file_path: str):
@@ -159,8 +173,11 @@ Txn.confirmation = has_one(Txn, Confirmation, 'txn_id')
 
 Wallet.txns = has_many(Wallet, Txn, 'wallet_id')
 Wallet.coins = has_many(Wallet, Coin, 'wallet_id')
+Wallet.addresses = has_many(Wallet, Address, 'wallet_id')
 Wallet.inputs = has_many(Wallet, Input, 'wallet_id')
 Wallet.outputs = has_many(Wallet, Output, 'wallet_id')
+
+Address.wallet = belongs_to(Address, Wallet, 'wallet_id')
 
 Input.coin = belongs_to(Input, Coin, 'id')
 Input.wallet = belongs_to(Input, Wallet, 'wallet_id')

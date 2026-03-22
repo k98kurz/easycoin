@@ -85,6 +85,11 @@ class TestTrustNetsChunksAndSnapshots(unittest.TestCase):
         assert 'features' in trustnet2.params
         assert trustnet1.id != trustnet2.id
 
+    def test_Chunk_empty_packify_properties_do_not_error(self):
+        chunk = models.Chunk()
+        chunk.data['leaves'] = None
+        assert len(chunk.leaves) == 0
+
     def test_Chunk_create_e2e(self):
         leaves = lambda l, s: [
             (i%256).to_bytes(1, 'big') * s

@@ -17,6 +17,7 @@ dependencies = [
   "tapehash >= 0.1.1",
   "crossconfig >= 0.0.3",
   "pyperclip >= 1.11.0",
+  "netaio >= 0.0.9",
 ]
 description = "Proof-of-concept + proof-of-work - consensus = easycoin."
 readme = "readme.md"
@@ -35,12 +36,8 @@ classifiers = [
 "Bug Tracker" = "https://github.com/k98kurz/easycoin/issues"
 
 [project.optional-dependencies]
-node = [
-  "netaio >= 0.0.9",
-]
 cui = [
   "textual >= 8.1.1",
-  "netaio >= 0.0.9",
 ]
 
 [project.scripts]

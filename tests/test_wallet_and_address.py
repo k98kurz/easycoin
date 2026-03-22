@@ -9,6 +9,7 @@ from tapescript import (
 )
 import os
 import sqloquent
+import struct
 import unittest
 
 
@@ -21,7 +22,7 @@ WALLET_NAME = 'test wallet'
 ANYONE_CAN_SPEND_LOCK = Script.from_src('true')
 
 
-class TestWallet(unittest.TestCase):
+class TestWalletAndAddress(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         models.set_connection_info(DB_FILEPATH)
@@ -42,7 +43,8 @@ class TestWallet(unittest.TestCase):
 
     def setUp(self):
         for m in [
-            models.Coin, models.Txn, models.Wallet, models.Input, models.Output,
+            models.Coin, models.Txn, models.Wallet, models.Address,
+            models.Input, models.Output,
             models.TrustNet, models.Attestation, models.Confirmation,
             models.Snapshot, models.Chunk,
             sqloquent.DeletedModel,
@@ -64,7 +66,7 @@ class TestWallet(unittest.TestCase):
         w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         assert type(w) is models.Wallet
         assert w.is_locked
-        assert len(w.data['seed']) == 32
+        assert len(w.data['seed']) == 80, len(w.data['seed'])
         assert len(w.checksum) == 32
 
     def test_reading_seed_from_locked_Wallet_raises_ValueError(self):
@@ -79,16 +81,6 @@ class TestWallet(unittest.TestCase):
         w.unlock(PASSWORD)
         assert not w.is_locked
         assert len(w.seed) == 32
-
-    def test_address_methods_e2e(self):
-        address = models.Wallet.make_address(ANYONE_CAN_SPEND_LOCK)
-        assert type(address) is str
-        assert models.Wallet.validate_address(address)
-        lock = models.Wallet.parse_address(address)
-        assert type(lock) is bytes
-        assert lock == ANYONE_CAN_SPEND_LOCK.bytes
-        assert not models.Wallet.validate_address(address + 'st')
-        assert not models.Wallet.validate_address(address + 'ab')
 
     def test_lock_type_methods_e2e(self):
         wallet = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
@@ -231,6 +223,78 @@ class TestWallet(unittest.TestCase):
         assert w.inputs[0].id == i.id
         assert len(w.outputs) == 1
         assert w.outputs[0].id == o.id
+
+    def test_Address_str_format_methods(self):
+        lock = b'\x01'
+        addr = models.Address({'lock': lock})
+        assert type(addr.hex) is str
+        assert len(addr.hex) == (len(lock) + 4) * 2, len(addr.hex)
+        assert models.Address.validate(addr.hex)
+        assert type(models.Address.parse(addr.hex)) is bytes, (
+            type(models.Address.parse(addr.hex)))
+        assert models.Address.parse(addr.hex) == lock, (
+            lock, models.Address.parse(addr.hex))
+        assert not models.Address.validate('12' + addr.hex)
+        assert not models.Address.validate(addr.hex + '12')
+        with self.assertRaises(TypeError):
+            models.Address.validate(b'not a str')
+
+    def test_Address_seialization_and_deserialization(self):
+        lock = b'\x01'
+        addr = models.Address({'lock': lock})
+        packed1 = addr.pack()
+        assert type(packed1) is bytes, type(packed1)
+        unpacked = models.Address.unpack(packed1)
+        assert type(unpacked) is models.Address, type(unpacked)
+        assert unpacked.lock == addr.lock
+        packed2 = addr.pack(include_wallet_info=True)
+        assert len(packed2) > len(packed1), (packed2, packed1)
+
+    def test_Wallet_Address_e2e(self):
+        w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
+        w.save()
+        w.unlock(PASSWORD)
+        lock = w.get_p2pkh_lock(w.nonce)
+        address = w.make_address(lock, w.nonce, secrets={'secret': 'passcode'})
+        assert type(address) is models.Address
+        address.save()
+
+        # reload from db
+        w = models.Wallet.find(w.id)
+        w.unlock(PASSWORD)
+        address = models.Address.find(address.id)
+
+        # test relations
+        assert address.wallet and address.wallet.id == w.id
+        assert w.addresses and [a.id for a in w.addresses] == [address.id]
+
+        # export and import: with and without password
+        exported1 = w.export_address(address, password=PASSWORD)
+        exported2 = w.export_address(address)
+        assert type(exported1) is bytes, type(exported1)
+        assert type(exported2) is bytes, type(exported2)
+        assert len(exported1) > len(exported2), (len(exported1), len(exported2))
+        
+        imported1 = w.import_address(exported1, password=PASSWORD)
+        imported2 = w.import_address(exported2)
+        assert type(imported1) is models.Address, type(imported1)
+        assert type(imported2) is models.Address, type(imported2)
+
+        # error handling
+        with self.assertRaises(TypeError):
+            w.export_address('not an address')
+        with self.assertRaises(TypeError):
+            w.export_address(address, password=b'not a string')
+        w.lock()
+        with self.assertRaises(ValueError):
+            w.export_address(address) # wallet is locked
+        w.unlock(PASSWORD)
+        with self.assertRaises(ValueError):
+            w.import_address(exported1) # missing password
+        with self.assertRaises(struct.error):
+            w.import_address(exported2[:-3]) # corrupted data
+        with self.assertRaises(ValueError):
+            w.import_address(b'akjahkjhad') # random data
 
 
 if __name__ == '__main__':

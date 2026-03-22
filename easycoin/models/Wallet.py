@@ -1,8 +1,10 @@
 from __future__ import annotations
 from .errors import type_assert, value_assert
+from .Address import Address
 from hashlib import sha256, pbkdf2_hmac
 from nacl.bindings import crypto_core_ed25519_scalar_mul, crypto_scalarmult_ed25519
 from nacl.signing import SigningKey, VerifyKey
+from netaio.crypto import seal, unseal
 from sqloquent import HashedModel, Default, RelatedCollection
 from tapehash import tapehash3
 from tapescript import (
@@ -16,7 +18,6 @@ from tapescript import (
     make_taproot_witness_keyspend,
     make_taproot_witness_scriptspend,
     clamp_scalar,
-    xor,
 )
 import os
 import packify
@@ -48,6 +49,7 @@ class Wallet(HashedModel):
     tags: str|None
     txns: RelatedCollection
     coins: RelatedCollection
+    addresses: RelatedCollection
     inputs: RelatedCollection
     outputs: RelatedCollection
 
@@ -56,7 +58,7 @@ class Wallet(HashedModel):
         """Dict mapping (nonce, child_nonce) to bytes(VerifyKey).
             Serialized by packify for ease of database persistence.
         """
-        return packify.unpack(self.data.get('pubkeys', _empty_dict))
+        return packify.unpack(self.data.get('pubkeys', None) or _empty_dict)
     @pubkeys.setter
     def pubkeys(self, val: dict[tuple[int, int|None], bytes]):
         type_assert(isinstance(val, dict),
@@ -75,7 +77,7 @@ class Wallet(HashedModel):
         """Dict mapping locks to secrets necessary for opening them.
             Intended for use with adapter signatures and HTLCs.
         """
-        return packify.unpack(self.data.get('secrets', _empty_dict))
+        return packify.unpack(self.data.get('secrets', None) or _empty_dict)
     @secrets.setter
     def secrets(self, val: dict[bytes, bytes]):
         type_assert(isinstance(val, dict), 'secrets must be dict[bytes, bytes]')
@@ -114,6 +116,22 @@ class Wallet(HashedModel):
             del self._key
         self._is_locked = True
 
+    def encrypt(self, data: bytes) -> bytes:
+        """Encrypt the data with the unlocked wallet's key and the seal
+            function from netaio.crypto. Raises `ValueError` if the
+            wallet is locked.
+        """
+        value_assert(not self.is_locked, 'cannot encrypt with locked wallet')
+        return seal(self._key, data)
+
+    def decrypt(self, data: bytes) -> bytes:
+        """Decrypt the data with the unlocked wallet's key and the
+            unseal function from netaio.crypto. Raises `ValueError` if
+            the wallet is locked.
+        """
+        value_assert(not self.is_locked, 'cannot decrypt with locked wallet')
+        return unseal(self._key, data)
+
     @staticmethod
     def generate_seed_phrase(wordlist: tuple[str]) -> list[str]:
         """Generates a seed phrase from the supplied wordlist using
@@ -148,7 +166,7 @@ class Wallet(HashedModel):
         key = pbkdf2_hmac(
             'sha256', password.encode(), sha256(b'easycoin').digest(), 10000
         )
-        seed = xor(seed, key)
+        seed = seal(key, seed)
         checksum = sha256(key + b'checksum check').digest()
         return cls({
             'seed': seed,
@@ -156,44 +174,85 @@ class Wallet(HashedModel):
             'name': name,
         })
 
-    @staticmethod
-    def make_address(lock: bytes|Script) -> str:
-        """Makes a somewhat human-readable address from a lock. The
-            address will include a 4-byte checksum to detect errors.
-            Raises `TypeError` if the lock is not a `bytes|Script`.
+    def make_address(
+            self, lock: bytes|Script, nonce: int, *,
+            committed_script: bytes|Script|None = None,
+            secrets: dict|None = None,
+        ) -> Address:
+        """Creates an `Address` for this wallet, but does not persist to
+            the database. Raises `TypeError` for invalid parameters.
         """
         type_assert(type(lock) in (bytes, Script),
-            'lock must be bytes|Script')
+            f'lock must be bytes|Script; not {type(lock)}')
+        type_assert(type(nonce) is int, 'nonce must be int')
+        type_assert(type(committed_script) in (bytes, Script, type(None)),
+            'committed_script must be bytes|Script|None; '
+            f'not {type(committed_script)}')
+        if not secrets:
+            secrets = {}
+        type_assert(type(secrets) is dict,
+            f'secrets must be dict|None; not {type(secrets)}')
         lock = lock.bytes if type(lock) is Script else lock
-        checksum = sha256(lock).digest()[:4]
-        return (lock + checksum).hex()
+        if type(committed_script) is Script:
+            committed_script = committed_script.bytes
+        address = Address()
+        address.lock = lock
+        address.nonce = nonce
+        address.committed_script = committed_script
+        address.secrets = self.encrypt(packify.pack(secrets))
+        address.wallet_id = self.id
+        return address
 
-    @staticmethod
-    def validate_address(address: str) -> bool:
-        """Validates an address. Returns False if the checksum check
-            fails or if the script cannot be decompiled. Raises
-            `TypeError` if the address is not a `str`.
+    def export_address(self, address: Address, *, password: str = '') -> bytes:
+        """Exports an address in a way that is portable between wallets.
+            Decrypts secrets with wallet key and optionally reencrypts
+            with the given password. Raises `ValueError` if wallet is
+            locked or if the address secrets could not be decrypted.
+            Raises `TypeError` for invalid parameter types.
         """
-        type_assert(type(address) is str, 'address must be str')
-        try:
-            address = bytes.fromhex(address)
-            lock = address[:-4]
-            checksum = address[-4:]
-            Script.from_bytes(lock)
-            return sha256(lock).digest()[:4] == checksum
-        except:
-            return False
+        type_assert(isinstance(address, Address),
+            f'address must be Address, not {type(address)}')
+        type_assert(type(password) is str,
+            f'password must be str, not {type(password)}')
+        secrets = self.decrypt(address.secrets)
+        if password:
+            key = pbkdf2_hmac(
+                'sha256', password.encode(), sha256(b'easycoin').digest(), 10000
+            )
+            secrets = seal(key, secrets)
+        return packify.pack({
+            'data': address.pack(),
+            'secrets': secrets
+        })
 
-    @staticmethod
-    def parse_address(address: str) -> bytes:
-        """Parses an address into the lock bytes. Raises `TypeError` if
-            address is not a `str`. Raises `ValueError` if validation
-            fails.
+    def import_address(self, data: bytes, *, password: str = '') -> Address:
+        """Imports an address that had been previously exported. If a
+            password is supplied, any secrets included in the serialized
+            address will be decrypted first. Raises `ValueError` or
+            `struct.error` if a password is required and not supplied, or
+            if the serialized data is corrupted.
         """
-        type_assert(type(address) is str, 'address must be str')
-        value_assert(Wallet.validate_address(address),
-            'cannot parse an invalid address')
-        return bytes.fromhex(address)[:-4]
+        address = packify.unpack(data)
+        value_assert(type(address) is dict,
+            f'invalid address format: must unpack into dict, not {type(address)}')
+        value_assert('data' in address,
+            'invalid address format: unpacked dict missing data')
+        value_assert('secrets' in address,
+            'invalid address format: unpacked dict missing secrets')
+        secrets = address['secrets']
+        if password:
+            key = pbkdf2_hmac(
+                'sha256', password.encode(), sha256(b'easycoin').digest(), 10000
+            )
+            secrets = unseal(key, secrets)
+        value_assert(type(packify.unpack(secrets)) is dict,
+            'invalid address format: secrets must unpack into dict, '
+            f'not {type(secrets)}'
+        )
+        secrets = self.encrypt(secrets)
+        addr = Address.unpack(address['data'])
+        addr.secrets = secrets
+        return addr
 
     @staticmethod
     def get_lock_type(lock: Script|bytes) -> str:
@@ -250,12 +309,12 @@ class Wallet(HashedModel):
         """
         value_assert(not self.is_locked,
             'cannot read the seed from a locked wallet')
-        return xor(self._key, self.data['seed'])
+        return self.decrypt(self.data['seed'])
     @seed.setter
     def seed(self, val: str):
         value_assert(not self.is_locked,
             'cannot set the seed of a locked wallet')
-        self.data['seed'] = xor(self._key, val)
+        self.data['seed'] = self.encrypt(val)
 
     def get_seed(self, nonce: int, child_nonce: int|None = None) -> bytes:
         """Derives the seed with the given nonce. If child_nonce is

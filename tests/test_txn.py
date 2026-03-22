@@ -55,6 +55,14 @@ class TestTxn(unittest.TestCase):
             m.query().delete()
         super().setUp()
 
+    def test_empty_packify_properties_do_not_error(self):
+        txn = models.Txn()
+        txn.data['details'] = None
+        txn.data['witness'] = None
+
+        assert txn.details == {}
+        assert txn.witness == {}
+
     def test_details_serializes_properly(self):
         t = models.Txn()
         t.details = {'test': 123}

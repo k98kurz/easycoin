@@ -57,7 +57,7 @@ class Chunk(HashedModel):
             are intended to make sure an individual chunk can fit within
             a UDP datagram.
         """
-        return packify.unpack(self.data.get('leaves', _empty_tuple))
+        return packify.unpack(self.data.get('leaves', None) or _empty_tuple)
     @leaves.setter
     def leaves(self, val: list[bytes]):
         type_assert(type(val) is list, 'leaves must be list[bytes]')
