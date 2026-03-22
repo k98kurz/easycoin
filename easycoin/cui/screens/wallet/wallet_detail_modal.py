@@ -1,11 +1,15 @@
-from textual.screen import Screen
+from textual import on
 from textual.app import ComposeResult
-from textual.containers import Vertical, Horizontal
+from textual.binding import Binding
+from textual.containers import Vertical, VerticalScroll, Horizontal, ItemGrid
+from textual.screen import Screen
 from textual.widgets import Button, DataTable, Static
 from textual.widgets.data_table import RowKey
-from textual.binding import Binding
 from easycoin.cui.clipboard import universal_copy
 from easycoin.models import Wallet, Address, Coin
+from .export_address_modal import ExportAddressModal
+from .import_address_modal import ImportAddressModal
+from .make_address_modal import MakeAddressModal
 from .unlock_modal import UnlockWalletModal
 
 
@@ -24,10 +28,10 @@ class WalletDetailModal(Screen):
 
     def compose(self) -> ComposeResult:
         """Compose wallet detail modal layout."""
-        with Vertical(id="wallet_detail", classes="modal-container"):
+        with VerticalScroll(id="wallet_detail", classes="modal-container"):
             yield Static("Wallet Details", classes="modal-title")
 
-            with Vertical(classes="card"):
+            with Vertical(classes="border-solid-primary px-1 h-10 my-1"):
                 yield Static("Loading...", id="wallet_name_display", classes="text-bold")
                 yield Static("Loading...", id="wallet_id_display", classes="text-muted")
 
@@ -41,17 +45,31 @@ class WalletDetailModal(Screen):
                         yield Static("Status:", classes="text-muted")
                         yield Static("Loading...", id="wallet_status")
 
-            yield Static("\n")
+            yield Static("Addresses", classes="py-1 bold")
+            yield DataTable(id="address_book", classes="h-min-10")
 
-            yield Static("Address Book", classes="panel-title")
-            yield DataTable(id="address_book")
-
-            with Horizontal(id="modal_actions"):
+            with ItemGrid(id="modal_actions", min_column_width=18):
                 yield Button("Unlock", id="btn_unlock", variant="primary")
                 yield Button("Lock", id="btn_lock", variant="primary")
-                yield Button("Copy Address", id="btn_copy_address", variant="default", disabled=True)
-                yield Button("Make Address", id="btn_make_address", variant="default")
-                yield Button("Export Address", id="btn_export_address", variant="default", disabled=True)
+                yield Button(
+                    "Make Address", id="btn_make_address", variant="default"
+                )
+                yield Button(
+                    "Import Address", id="btn_import_address", variant="default",
+                    disabled=True
+                )
+                yield Button(
+                    "Export Address", id="btn_export_address", variant="default",
+                    disabled=True
+                )
+                yield Button(
+                    "Copy Address", id="btn_copy_address", variant="default",
+                    disabled=True
+                )
+                yield Button(
+                    "Delete Address", id="btn_delete_address", variant="error",
+                    disabled=True
+                )
                 yield Button("Close", id="btn_close", variant="default")
 
     def on_mount(self) -> None:
@@ -116,17 +134,7 @@ class WalletDetailModal(Screen):
                 table = self.query_one("#address_book", DataTable)
                 table.add_columns("Address", "Status", "Coins", "Balance")
 
-                self._row_map = {}
-                address_book = self._get_address_book()
-                for status, address_hex, balance, count, addr in address_book:
-                    row_key = table.add_row(
-                        self._truncate_address(address_hex),
-                        status,
-                        str(count),
-                        str(balance)
-                    )
-                    if addr:
-                        self._row_map[row_key] = addr
+                self._refresh_address_book()
             except Exception as e:
                 self.app.notify(f"Error loading address book: {e}", severity="error")
         except Exception as e:
@@ -190,6 +198,9 @@ class WalletDetailModal(Screen):
                     self.query_one(
                         "#btn_copy_address", Button
                     ).disabled = True
+                    self.query_one(
+                        "#btn_delete_address", Button
+                    ).disabled = True
                     return
                 row_key = table.coordinate_to_cell_key(cursor).row_key
 
@@ -203,6 +214,9 @@ class WalletDetailModal(Screen):
                 self.query_one(
                     "#btn_copy_address", Button
                 ).disabled = False
+                self.query_one(
+                    "#btn_delete_address", Button
+                ).disabled = False
             else:
                 self.selected_address = None
                 self.query_one(
@@ -210,6 +224,9 @@ class WalletDetailModal(Screen):
                 ).disabled = True
                 self.query_one(
                     "#btn_copy_address", Button
+                ).disabled = True
+                self.query_one(
+                    "#btn_delete_address", Button
                 ).disabled = True
         except Exception as e:
             self.app.log_event(f"Error updating selection: {e}", "ERROR")
@@ -291,6 +308,7 @@ class WalletDetailModal(Screen):
             self.selected_address = None
             self.query_one("#btn_export_address", Button).disabled = True
             self.query_one("#btn_copy_address", Button).disabled = True
+            self.query_one("#btn_delete_address", Button).disabled = True
             self._set_button_visibility()
             self._refresh_status()
         except Exception as e:
@@ -299,7 +317,9 @@ class WalletDetailModal(Screen):
 
     def _truncate_address(self, address: str) -> str:
         """Truncate address for display."""
-        return f"{address[:16]}...{address[-8:]}"
+        if len(address) < 100:
+            return address
+        return f"{address[:92]}...{address[-8:]}"
 
     def _truncate_id(self, wallet_id: str) -> str:
         """Truncate wallet ID for display."""
@@ -343,10 +363,12 @@ class WalletDetailModal(Screen):
                 self.query_one("#btn_lock", Button).display = "none"
                 self.query_one("#btn_unlock", Button).display = "block"
                 self.query_one("#btn_make_address", Button).disabled = True
+                self.query_one("#btn_import_address", Button).disabled = True
             else:
                 self.query_one("#btn_lock", Button).display = "block"
                 self.query_one("#btn_unlock", Button).display = "none"
                 self.query_one("#btn_make_address", Button).disabled = False
+                self.query_one("#btn_import_address", Button).disabled = False
         except Exception as e:
             self.app.log_event(f"Error setting button visibility: {e}", "ERROR")
 
@@ -393,13 +415,64 @@ class WalletDetailModal(Screen):
 
     def _make_address(self) -> None:
         """Open make address modal."""
-        from .make_address_modal import MakeAddressModal
         self.app.push_screen(MakeAddressModal())
+
+    @on(Button.Pressed, "#btn_import_address")
+    def _import_address(self) -> None:
+        """Open import address modal."""
+        self.app.push_screen(ImportAddressModal())
 
     def _export_address(self) -> None:
         """Open export address modal."""
         if not self.selected_address:
             self.app.notify("No address selected", severity="warning")
             return
-        from .export_address_modal import ExportAddressModal
         self.app.push_screen(ExportAddressModal(self.selected_address))
+
+    @on(Button.Pressed, "#btn_delete_address")
+    def _delete_address(self) -> None:
+        """Delete selected address."""
+        if not self.selected_address:
+            self.app.notify("No address selected", severity="warning")
+            return
+
+        try:
+            address_hex = self.selected_address.hex
+            self.selected_address.delete()
+            self.selected_address = None
+            self.app.notify(
+                f"Address deleted: {self._truncate_address(address_hex)}",
+                severity="success"
+            )
+            self._refresh_address_book()
+        except Exception as e:
+            self.app.notify(f"Error deleting address: {e}", severity="error")
+            self.app.log_event(f"Delete address error: {e}", "ERROR")
+
+    def _refresh_address_book(self) -> None:
+        """Refresh the address book table."""
+        try:
+            table = self.query_one("#address_book", DataTable)
+            table.clear()
+            self._row_map = {}
+            self.selected_address = None
+
+            # Disable selection-dependent buttons
+            self.query_one("#btn_export_address", Button).disabled = True
+            self.query_one("#btn_copy_address", Button).disabled = True
+            self.query_one("#btn_delete_address", Button).disabled = True
+
+            self._row_map = {}
+            address_book = self._get_address_book()
+            for status, address_hex, balance, count, addr in address_book:
+                row_key = table.add_row(
+                    self._truncate_address(address_hex),
+                    status,
+                    str(count),
+                    str(balance)
+                )
+                if addr:
+                    self._row_map[row_key] = addr
+        except Exception as e:
+            self.app.notify(f"Error refreshing address book: {e}", severity="error")
+            self.app.log_event(f"Refresh address book error: {e}", "ERROR")

@@ -251,6 +251,7 @@ class Wallet(HashedModel):
         )
         secrets = self.encrypt(secrets)
         addr = Address.unpack(address['data'])
+        addr.wallet_id = self.id
         addr.secrets = secrets
         return addr
 

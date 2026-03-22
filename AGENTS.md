@@ -15,7 +15,17 @@ Do NOT stage changes unless explicitly instructed to.
 Before assuming something about the system, check the available documentation in the
 docs/ folder:
 
-- models.md: sqloquent models, many of which have important functionality
+- models.md: sqloquent models, many of which have important functionality, e.g.
+    - Wallet
+    - Coin
+    - Txn
+    - Input
+    - Output
+    - TrustNet
+    - Attestation
+    - Confirmation
+    - Snapshot
+    - Chunk
 - sqloquent.md: sqloquent package
 
 Be sure to grep through the files to find the right line numbers before reading them
@@ -81,6 +91,10 @@ if  (   some_long_condition_goes >= here_first
 - Quote code (variable names, types, etc) within the docstring using backticks
 - Closing quotation marks on own line except for short, one-line docstrings
 - File-level multiline docstrings should be unindented and should start on own line
+- Do NOT write docstrings that are improperly indented
+- Do NOT add empty lines in docstrings
+- Do NOT add "Arg: " and "Returns: " lists
+- ONLY include information that is not obvious from the annotations
 
 Examples:
 ```python
@@ -126,6 +140,18 @@ import json # stdlib
 import os # stdlib
 import packify # external package
 ```
+
+### Textual CUI
+
+#### Button Event Management
+
+- Prefer the `@on` decorator over long `on_button_pressed()` methods
+
+#### Element Styling
+
+- The styles are contained in easycoin/cui/styles.tcss
+- Prefer the existing tailwind-like classes over creating a new custom class/whatever
+- If there is an opportunity to make a new tailwind-like class for a style, make it
 
 ### Testing Style
 
