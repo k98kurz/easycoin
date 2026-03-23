@@ -13,6 +13,15 @@ class ImportAddressModal(Screen):
         Binding("escape", "cancel", "Cancel"),
     ]
 
+    def __init__(self, success_callback=None):
+        """Initialize import address modal.
+
+        Args:
+            success_callback: Optional callback to call after address is imported
+        """
+        super().__init__()
+        self.success_callback = success_callback
+
     def compose(self) -> ComposeResult:
         """Compose import address modal layout."""
         with Vertical(id="import_address_modal", classes="modal-container"):
@@ -72,6 +81,8 @@ class ImportAddressModal(Screen):
             address.save()
             self.app.notify("Address imported", severity="success")
             self.app.pop_screen()
+            if self.success_callback:
+                self.app.call_later(self.success_callback)
         except ValueError as e:
             self.app.notify(f"Import failed: {e}", severity="error")
             self.app.log_event(f"Import address error: {e}", "ERROR")

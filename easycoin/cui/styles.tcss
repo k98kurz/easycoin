@@ -240,6 +240,11 @@ CreateWalletModal {
     background: $background 50%;
 }
 
+/* Restore Wallet Modal */
+RestoreWalletModal {
+    background: $background 50%;
+}
+
 /* Unlock Wallet Modal */
 UnlockWalletModal {
     background: $background 50%;

@@ -20,9 +20,14 @@ class MakeAddressModal(Screen):
         ("P2TR", "Pay to Taproot"),
     ]
 
-    def __init__(self):
-        """Initialize make address modal."""
+    def __init__(self, success_callback=None):
+        """Initialize make address modal.
+
+        Args:
+            success_callback: Optional callback to call after address is saved
+        """
         super().__init__()
+        self.success_callback = success_callback
         self.selected_type = "P2PK"
         self.current_lock = None
         self.current_committed_script = None
@@ -157,6 +162,8 @@ class MakeAddressModal(Screen):
             truncated = f"{address.hex[:16]}..."
             self.app.notify(f"Address saved: {truncated}", severity="success")
             self.app.pop_screen()
+            if self.success_callback:
+                self.app.call_later(self.success_callback)
         except Exception as e:
             self.app.notify(f"Error saving address: {e}", severity="error")
             self.app.log_event(f"Save address error: {e}", "ERROR")

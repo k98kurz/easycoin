@@ -6,6 +6,7 @@ from easycoin.models import Wallet, Coin
 from ..base import BaseScreen
 from easycoin.cui.widgets.confirmation_modal import ConfirmationModal
 from .create_wallet import CreateWalletModal
+from .restore_wallet import RestoreWalletModal
 from .unlock_modal import UnlockWalletModal
 from .wallet_detail_modal import WalletDetailModal
 
@@ -64,6 +65,7 @@ class WalletListScreen(BaseScreen):
         super().on_mount()
         table = self.query_one("#wallets_table", DataTable)
         table.add_columns("Name", "Wallet ID", "Status", "Balance", "Active", "Tags")
+        table.cursor_type = "row"
         self.call_later(self._load_wallet_list_data)
         self.call_later(self._update_button_state)
 
@@ -120,7 +122,7 @@ class WalletListScreen(BaseScreen):
     @on(Button.Pressed, "#btn_restore")
     def action_restore_wallet(self) -> None:
         """Restore wallet from seed."""
-        self.app.notify("Restore Wallet screen not yet implemented", severity="warning")
+        self.app.push_screen(RestoreWalletModal(self._refresh_table))
 
     @on(Button.Pressed, "#btn_select")
     def action_select_wallet(self) -> None:

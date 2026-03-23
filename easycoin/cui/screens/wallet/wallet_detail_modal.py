@@ -415,12 +415,16 @@ class WalletDetailModal(Screen):
 
     def _make_address(self) -> None:
         """Open make address modal."""
-        self.app.push_screen(MakeAddressModal())
+        self.app.push_screen(
+            MakeAddressModal(self._refresh_address_book)
+        )
 
     @on(Button.Pressed, "#btn_import_address")
     def _import_address(self) -> None:
         """Open import address modal."""
-        self.app.push_screen(ImportAddressModal())
+        self.app.push_screen(
+            ImportAddressModal(self._refresh_address_book)
+        )
 
     def _export_address(self) -> None:
         """Open export address modal."""
