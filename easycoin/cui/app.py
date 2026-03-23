@@ -5,7 +5,7 @@ from textual.widgets import Static
 from easycoin.config import ConfigManager
 from easycoin.cui.state import StateManager
 from easycoin.cui.screens.dashboard import DashboardScreen
-from easycoin.cui.screens.wallet.wallet_list import WalletListScreen
+from easycoin.cui.screens.wallet.main_screen import WalletListScreen
 from easycoin.cui.screens.coins.placeholder import CoinsScreen
 from easycoin.cui.screens.transactions.placeholder import TransactionsScreen
 from easycoin.cui.screens.network.placeholder import NetworkScreen

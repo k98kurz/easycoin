@@ -5,8 +5,8 @@ from textual.widgets import Button, DataTable, Static
 from easycoin.models import Wallet, Coin
 from ..base import BaseScreen
 from easycoin.cui.widgets.confirmation_modal import ConfirmationModal
-from .create_wallet import CreateWalletModal
-from .restore_wallet import RestoreWalletModal
+from .create_wallet_modal import CreateWalletModal
+from .restore_wallet_modal import RestoreWalletModal
 from .unlock_modal import UnlockWalletModal
 from .wallet_detail_modal import WalletDetailModal
 

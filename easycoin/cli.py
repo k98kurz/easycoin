@@ -33,7 +33,7 @@ def daemon():
     print("Not yet implemented")
 
 
-def interactive():
+def interactive(debug = False):
     config = ConfigManager("easycoin")
     config.load()
     db_path = config.get_db_path()
@@ -45,9 +45,12 @@ def interactive():
 
     try:
         from .cui import EasyCoinApp
-    except ImportError:
-        print("Error: the optional cui dependency is missing.")
-        print("Install it with `pip install easycoin[cui]`.")
+    except ImportError as e:
+        if debug:
+            print(e)
+        else:
+            print("Error: the optional cui dependency is missing.")
+            print("Install it with `pip install easycoin[cui]`.")
         exit(4)
 
     app = EasyCoinApp()
@@ -80,7 +83,7 @@ def run():
         exit()
 
     if '--interactive' in argv or '-i' in argv:
-        interactive()
+        interactive('--debug' in argv)
         exit()
 
     if '--help' in argv or '-h' in argv:

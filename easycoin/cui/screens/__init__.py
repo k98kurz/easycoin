@@ -1,7 +1,7 @@
 """EasyCoin CUI screens package."""
 
 from .dashboard import DashboardScreen
-from .wallet.wallet_list import WalletListScreen
+from .wallet.main_screen import WalletListScreen
 
 __all__ = [
     "DashboardScreen",
