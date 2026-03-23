@@ -143,15 +143,17 @@ import packify # external package
 
 ### Textual CUI
 
-#### Button Event Management
+#### Event Management
 
+- Prefer using the `BINDINGS` with `action_*()` handlers over `on_key()` 
 - Prefer the `@on` decorator over long `on_button_pressed()` methods
 
 #### DataTable
 
 - Use "row" cursor type: `table.cursor_type = "row"` after `add_columns()`
 - Default cursor highlights individual cells, "row" highlights the whole row
-- `table.get_row_at(table.cursor_row)` returns the tuple of column values for the selected row
+- `table.get_row_at(table.cursor_row)` returns the tuple of column values for
+the selected row
 
 #### Element Styling
 

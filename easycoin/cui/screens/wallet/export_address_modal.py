@@ -1,8 +1,9 @@
 from textual.screen import Screen
 from textual.app import ComposeResult
-from textual.containers import Vertical, Horizontal
-from textual.widgets import Button, Static, Input
+from textual.containers import Vertical, VerticalScroll, Horizontal, ItemGrid
+from textual.widgets import Button, Static, Input, TextArea
 from textual.binding import Binding
+from tapescript import Script
 from easycoin.cui.clipboard import universal_copy
 from easycoin.models import Address
 
@@ -20,26 +21,39 @@ class ExportAddressModal(Screen):
         self.address = address
         self.exported_hex = None
 
+        try:
+            self.decompiled_lock = Script.from_bytes(address.lock).src
+        except Exception:
+            self.decompiled_lock = "Error decompiling lock"
+
     def compose(self) -> ComposeResult:
         """Compose export address modal layout."""
-        with Vertical(id="export_address_modal", classes="modal-container"):
-            yield Static("Export Address", classes="modal-title")
+        with VerticalScroll(id="export_address_modal", classes="modal-container"):
+            yield Static("View/Export Address", classes="modal-title")
             yield Static("\n")
 
             yield Static(f"Address: {self.address.hex}", classes="text-bold")
             yield Static("")
 
-            yield Static(
-                "Password (optional, encrypts secrets):\n",
-                classes="text-bold"
-            )
-            yield Input(
-                placeholder="Leave empty for no password",
-                password=True,
-                id="password_input"
-            )
+            with Horizontal(classes="h-min-5"):
+                with Vertical():
+                    yield Static(
+                        "Password (optional):\n",
+                        classes="text-bold"
+                    )
+                    yield Input(
+                        placeholder="Leave empty to export secrets unencrypted",
+                        password=True,
+                        id="password_input"
+                    )
+                with Vertical():
+                    yield Static("Filename:\n", classes="form-label")
+                    yield Input(
+                        placeholder="address_export.hex",
+                        id="file_input"
+                    )
 
-            yield Static("")
+            yield Static("\n")
             yield Static("Exported Data:\n", classes="form-label")
             yield Static(
                 "Click Export to generate",
@@ -47,13 +61,13 @@ class ExportAddressModal(Screen):
                 classes="text-muted"
             )
             yield Static("\n")
-            yield Static("Filename:\n", classes="form-label")
-            yield Input(
-                placeholder="address_export.hex",
-                id="file_input"
+            yield Static("Lock (Decompiled):\n", classes="form-label")
+            yield TextArea(
+                self.decompiled_lock, read_only=True, show_line_numbers=False,
+                soft_wrap=True, id="lock_display", classes="h-10"
             )
 
-            with Horizontal(id="export_actions"):
+            with ItemGrid(id="modal_actions", min_column_width=18):
                 yield Button("Export", id="btn_export", variant="primary")
                 yield Button("Cancel", id="btn_cancel", variant="default")
                 yield Button(
@@ -65,7 +79,6 @@ class ExportAddressModal(Screen):
                     variant="default",
                     disabled=True
                 )
-
 
     def on_mount(self) -> None:
         """Focus password input on mount."""

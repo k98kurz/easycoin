@@ -1,24 +1,25 @@
-from textual.screen import Screen
+from textual.screen import ModalScreen
 from textual.app import ComposeResult
 from textual.containers import Vertical, Horizontal
 from textual.widgets import Static, Button
 
 
-class ConfirmationModal(Screen):
+class ConfirmationModal(ModalScreen):
     """General purpose confirmation modal dialog."""
 
-    def __init__(self, title: str, message: str, callback=None):
-        """Initialize confirmation modal.
-
-        Args:
-            title: Modal title text
-            message: Confirmation message/question
-            callback: Optional callback to call on confirm
-        """
+    def __init__(
+            self, title: str, message: str, *,
+            confirm_btn_variant="success", confirm_btn_classes="",
+            cancel_btn_variant="default", cancel_btn_classes="",
+        ):
+        """Initialize confirmation modal."""
         super().__init__()
         self.title = title
         self.message = message
-        self.callback = callback
+        self.confirm_btn_variant = confirm_btn_variant
+        self.confirm_btn_classes = confirm_btn_classes
+        self.cancel_btn_variant = cancel_btn_variant
+        self.cancel_btn_classes = cancel_btn_classes
 
     def compose(self) -> ComposeResult:
         """Compose confirmation modal layout."""
@@ -27,15 +28,18 @@ class ConfirmationModal(Screen):
             yield Static("\n")
             yield Static(self.message)
             with Horizontal(id="modal_actions"):
-                yield Button("Confirm", id="btn_confirm", variant="success")
-                yield Button("Cancel", id="btn_cancel", variant="default")
-            yield Static("")
+                yield Button(
+                    "Confirm", id="btn_confirm", variant=self.confirm_btn_variant,
+                    classes=self.confirm_btn_classes,
+                )
+                yield Button(
+                    "Cancel", id="btn_cancel", variant=self.cancel_btn_variant,
+                    classes=self.cancel_btn_classes,
+                )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button clicks."""
         if event.button.id == "btn_confirm":
-            if self.callback:
-                self.callback()
-            self.app.pop_screen()
+            self.dismiss(True)
         elif event.button.id == "btn_cancel":
-            self.app.pop_screen()
+            self.dismiss(False)

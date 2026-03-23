@@ -3,9 +3,10 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll, Horizontal, ItemGrid
 from textual.screen import Screen
-from textual.widgets import Button, DataTable, Static
+from textual.widgets import Button, DataTable, Static, Footer
 from textual.widgets.data_table import RowKey
 from easycoin.cui.clipboard import universal_copy
+from easycoin.cui.widgets.confirmation_modal import ConfirmationModal
 from easycoin.models import Wallet, Address, Coin
 from .export_address_modal import ExportAddressModal
 from .import_address_modal import ImportAddressModal
@@ -17,7 +18,13 @@ class WalletDetailModal(Screen):
     """Modal for displaying wallet details."""
 
     BINDINGS = [
-        Binding("ctrl+c", "copy_address", "Copy Address", show=False),
+        Binding("l", "toggle_lock", "Lock/Unlock"),
+        Binding("a", "make_address", "Make Address"),
+        Binding("i", "import_address", "Import Address"),
+        Binding("v", "export_address", "View/Export Address"),
+        Binding("c", "copy_address", "Copy Address"),
+        Binding("d", "delete_address", "Delete Address"),
+        Binding("escape", "cancel", "Cancel"),
     ]
 
     def __init__(self):
@@ -32,8 +39,12 @@ class WalletDetailModal(Screen):
             yield Static("Wallet Details", classes="modal-title")
 
             with Vertical(classes="border-solid-primary px-1 h-10 my-1"):
-                yield Static("Loading...", id="wallet_name_display", classes="text-bold")
-                yield Static("Loading...", id="wallet_id_display", classes="text-muted")
+                yield Static(
+                    "Loading...", id="wallet_name_display", classes="text-bold"
+                )
+                yield Static(
+                    "Loading...", id="wallet_id_display", classes="text-muted"
+                )
 
                 yield Static("")
 
@@ -59,7 +70,7 @@ class WalletDetailModal(Screen):
                     disabled=True
                 )
                 yield Button(
-                    "Export Address", id="btn_export_address", variant="default",
+                    "View/Export", id="btn_export_address", variant="default",
                     disabled=True
                 )
                 yield Button(
@@ -71,6 +82,7 @@ class WalletDetailModal(Screen):
                     disabled=True
                 )
                 yield Button("Close", id="btn_close", variant="default")
+        yield Footer()
 
     def on_mount(self) -> None:
         """Populate wallet info and address book table on mount."""
@@ -81,7 +93,7 @@ class WalletDetailModal(Screen):
     def _load_wallet_data(self) -> None:
         """Load wallet data with error handling."""
         try:
-            if not self.app.wallet: 
+            if not self.app.wallet:
                 self.app.notify("Wallet not available in memory", severity="error")
                 self.app.pop_screen()
                 return
@@ -141,26 +153,21 @@ class WalletDetailModal(Screen):
             self.app.notify(f"Error loading wallet: {e}", severity="error")
             self.app.log_event(f"Error loading wallet data: {e}", "ERROR")
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button clicks."""
-        if event.button.id == "btn_unlock":
-            self._unlock()
-        elif event.button.id == "btn_lock":
-            self._lock()
-        elif event.button.id == "btn_copy_address":
-            self._copy_address()
-        elif event.button.id == "btn_make_address":
-            self._make_address()
-        elif event.button.id == "btn_export_address":
-            self._export_address()
-        elif event.button.id == "btn_close":
-            self.app.pop_screen()
+    def action_toggle_lock(self) -> None:
+        if not self.app.wallet:
+            return
+        if self.app.wallet.is_locked:
+            self.action_unlock()
+        else:
+            self.action_lock()
 
+    @on(Button.Pressed, "#btn_close")
+    def action_cancel(self) -> None:
+        """Close wallet detail modal. Action handler for Escape key."""
+        self.app.pop_screen()
+
+    @on(Button.Pressed, "#btn_copy_address")
     def action_copy_address(self) -> None:
-        """Action handler for Ctrl+C binding."""
-        self._copy_address()
-
-    def _copy_address(self) -> None:
         """Copy selected address hex to clipboard."""
         if not self.selected_address:
             self.app.notify("No address selected", severity="warning")
@@ -173,10 +180,106 @@ class WalletDetailModal(Screen):
             self.app.notify(f"Failed to copy: {e}", severity="error")
             self.app.log_event(f"Copy address error: {e}", "ERROR")
 
-    def on_key(self, event) -> None:
-        """Handle keyboard events."""
-        if event.key == "escape":
-            self.app.pop_screen()
+    @on(Button.Pressed, "#btn_unlock")
+    def action_unlock(self) -> None:
+        """Unlock wallet."""
+        if not self.app.wallet:
+            self.app.notify("Wallet not loaded", severity="error")
+            return
+
+        try:
+            def on_unlock_success():
+                self._set_status("Unlocked")
+                self._set_button_visibility()
+                self._refresh_data()
+                self._update_selection_for_cursor()
+            self.app.push_screen(UnlockWalletModal(
+                self.app.wallet.id, on_unlock_success
+            ))
+        except Exception as e:
+            self.app.notify(f"Error toggling lock: {e}", severity="error")
+            self.app.log_event(f"Toggle lock error: {e}", "ERROR")
+
+    @on(Button.Pressed, "#btn_lock")
+    def action_lock(self) -> None:
+        """Lock wallet."""
+        if not self.app.wallet:
+            self.app.notify("Wallet not loaded", severity="error")
+            return
+
+        try:
+            self.app.wallet.lock()
+            self.app.log_event("Wallet locked", "INFO")
+            self.selected_address = None
+            self.query_one("#btn_export_address", Button).disabled = True
+            self.query_one("#btn_copy_address", Button).disabled = True
+            self.query_one("#btn_delete_address", Button).disabled = True
+            self._set_button_visibility()
+            self._refresh_status()
+        except Exception as e:
+            self.app.notify(f"Error toggling lock: {e}", severity="error")
+            self.app.log_event(f"Toggle lock error: {e}", "ERROR")
+
+    @on(Button.Pressed, "#btn_make_address")
+    def action_make_address(self) -> None:
+        """Open make address modal."""
+        self.app.push_screen(
+            MakeAddressModal(self._refresh_address_book)
+        )
+
+    @on(Button.Pressed, "#btn_import_address")
+    def action_import_address(self) -> None:
+        """Open import address modal."""
+        self.app.push_screen(
+            ImportAddressModal(self._refresh_address_book)
+        )
+
+    @on(Button.Pressed, "#btn_export_address")
+    def action_export_address(self) -> None:
+        """Open export address modal."""
+        if not self.selected_address:
+            self.app.notify("No address selected", severity="warning")
+            return
+        self.app.push_screen(ExportAddressModal(self.selected_address))
+
+    @on(Button.Pressed, "#btn_delete_address")
+    def action_delete_address(self) -> None:
+        """Delete selected address with confirmation."""
+        if not self.selected_address:
+            self.app.notify("No address selected", severity="warning")
+            return
+
+        address_hex = self.selected_address.hex
+        truncated = self._truncate_address(address_hex)
+        message = (
+            f"Are you sure you want to delete address "
+            f"'{truncated}'? This action cannot be undone."
+        )
+
+        def confirm_delete(result: bool):
+            if not result:
+                return
+
+            try:
+                self.selected_address.delete()
+                self.selected_address = None
+                self.app.notify(
+                    f"Address deleted: {truncated}",
+                    severity="success"
+                )
+                self._refresh_address_book()
+            except Exception as e:
+                self.app.notify(
+                    f"Error deleting address: {e}", severity="error"
+                )
+                self.app.log_event(f"Delete address error: {e}", "ERROR")
+
+        modal = ConfirmationModal(
+            title="Confirm Delete Address",
+            message=message,
+            confirm_btn_variant="warning",
+        )
+        self.app.push_screen(modal, confirm_delete)
 
     def on_data_table_row_highlighted(
             self, event: DataTable.RowHighlighted
@@ -279,42 +382,6 @@ class WalletDetailModal(Screen):
 
         return entries
 
-    def _unlock(self) -> None:
-        """Unlock wallet."""
-        if not self.app.wallet:
-            self.app.notify("Wallet not loaded", severity="error")
-            return
-
-        try:
-            def on_unlock_success():
-                self._set_status("Unlocked")
-                self._set_button_visibility()
-                self._refresh_data()
-                self._update_selection_for_cursor()
-            self.app.push_screen(UnlockWalletModal(self.app.wallet.id, on_unlock_success))
-        except Exception as e:
-            self.app.notify(f"Error toggling lock: {e}", severity="error")
-            self.app.log_event(f"Toggle lock error: {e}", "ERROR")
-
-    def _lock(self) -> None:
-        """Lock wallet."""
-        if not self.app.wallet:
-            self.app.notify("Wallet not loaded", severity="error")
-            return
-
-        try:
-            self.app.wallet.lock()
-            self.app.log_event("Wallet locked", "INFO")
-            self.selected_address = None
-            self.query_one("#btn_export_address", Button).disabled = True
-            self.query_one("#btn_copy_address", Button).disabled = True
-            self.query_one("#btn_delete_address", Button).disabled = True
-            self._set_button_visibility()
-            self._refresh_status()
-        except Exception as e:
-            self.app.notify(f"Error toggling lock: {e}", severity="error")
-            self.app.log_event(f"Toggle lock error: {e}", "ERROR")
-
     def _truncate_address(self, address: str) -> str:
         """Truncate address for display."""
         if len(address) < 100:
@@ -412,46 +479,6 @@ class WalletDetailModal(Screen):
             self._set_button_visibility()
         except Exception as e:
             self.app.log_event(f"Error refreshing status: {e}", "ERROR")
-
-    def _make_address(self) -> None:
-        """Open make address modal."""
-        self.app.push_screen(
-            MakeAddressModal(self._refresh_address_book)
-        )
-
-    @on(Button.Pressed, "#btn_import_address")
-    def _import_address(self) -> None:
-        """Open import address modal."""
-        self.app.push_screen(
-            ImportAddressModal(self._refresh_address_book)
-        )
-
-    def _export_address(self) -> None:
-        """Open export address modal."""
-        if not self.selected_address:
-            self.app.notify("No address selected", severity="warning")
-            return
-        self.app.push_screen(ExportAddressModal(self.selected_address))
-
-    @on(Button.Pressed, "#btn_delete_address")
-    def _delete_address(self) -> None:
-        """Delete selected address."""
-        if not self.selected_address:
-            self.app.notify("No address selected", severity="warning")
-            return
-
-        try:
-            address_hex = self.selected_address.hex
-            self.selected_address.delete()
-            self.selected_address = None
-            self.app.notify(
-                f"Address deleted: {self._truncate_address(address_hex)}",
-                severity="success"
-            )
-            self._refresh_address_book()
-        except Exception as e:
-            self.app.notify(f"Error deleting address: {e}", severity="error")
-            self.app.log_event(f"Delete address error: {e}", "ERROR")
 
     def _refresh_address_book(self) -> None:
         """Refresh the address book table."""

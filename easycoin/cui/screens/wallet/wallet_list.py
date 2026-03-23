@@ -143,13 +143,17 @@ class WalletListScreen(BaseScreen):
 
             if (self.app.wallet and self.app.wallet.id == wallet_id
                     and not self.app.wallet.is_locked):
-                self.app.notify(f"Opening wallet: {wallet_id[:16]}...", severity="information")
+                self.app.notify(
+                    f"Opening wallet: {wallet_id[:16]}...", severity="information"
+                )
                 self.app.push_screen(WalletDetailModal())
                 return
 
             def on_unlock_success():
                 self.log_event(f"Selected wallet: {wallet_id[:16]}...", "INFO")
-                self.app.notify(f"Wallet selected: {wallet_id[:16]}...", severity="information")
+                self.app.notify(
+                    f"Wallet selected: {wallet_id[:16]}...", severity="information"
+                )
                 self.app.push_screen(WalletDetailModal())
                 self._refresh_table()
 
@@ -159,7 +163,7 @@ class WalletListScreen(BaseScreen):
             self.log_event(f"Select wallet error: {e}", "ERROR")
 
     @on(Button.Pressed, "#btn_delete")
-    def action_delete_wallet(self) -> None:
+    async def action_delete_wallet(self) -> None:
         """Delete selected wallet with confirmation."""
         try:
             table = self.query_one("#wallets_table", DataTable)
@@ -182,30 +186,39 @@ class WalletListScreen(BaseScreen):
             wallet_name = table.get_row_at(table.cursor_row)[0]
             confirmation_message = (
                 f"Are you sure you want to delete wallet "
-                f"'{wallet_name}' ({self._truncate_id(wallet_id)})? This action cannot be undone."
+                f"'{wallet_name}' ({self._truncate_id(wallet_id)})? This action "
+                "cannot be undone."
             )
 
-            def confirm_delete():
+            def confirm_delete(result: bool):
+                if not result:
+                    return
+
                 try:
                     wallet = Wallet.find(wallet_id)
                     if wallet:
                         wallet.delete()
-                        self.log_event(f"Deleted wallet: {wallet_id[:16]}...", "INFO")
-                        self.app.notify("Wallet deleted successfully", severity="information")
+                        self.log_event(
+                            f"Deleted wallet: {wallet_id[:16]}...", "INFO"
+                        )
+                        self.app.notify(
+                            "Wallet deleted successfully", severity="information"
+                        )
                         self._refresh_table()
                     else:
                         self.app.notify("Wallet not found", severity="error")
                 except Exception as e:
-                    self.app.notify(f"Failed to delete wallet: {e}", severity="error")
+                    self.app.notify(
+                        f"Failed to delete wallet: {e}", severity="error"
+                    )
                     self.log_event(f"Delete wallet failed: {e}", "ERROR")
 
-            self.app.push_screen(
-                ConfirmationModal(
-                    title="Confirm Delete Wallet",
-                    message=confirmation_message,
-                    callback=confirm_delete
-                )
+            modal = ConfirmationModal(
+                title="Confirm Delete Wallet",
+                message=confirmation_message,
+                confirm_btn_variant="warning",
             )
+            self.app.push_screen(modal, confirm_delete)
         except Exception as e:
             self.app.notify(f"Error preparing delete: {e}", severity="error")
             self.log_event(f"Delete wallet preparation error: {e}", "ERROR")
