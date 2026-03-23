@@ -33,6 +33,16 @@ as they are very long.
 
 ## Code Style
 
+### Error Handling
+
+- Do NOT catch, log, or suppress errors regarding UI element querying or updating
+    - ALL such errors should crash the app with a stack trace naturally
+    - Catching and suppressing errors made from assumptions about the UI structure
+    is actively detrimental to the development of this project, so stop doing it
+- Catch ONLY errors that are known to occur due to invalid user inputs, e.g. bad
+passwords that fail to unlock a wallet and raise a ValueError, or potential database
+inconsistencies
+
 ### Line length
 
 - Soft max of 80 for normal lines

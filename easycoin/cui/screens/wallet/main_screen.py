@@ -4,10 +4,9 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Static
 from easycoin.models import Wallet, Coin
 from ..base import BaseScreen
-from easycoin.cui.widgets.confirmation_modal import ConfirmationModal
+from easycoin.cui.widgets import ConfirmationModal, InputModal
 from .create_wallet_modal import CreateWalletModal
 from .restore_wallet_modal import RestoreWalletModal
-from .unlock_modal import UnlockWalletModal
 from .wallet_detail_modal import WalletDetailModal
 
 
@@ -127,40 +126,63 @@ class WalletListScreen(BaseScreen):
     @on(Button.Pressed, "#btn_select")
     def action_select_wallet(self) -> None:
         """Select and unlock a wallet."""
-        try:
-            table = self.query_one("#wallets_table", DataTable)
-            if table.cursor_row is None:
-                self.app.notify("No wallet selected", severity="warning")
+        table = self.query_one("#wallets_table", DataTable)
+        if table.cursor_row is None:
+            self.app.notify("No wallet selected", severity="warning")
+            return
+
+        display_id = table.get_row_at(table.cursor_row)[1]
+        wallet_id = self._wallet_id_map.get(display_id)
+        wallet = Wallet.find(wallet_id)
+
+        if not wallet_id:
+            self.app.notify("Wallet not found", severity="error")
+            self.log_event(f"Wallet ID not in mapping: {display_id}", "ERROR")
+            return
+
+        if (self.app.wallet and self.app.wallet.id == wallet_id
+                and not self.app.wallet.is_locked):
+            self.app.notify(
+                f"Opening wallet: {wallet_id[:16]}...", severity="information"
+            )
+            self.app.push_screen(WalletDetailModal())
+            return
+
+        def on_password_submit(password: str | None):
+            if not password:
+                self.app.notify("Password is required", severity="warning")
                 return
 
-            display_id = table.get_row_at(table.cursor_row)[1]
-            wallet_id = self._wallet_id_map.get(display_id)
-
-            if not wallet_id:
-                self.app.notify("Wallet not found", severity="error")
-                self.log_event(f"Wallet ID not in mapping: {display_id}", "ERROR")
+            try:
+                wallet.unlock(password)
+            except ValueError as e:
+                self.app.notify(f"Failed to unlock: {e}", severity="error")
+                self.app.log_event(f"Unlock failed: {e}", "ERROR")
+                return
+            except Exception as e:
+                self.app.notify(f"Unexpected error: {e}", severity="error")
+                self.app.log_event(f"Unlock error: {e}", "ERROR")
                 return
 
-            if (self.app.wallet and self.app.wallet.id == wallet_id
-                    and not self.app.wallet.is_locked):
-                self.app.notify(
-                    f"Opening wallet: {wallet_id[:16]}...", severity="information"
-                )
-                self.app.push_screen(WalletDetailModal())
-                return
+            self.app.wallet = wallet
+            self.app.notify("Wallet unlocked", severity="success")
+            self.app.log_event(f"Wallet unlocked: {wallet_id}...", "INFO")
 
-            def on_unlock_success():
-                self.log_event(f"Selected wallet: {wallet_id[:16]}...", "INFO")
-                self.app.notify(
-                    f"Wallet selected: {wallet_id[:16]}...", severity="information"
-                )
-                self.app.push_screen(WalletDetailModal())
-                self._refresh_table()
+            self.log_event(f"Selected wallet: {wallet_id}...", "INFO")
+            self.app.notify(
+                f"Wallet selected: {wallet_id[:16]}...", severity="information"
+            )
+            self.app.push_screen(WalletDetailModal())
+            self._refresh_table()
 
-            self.app.push_screen(UnlockWalletModal(wallet_id, on_unlock_success))
-        except Exception as e:
-            self.app.notify(f"Error selecting wallet: {e}", severity="error")
-            self.log_event(f"Select wallet error: {e}", "ERROR")
+        modal_description = f"Wallet: '{wallet.name}' ({wallet.id})"
+        self.app.push_screen(
+            InputModal(
+                "Unlock Wallet", modal_description, is_password=True,
+                btn_text = "Unlock"
+            ),
+            on_password_submit
+        )
 
     @on(Button.Pressed, "#btn_delete")
     async def action_delete_wallet(self) -> None:

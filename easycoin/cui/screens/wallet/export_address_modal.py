@@ -1,7 +1,8 @@
+from textual import on
 from textual.screen import Screen
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll, Horizontal, ItemGrid
-from textual.widgets import Button, Static, Input, TextArea
+from textual.widgets import Button, Static, Input, TextArea, Footer
 from textual.binding import Binding
 from tapescript import Script
 from easycoin.cui.clipboard import universal_copy
@@ -12,6 +13,9 @@ class ExportAddressModal(Screen):
     """Modal for exporting an address with optional password protection."""
 
     BINDINGS = [
+        Binding("x", "export", "Export"),
+        Binding("c", "copy_to_clipboard", "Copy to Clipboard"),
+        Binding("s", "save_to_file", "Save to File"),
         Binding("escape", "cancel", "Cancel"),
     ]
 
@@ -30,9 +34,23 @@ class ExportAddressModal(Screen):
         """Compose export address modal layout."""
         with VerticalScroll(id="export_address_modal", classes="modal-container"):
             yield Static("View/Export Address", classes="modal-title")
-            yield Static("\n")
+            yield Static("")
 
             yield Static(f"Address: {self.address.hex}", classes="text-bold")
+            yield Static("")
+            yield Static("Lock (Decompiled):\n", classes="form-label")
+            yield TextArea(
+                self.decompiled_lock, read_only=True, show_line_numbers=False,
+                soft_wrap=True, id="lock_display", classes="h-10"
+            )
+            yield Static("")
+
+            yield Static("Exported Data:\n", classes="form-label")
+            yield Static(
+                "Click Export to generate",
+                id="export_display",
+                classes="text-muted"
+            )
             yield Static("")
 
             with Horizontal(classes="h-min-5"):
@@ -53,23 +71,8 @@ class ExportAddressModal(Screen):
                         id="file_input"
                     )
 
-            yield Static("\n")
-            yield Static("Exported Data:\n", classes="form-label")
-            yield Static(
-                "Click Export to generate",
-                id="export_display",
-                classes="text-muted"
-            )
-            yield Static("\n")
-            yield Static("Lock (Decompiled):\n", classes="form-label")
-            yield TextArea(
-                self.decompiled_lock, read_only=True, show_line_numbers=False,
-                soft_wrap=True, id="lock_display", classes="h-10"
-            )
-
             with ItemGrid(id="modal_actions", min_column_width=18):
                 yield Button("Export", id="btn_export", variant="primary")
-                yield Button("Cancel", id="btn_cancel", variant="default")
                 yield Button(
                     "Copy", id="btn_copy", variant="default", disabled=True
                 )
@@ -79,27 +82,11 @@ class ExportAddressModal(Screen):
                     variant="default",
                     disabled=True
                 )
+                yield Button("Cancel", id="btn_cancel", variant="default")
+        yield Footer()
 
-    def on_mount(self) -> None:
-        """Focus password input on mount."""
-        self.query_one("#password_input", Input).focus()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button clicks."""
-        if event.button.id == "btn_export":
-            self._do_export()
-        elif event.button.id == "btn_cancel":
-            self.app.pop_screen()
-        elif event.button.id == "btn_copy":
-            self._copy_to_clipboard()
-        elif event.button.id == "btn_save_file":
-            self._save_to_file()
-
-    def action_cancel(self) -> None:
-        """Action handler for Escape key."""
-        self.app.pop_screen()
-
-    def _do_export(self) -> None:
+    @on(Button.Pressed, "#btn_export")
+    def action_export(self) -> None:
         """Export the address with optional password."""
         if not self.app.wallet:
             self.app.notify("Wallet not loaded", severity="error")
@@ -114,21 +101,27 @@ class ExportAddressModal(Screen):
             exported = self.app.wallet.export_address(
                 self.address, password=password
             )
-            self.exported_hex = exported.hex()
-            self.query_one("#export_display", Static).update(
-                self.exported_hex
-            )
-            self.query_one("#btn_copy", Button).disabled = False
-            self.query_one("#btn_save_file", Button).disabled = False
-            self.app.notify("Address exported", severity="success")
+        except ValueError as e:
+            self.app.notify(f"Export failed: {e}", severity="error")
+            self.app.log_event(f"Export address error: {e}", "ERROR")
+            return
         except Exception as e:
             self.app.notify(f"Export failed: {e}", severity="error")
             self.app.log_event(f"Export address error: {e}", "ERROR")
+            return
 
-    def _copy_to_clipboard(self) -> None:
+        self.exported_hex = exported.hex()
+        self.query_one("#export_display", Static).update(
+            self.exported_hex
+        )
+        self.query_one("#btn_copy", Button).disabled = False
+        self.query_one("#btn_save_file", Button).disabled = False
+
+    @on(Button.Pressed, "#btn_copy")
+    def action_copy_to_clipboard(self) -> None:
         """Copy exported hex to clipboard."""
         if not self.exported_hex:
-            self.app.notify("Nothing to copy", severity="warning")
+            self.app.notify("Nothing to copy; must export first", severity="warning")
             return
 
         try:
@@ -138,10 +131,11 @@ class ExportAddressModal(Screen):
             self.app.notify(f"Failed to copy: {e}", severity="error")
             self.app.log_event(f"Copy error: {e}", "ERROR")
 
-    def _save_to_file(self) -> None:
+    @on(Button.Pressed, "#btn_save_file")
+    def action_save_to_file(self) -> None:
         """Save exported hex to a file."""
         if not self.exported_hex:
-            self.app.notify("Nothing to save", severity="warning")
+            self.app.notify("Nothing to save; must export first", severity="warning")
             return
 
         filename = self.query_one("#file_input", Input).value.strip()
@@ -156,6 +150,11 @@ class ExportAddressModal(Screen):
         except Exception as e:
             self.app.notify(f"Save failed: {e}", severity="error")
             self.app.log_event(f"Save file error: {e}", "ERROR")
+
+    @on(Button.Pressed, "#btn_cancel")
+    def action_cancel(self) -> None:
+        """Action handler for Escape key."""
+        self.app.pop_screen()
 
     def _truncate_address(self, address: str) -> str:
         """Truncate address for display."""
