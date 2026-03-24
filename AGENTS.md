@@ -151,14 +151,14 @@ import os # stdlib
 import packify # external package
 ```
 
-### Textual CUI
+## Textual CUI
 
-#### Event Management
+### Event Management
 
 - Prefer using the `BINDINGS` with `action_*()` handlers over `on_key()` 
 - Prefer the `@on` decorator over long `on_button_pressed()` methods
 
-#### Element Querying
+### Element Querying
 
 - If the element has an ID, do NOT specify the element type
     - E.g. do NOT use `self.query_one("#some_id_maps_to_one_element", SomeType)`
@@ -167,28 +167,34 @@ import packify # external package
     the element type is redundant and makes refactoring code more difficult for
     no benefit
 
-#### DataTable
+### DataTable
 
 - Use "row" cursor type: `table.cursor_type = "row"` after `add_columns()`
 - Default cursor highlights individual cells, "row" highlights the whole row
 - `table.get_row_at(table.cursor_row)` returns the tuple of column values for
 the selected row
 
-#### Element Styling
+### Element Styling
 
 - Many styles are contained in easycoin/cui/styles.tcss
 - Prefer the existing tailwind-like classes over creating a new custom class/whatever
 - If there is an opportunity to make a new tailwind-like class for a style, make it
 - If custom CSS is required, write it to the `CSS` property of the screen/widget
 
-#### Modals
+### Modals
 
 - Modals should subclass ModalScreen, not Screen
 - Content should be contained within a Vertical or VerticalScroll with
 `classes="modal-container"`
 - Modals should have a Footer at the bottom, outside of the container
 
-### Testing Style
+## Database (Models, etc)
+
+- Do NOT modify any database models, relations, migrations, or configuration
+- Read before assuming
+- This package uses sqloquent for database models, ORM, and schema migrations
+
+## Testing Style
 
 - This project uses unittest from the stdlib, NOT pytest
 - Use `assert` with descriptive error messages instead of `self.assertEqual` etc.

@@ -340,8 +340,16 @@ class Txn(HashedModel):
             "so_n": so_n,
             "sigfield1": b'Txn',
             "sigfield2": coin.id_bytes,
-            "sigfield3": sha256(b''.join(sorted([i.id_bytes for i in self.inputs]))).digest(),
-            "sigfield4": sha256(b''.join(sorted([o.id_bytes for o in self.outputs]))).digest(),
+            "sigfield3": sha256(
+                b''.join(sorted([
+                    i.id_bytes for i in self.inputs
+                ]))
+            ).digest(),
+            "sigfield4": sha256(
+                b''.join(sorted([
+                    o.id_bytes for o in self.outputs
+                ]))
+            ).digest(),
         }
         return cache
 

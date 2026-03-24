@@ -171,4 +171,3 @@ class Coin(HashedModel):
         coin.details = details
         return coin
 
-
