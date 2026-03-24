@@ -158,6 +158,15 @@ import packify # external package
 - Prefer using the `BINDINGS` with `action_*()` handlers over `on_key()` 
 - Prefer the `@on` decorator over long `on_button_pressed()` methods
 
+#### Element Querying
+
+- If the element has an ID, do NOT specify the element type
+    - E.g. do NOT use `self.query_one("#some_id_maps_to_one_element", SomeType)`
+    - E.g. DO use `self.query_one("#some_id_maps_to_one_element")`
+    - The app will crash if more than one element shares the same ID; specifying
+    the element type is redundant and makes refactoring code more difficult for
+    no benefit
+
 #### DataTable
 
 - Use "row" cursor type: `table.cursor_type = "row"` after `add_columns()`

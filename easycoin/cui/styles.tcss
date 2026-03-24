@@ -310,6 +310,26 @@ ImportAddressModal {
     width: 70%;
 }
 
+/* REPL Modal - Wide for code execution */
+ReplModal {
+    background: $background 50%;
+}
+
+#repl_modal {
+    width: 70%;
+}
+
+#repl_output {
+    height: 1fr;
+    min-height: 20;
+    border: solid $primary;
+    padding: 1;
+}
+
+#repl_input {
+    margin-top: 1;
+}
+
 /* Forms */
 .form-row {
     height: 3;

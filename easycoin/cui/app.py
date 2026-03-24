@@ -10,6 +10,7 @@ from easycoin.cui.screens.coins.placeholder import CoinsScreen
 from easycoin.cui.screens.transactions.placeholder import TransactionsScreen
 from easycoin.cui.screens.network.placeholder import NetworkScreen
 from easycoin.cui.screens.trustnet.placeholder import TrustNetScreen
+from easycoin.cui.screens.repl.repl_modal import ReplModal
 import logging
 
 
@@ -27,9 +28,11 @@ class EasyCoinApp(App):
         "transactions": TransactionsScreen,
         "network": NetworkScreen,
         "trustnet": TrustNetScreen,
+        "repl": ReplModal,
     }
 
     BINDINGS = [
+        ("0", "open_repl", "REPL"),
         ("1", "switch_to_dashboard", "Dashboard"),
         ("2", "switch_to_wallet", "Identity/Wallet"),
         ("3", "switch_to_coins", "Coins"),
@@ -111,6 +114,10 @@ class EasyCoinApp(App):
     def action_switch_to_transactions(self) -> None:
         """Switch to transactions screen."""
         self.switch_screen("transactions")
+
+    def action_open_repl(self) -> None:
+        """Open REPL modal for Python code execution."""
+        self.push_screen("repl")
 
 #    def action_refresh(self) -> None:
 #        """Refresh current screen."""
