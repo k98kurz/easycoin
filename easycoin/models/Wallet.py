@@ -17,6 +17,12 @@ from tapescript import (
     make_taproot_lock,
     make_taproot_witness_keyspend,
     make_taproot_witness_scriptspend,
+    make_graftroot_lock,
+    make_graftroot_witness_keyspend,
+    make_graftroot_witness_surrogate,
+    make_graftap_lock,
+    make_graftap_witness_keyspend,
+    make_graftap_witness_scriptspend,
     clamp_scalar,
 )
 import os
@@ -449,6 +455,64 @@ class Wallet(HashedModel):
         """
         return make_taproot_witness_scriptspend(
             self.get_pubkey(nonce, child_nonce),
+            script
+        )
+
+    def get_p2gr_lock(
+            self, nonce: int, child_nonce: int|None = None, sigflags: str = 'fa'
+        ) -> Script:
+        """..."""
+        return make_graftroot_lock(
+            self.get_pubkey(nonce, child_nonce), sigflags=sigflags
+        )
+
+    def get_p2gr_witness_keyspend(
+            self, nonce: int, txn: 'Txn', coin: 'Coin',
+            child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
+        """..."""
+        return make_graftroot_witness_keyspend(
+            self.get_seed(nonce, child_nonce),
+            txn.runtime_cache(coin),
+            sigflags=sigflags
+        )
+
+    def get_p2gr_witness_surrogate(
+            self, nonce: int, surrogate_script: Script|str,
+            child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
+        """..."""
+        return make_graftroot_witness_surrogate(
+            self.get_seed(nonce, child_nonce),
+            script
+        )
+
+    def get_p2gt_lock(
+            self, nonce: int, child_nonce: int|None = None
+        ) -> Script:
+        """..."""
+        return make_graftap_lock(
+            self.get_pubkey(nonce, child_nonce)
+        )
+
+    def get_p2gt_witness_keyspend(
+            self, nonce: int, txn: 'Txn', coin: 'Coin',
+            child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
+        """..."""
+        return make_graftap_witness_keyspend(
+            self.get_seed(nonce, child_nonce),
+            txn.runtime_cache(coin),
+            sigflags=sigflags
+        )
+
+    def get_p2gt_witness_scriptspend(
+            self, nonce: int, surrogate_script: Script|str,
+            child_nonce: int|None = None, sigflags = 'fa'
+        ) -> Script:
+        """..."""
+        return make_graftap_witness_scriptspend(
+            self.get_seed(nonce, child_nonce),
             script
         )
 
