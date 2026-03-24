@@ -176,9 +176,17 @@ the selected row
 
 #### Element Styling
 
-- The styles are contained in easycoin/cui/styles.tcss
+- Many styles are contained in easycoin/cui/styles.tcss
 - Prefer the existing tailwind-like classes over creating a new custom class/whatever
 - If there is an opportunity to make a new tailwind-like class for a style, make it
+- If custom CSS is required, write it to the `CSS` property of the screen/widget
+
+#### Modals
+
+- Modals should subclass ModalScreen, not Screen
+- Content should be contained within a Vertical or VerticalScroll with
+`classes="modal-container"`
+- Modals should have a Footer at the bottom, outside of the container
 
 ### Testing Style
 

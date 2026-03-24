@@ -1,7 +1,10 @@
 from datetime import datetime
 from enum import Enum
 from rich.text import Text
-from textual.widgets import RichLog
+from textual.app import ComposeResult
+from textual.containers import Vertical, Horizontal
+from textual.widgets import RichLog, OptionList, Input, Button, Static
+from textual.widgets.option_list import Option
 
 
 class LogLevel(Enum):
@@ -13,15 +16,15 @@ class LogLevel(Enum):
     CRITICAL = "CRITICAL"
 
 
-class EventLog(RichLog):
-    """Enhanced RichLog with severity filtering and file persistence."""
+class EventLogDisplay(RichLog):
+    """RichLog widget with severity filtering and file persistence."""
     _filter_level: LogLevel
     _search_query: str
     _all_entries: list[tuple[LogLevel, str, datetime]]
     _app_log_count: int
 
     def __init__(self, max_lines: int = 1000, **kwargs):
-        """Initialize EventLog."""
+        """Initialize EventLogDisplay."""
         super().__init__(max_lines=max_lines, auto_scroll=True, **kwargs)
         self._filter_level = LogLevel.INFO
         self._search_query = ""
@@ -41,10 +44,9 @@ class EventLog(RichLog):
 
     def _load_all_entries(self) -> None:
         """Load all log entries from app state on mount."""
-        if (
-            hasattr(self.app, 'state')
-            and hasattr(self.app.state._state, 'log_entries')
-        ):
+        if  (   hasattr(self.app, 'state')
+                and hasattr(self.app.state._state, 'log_entries')
+            ):
             for entry in self.app.state._state.log_entries:
                 try:
                     level = LogLevel[entry.level]
@@ -68,17 +70,6 @@ class EventLog(RichLog):
             self, message: str, level: LogLevel, timestamp: datetime
         ) -> None:
         """Display a single log entry."""
-        if self._should_display(level, message):
-            self._write_colored(message, level, timestamp)
-
-    def write_log(
-            self, message: str, level: LogLevel = LogLevel.INFO,
-            persistent: bool = False
-        ):
-        """Write a log entry with severity level. Deprecated: use app.log_event."""
-        timestamp = datetime.now()
-        self._all_entries.append((level, message, timestamp))
-
         if self._should_display(level, message):
             self._write_colored(message, level, timestamp)
 
@@ -135,3 +126,99 @@ class EventLog(RichLog):
         for level, message, timestamp in self._all_entries:
             if self._should_display(level, message):
                 self._write_colored(message, level, timestamp)
+
+
+class EventLog(Vertical):
+    """Complete event log widget with display, filters, and controls."""
+
+    DEFAULT_CSS = """
+        EventLog { height: 1fr; }
+
+        #log_search { width: 1fr; }
+
+        #event_log_display { height: 1fr; }
+
+        .log-actions Button { width: 1fr; }
+    """
+
+    def compose(self) -> ComposeResult:
+        """Compose event log widget layout."""
+        yield Static("Event Log", classes="panel-title")
+
+        yield OptionList(
+            Option("DEBUG", id="DEBUG"),
+            Option("INFO", id="INFO"),
+            Option("WARNING", id="WARNING"),
+            Option("ERROR", id="ERROR"),
+            Option("CRITICAL", id="CRITICAL"),
+            id="level_filter",
+            classes="h-5",
+        )
+
+        yield Input(placeholder="Search logs...", id="log_search")
+
+        yield EventLogDisplay(id="event_log_display")
+
+        with Horizontal(classes="h-auto"):
+            yield Button("Clear", id="clear_btn", variant="default")
+            yield Button("Export", id="export_btn", variant="success")
+
+    def on_mount(self) -> None:
+        """Subscribe to app state when widget is mounted."""
+        if hasattr(self.app, 'state'):
+            self.app.state.subscribe(self)
+
+    def on_unmount(self) -> None:
+        """Unsubscribe from app state when widget is unmounted."""
+        if hasattr(self.app, 'state'):
+            self.app.state.unsubscribe(self)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle search input changes."""
+        if event.input.id == "log_search":
+            log_widget = self.query_one("#event_log_display", EventLogDisplay)
+            log_widget.search(event.value)
+
+    def on_option_list_option_highlighted(
+            self, event: OptionList.OptionHighlighted
+        ) -> None:
+        """Handle severity filter selection."""
+        level_mapping = {
+            "DEBUG": LogLevel.DEBUG,
+            "INFO": LogLevel.INFO,
+            "WARNING": LogLevel.WARNING,
+            "ERROR": LogLevel.ERROR,
+            "CRITICAL": LogLevel.CRITICAL
+        }
+
+        log_widget = self.query_one("#event_log_display", EventLogDisplay)
+        level = level_mapping.get(event.option.id)
+        if level is not None:
+            log_widget.set_filter(level)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button clicks."""
+        log_widget = self.query_one("#event_log_display", EventLogDisplay)
+
+        if event.button.id == "clear_btn":
+            log_widget.clear()
+            self.app.log_event("Log cleared", "INFO")
+        elif event.button.id == "export_btn":
+            self.export_log()
+
+    def export_log(self) -> None:
+        """Export log entries to a file."""
+        log_widget = self.query_one("#event_log_display", EventLogDisplay)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        export_path = f"easycoin_log_{timestamp}.txt"
+
+        try:
+            with open(export_path, "w") as f:
+                for level, message, ts in log_widget._all_entries:
+                    ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
+                    f.write(f"[{ts_str}] [{level.value}] {message}\n")
+
+            self.app.notify(f"Log exported to {export_path}", severity="information")
+        except Exception as e:
+            self.app.notify(f"Export failed: {e}", severity="error")

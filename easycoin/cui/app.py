@@ -11,6 +11,7 @@ from easycoin.cui.screens.transactions.placeholder import TransactionsScreen
 from easycoin.cui.screens.network.placeholder import NetworkScreen
 from easycoin.cui.screens.trustnet.placeholder import TrustNetScreen
 from easycoin.cui.screens.repl.repl_modal import ReplModal
+from easycoin.cui.screens.event_log_modal import EventLogModal
 import logging
 
 
@@ -29,6 +30,7 @@ class EasyCoinApp(App):
         "network": NetworkScreen,
         "trustnet": TrustNetScreen,
         "repl": ReplModal,
+        "event_log": EventLogModal,
     }
 
     BINDINGS = [
@@ -37,6 +39,7 @@ class EasyCoinApp(App):
         ("2", "switch_to_wallet", "Identity/Wallet"),
         ("3", "switch_to_coins", "Coins"),
         ("4", "switch_to_transactions", "Transactions"),
+        ("ctrl+l", "open_event_log", "Event Log"),
         ("f5", "refresh", "Refresh"),
         ("q", "quit", "Quit"),
     ]
@@ -119,9 +122,9 @@ class EasyCoinApp(App):
         """Open REPL modal for Python code execution."""
         self.push_screen("repl")
 
-#    def action_refresh(self) -> None:
-#        """Refresh current screen."""
-#        self.notify("Refreshing screen", severity="information")
+    def action_open_event_log(self) -> None:
+        """Open event log modal for viewing and managing logs."""
+        self.push_screen("event_log")
 
     def log_event(self, message: str, level: str = "INFO") -> None:
         """Append log entry to state. Args:

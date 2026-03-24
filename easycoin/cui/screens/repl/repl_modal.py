@@ -5,8 +5,24 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Input, Footer
+from textual.widgets import Button, Footer, Static, TextArea
 from easycoin.cui.widgets import ECTextArea
+
+
+class ReplTextArea(TextArea):
+    """Custom TextArea that handles Enter, Ctrl+O, Ctrl+T/Alt+T for REPL input."""
+
+    def on_key(self, event) -> None:
+        """Handle key events for submission vs newline."""
+        if event.key == "enter":
+            event.prevent_default()
+            self.screen.action_submit_code()
+        elif event.key == "ctrl+o":
+            event.prevent_default()
+            self.insert("\n")
+        elif event.key in ("ctrl+t", 'alt+t'):
+            event.prevent_default()
+            self.insert(" " * 4)
 
 
 class ReplModal(Screen):
@@ -39,11 +55,13 @@ class ReplModal(Screen):
                 show_line_numbers=False
             )
 
-            with Vertical(classes="mt-1"):
-                yield Input(
-                    placeholder="Enter Python code (Enter to execute)",
-                    id="repl_input"
-                )
+            yield Static(
+                "Enter: execute. Ctrl+O: insert new line. Cltr+T or Alt+T: indent.",
+                classes="mt-1"
+            )
+
+            with Vertical(classes="mt-1 h-min-3"):
+                yield ReplTextArea(id="repl_input", placeholder="Enter Python code")
 
             with Horizontal(id="modal_actions"):
                 yield Button("Clear", id="btn_clear", variant="default")
@@ -57,42 +75,45 @@ class ReplModal(Screen):
         output.text = (">>> EasyCoin Python REPL\nAccess: app, state, config, "
             "logger, wallet\n")
         output.scroll_end()
+        self.query_one("#repl_input").focus()
 
     def _update_namespace(self) -> None:
         """Update namespace with current app objects."""
         self._namespace['app'] = self.app
-        self._namespace['state'] = self.app.state if hasattr(self.app, 'state') else None
-        self._namespace['config'] = self.app.config if hasattr(self.app, 'config') else None
-        self._namespace['logger'] = self.app.logger if hasattr(self.app, 'logger') else None
-        self._namespace['wallet'] = self.app.wallet if hasattr(self.app, 'wallet') else None
-
-    @on(Input.Submitted, "#repl_input")
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle input submission."""
-        if not event.value.strip():
-            return
-        self._execute_code(event.value)
-        self.query_one("#repl_input", Input).value = ""
+        self._namespace['state'] = (
+            self.app.state if hasattr(self.app, 'state') else None
+        )
+        self._namespace['config'] = (
+            self.app.config if hasattr(self.app, 'config') else None
+        )
+        self._namespace['logger'] = (
+            self.app.logger if hasattr(self.app, 'logger') else None
+        )
+        self._namespace['wallet'] = (
+            self.app.wallet if hasattr(self.app, 'wallet') else None
+        )
 
     def on_key(self, event) -> None:
-        """Handle keyboard events for history navigation."""
+        """Handle keyboard events."""
         if event.key == "escape":
             self.action_close()
             return
 
-        input_widget = self.query_one("#repl_input", Input)
+        input_widget = self.query_one("#repl_input")
 
         if event.key == "up":
             if self._history_index > 0:
                 self._history_index -= 1
-                input_widget.value = self._history[self._history_index]
+                input_widget.text = self._history[self._history_index]
+            event.stop()
         elif event.key == "down":
             if self._history_index < len(self._history) - 1:
                 self._history_index += 1
-                input_widget.value = self._history[self._history_index]
+                input_widget.text = self._history[self._history_index]
             elif self._history_index == len(self._history) - 1:
                 self._history_index = len(self._history)
-                input_widget.value = ""
+                input_widget.text = ""
+            event.stop()
 
     @on(Button.Pressed, "#btn_clear")
     def action_clear(self) -> None:
@@ -103,6 +124,14 @@ class ReplModal(Screen):
     def action_close(self) -> None:
         """Close the REPL modal."""
         self.app.pop_screen()
+
+    def action_submit_code(self) -> None:
+        """Submit the code in the input area for execution."""
+        input_widget = self.query_one("#repl_input")
+        text = input_widget.text
+        if text.strip():
+            self._execute_code(text)
+            input_widget.text = ""
 
     def _execute_code(self, code: str) -> None:
         """Execute Python code and display output/errors."""

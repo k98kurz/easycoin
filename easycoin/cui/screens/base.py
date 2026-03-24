@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.css.query import NoMatches
 from textual.containers import Horizontal
 from textual.widgets import Footer
-from easycoin.cui.widgets.event_log import EventLog, LogLevel
+from easycoin.cui.widgets.event_log import EventLog
 from easycoin.cui.widgets.top_tabs import TopTabs
 from easycoin.models.Coin import Coin
 from easycoin.cui.widgets.right_sidebar import RightSidebar
