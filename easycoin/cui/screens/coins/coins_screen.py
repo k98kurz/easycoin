@@ -1,1 +1,149 @@
-"""CoinsScreen: view and manage coins with filtering and mining configuration."""
+from textual import on
+from textual.app import ComposeResult
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Button, Checkbox, DataTable, Input, Static
+from easycoin.models import Coin, TrustNet, Wallet
+from ..base import BaseScreen
+from .mine_config import MiningConfigurationModal
+
+
+class CoinsScreen(BaseScreen):
+    """View and manage owned coins."""
+
+    TAB_ID = "tab_coins"
+
+    BINDINGS = [
+        ("f5", "refresh_coins", "Refresh"),
+        ("m", "open_mining_config", "Configure Mining"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        """Compose coins screen layout."""
+        yield from super().compose()
+
+    def _compose_content(self) -> ComposeResult:
+        """Compose coins screen content area."""
+        with Vertical(id="coins_screen"):
+            yield Static("Coins", classes="panel-title")
+            with Horizontal(id="coins_header", classes="h-3 mt-1"):
+                yield Checkbox("Active Wallet Only", id="box_active_wallet")
+                yield Input(placeholder="Search coins...", id="search_input")
+
+            yield DataTable(id="coins_table", classes="mt-1")
+
+            with Horizontal(id="coins_actions"):
+                yield Button("Refresh", id="btn_refresh", variant="default")
+                yield Button(
+                    "Configure Mining",
+                    id="btn_mine_config",
+                    variant="primary"
+                )
+
+    def on_mount(self) -> None:
+        """Initialize coins table on mount."""
+        super().on_mount()
+        table = self.query_one("#coins_table", DataTable)
+        table.cursor_type = "row"
+        table.add_columns(
+            "Coin ID",
+            "Amount",
+            "Lock Type",
+            "Status",
+            "Network"
+        )
+        self._load_coins()
+
+    @on(Input.Changed, "#search_input")
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle search input changes."""
+        self._load_coins(search_query=event.value)
+
+    @on(Button.Pressed, "#btn_refresh")
+    def action_refresh_coins(self) -> None:
+        """Refresh coins data."""
+        self.log_event("Refreshing coins", "INFO")
+        search_input = self.query_one("#search_input", Input)
+        self._load_coins(search_query=search_input.value)
+
+    @on(Button.Pressed, "#btn_mine_config")
+    def action_open_mining_config(self) -> None:
+        """Open mining configuration modal."""
+        self.app.push_screen(MiningConfigurationModal())
+
+    def _load_coins(self, search_query: str = "") -> None:
+        """Load coins from database and populate table."""
+        coins = []
+        try:
+            if self.app.wallet and self.query_one(
+                "#box_active_wallet",
+                Checkbox
+            ).value:
+                self.app.wallet.coins.reload()
+                coins = list(self.app.wallet.coins.get())
+            else:
+                for chunk in Coin.query().chunk(500):
+                    coins.extend(chunk)
+        except Exception as e:
+            self.log_event(f"Error loading coins: {e}", "ERROR")
+            self.app.notify(f"Error loading coins: {e}", severity="error")
+            return
+
+        table = self.query_one("#coins_table", DataTable)
+        table.clear()
+
+        sorted_coins = sorted(
+            coins,
+            key=lambda c: c.timestamp if hasattr(c, 'timestamp') else 0,
+            reverse=True
+        )
+
+        for coin in sorted_coins:
+            if search_query and search_query.lower() not in coin.id.lower():
+                continue
+
+            try:
+                table.add_row(
+                    self._truncate_id(coin.id),
+                    f"{coin.amount:,} EC⁻¹",
+                    Wallet.get_lock_type(coin.lock),
+                    "Available",
+                    self._get_network_name(coin.net_id)
+                )
+            except Exception as e:
+                self.log_event(f"Error adding coin row: {e}", "ERROR")
+
+    def on_coins_mined(self, coins: list[Coin | Exception]) -> None:
+        """Handle newly mined coins."""
+        self.action_refresh_coins()
+
+        new_coins = [c for c in coins if not isinstance(c, Exception)]
+        if new_coins:
+            self.app.notify(
+                f"Mined {len(new_coins)} new coin(s)",
+                severity="success"
+            )
+
+    def _get_network_name(self, net_id: str) -> str:
+        """Get network name from ID."""
+        if not net_id:
+            return "None"
+
+        try:
+            trustnet = TrustNet.find(net_id)
+            if trustnet:
+                return trustnet.name or "Unknown"
+        except Exception as e:
+            self.log_event(f"Error finding trustnet: {e}", "DEBUG")
+
+        return net_id[:16] + "..."
+
+    def _truncate_id(
+        self,
+        coin_id: str,
+        prefix_len: int = 8,
+        suffix_len: int = 4
+    ) -> str:
+        """Truncate coin ID for display."""
+        if len(coin_id) <= prefix_len + suffix_len:
+            return coin_id
+        return f"{coin_id[:prefix_len]}...{coin_id[-suffix_len:]}"

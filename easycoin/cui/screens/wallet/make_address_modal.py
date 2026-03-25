@@ -26,6 +26,8 @@ class MakeAddressModal(Screen):
         ("Custom", "Custom"),
     ]
 
+    CSS = "MakeAddressModal { background: $background 50%; }"
+
     def __init__(self, success_callback=None):
         """Initialize make address modal."""
         super().__init__()
@@ -39,7 +41,7 @@ class MakeAddressModal(Screen):
 
     def compose(self) -> ComposeResult:
         """Compose make address modal layout."""
-        with VerticalScroll(id="make_address_modal", classes="modal-container"):
+        with VerticalScroll(classes="modal-container w-70p"):
             yield Static("Make Address", classes="modal-title")
 
             with Horizontal(classes="h-10 mt-1"):

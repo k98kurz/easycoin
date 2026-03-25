@@ -131,9 +131,11 @@ class WalletListScreen(BaseScreen):
             self.app.notify("No wallet selected", severity="warning")
             return
 
-        display_id = table.get_row_at(table.cursor_row)[1]
+        try:
+            display_id = table.get_row_at(table.cursor_row)[1]
+        except BaseException:
+            return self.app.notify("No wallet selected", severity="warning")
         wallet_id = self._wallet_id_map.get(display_id)
-        wallet = Wallet.find(wallet_id)
 
         if not wallet_id:
             self.app.notify("Wallet not found", severity="error")

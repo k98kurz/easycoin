@@ -1,8 +1,8 @@
 from textual import on
-from textual.screen import ModalScreen
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, Horizontal
+from textual.screen import ModalScreen
 from textual.widgets import Static, Input, Button, Footer
 
 
@@ -27,7 +27,7 @@ class InputModal(ModalScreen[str|None]):
 
     def compose(self) -> ComposeResult:
         """Compose unlock modal layout."""
-        with Vertical(id="input_modal", classes="modal-container"):
+        with Vertical(id="input_modal", classes="modal-container w-50p"):
             yield Static(self.title, classes="modal-title")
             yield Static("\n")
             yield Static(self.description)

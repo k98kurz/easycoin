@@ -32,6 +32,19 @@ class ReplModal(Screen):
         Binding("escape", "close", "Close"),
     ]
 
+    CSS = """
+        ReplModal {
+            background: $background 50%;
+        }
+
+        #repl_output {
+            height: 1fr;
+            min-height: 20;
+            border: solid $primary;
+            padding: 1;
+        }
+    """
+
     _namespace: dict
     _history: list[str]
     _history_index: int
@@ -49,7 +62,7 @@ class ReplModal(Screen):
 
     def compose(self) -> ComposeResult:
         """Compose REPL modal layout."""
-        with VerticalScroll(id="repl_modal", classes="modal-container"):
+        with VerticalScroll(id="repl_modal", classes="modal-container w-70p"):
             yield ECTextArea(
                 id="repl_output", read_only=True, soft_wrap=True,
                 show_line_numbers=False
@@ -61,7 +74,10 @@ class ReplModal(Screen):
             )
 
             with Vertical(classes="mt-1 h-min-3"):
-                yield ReplTextArea(id="repl_input", placeholder="Enter Python code")
+                yield ReplTextArea(
+                    id="repl_input", classes="mt-1",
+                    placeholder="Enter Python code"
+                )
 
             with Horizontal(id="modal_actions"):
                 yield Button("Clear", id="btn_clear", variant="default")

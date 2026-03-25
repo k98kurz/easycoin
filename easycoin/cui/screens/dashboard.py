@@ -1,3 +1,4 @@
+from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, Container
 from textual.css.query import NoMatches
@@ -66,47 +67,19 @@ class DashboardScreen(BaseScreen):
         super().on_mount()
 
     def on_wallet_info_changed(self, wallet_info: dict) -> None:
-        """Handle wallet info updates.
-
-        Args:
-            wallet_info: Dict with keys 'balance' (int), 'coins' (int),
-                         and 'stamps' (dict[str, int]).
+        """Handle wallet info updates. `wallet_info` is a dict with keys
+            `balance` (int), `coins` (int), and `stamps` (dict[str, int]).
         """
         self.query_one("#wallet_info_display").update(self._format_wallet_info())
 
     def on_mining_status_changed(self, active: bool, progress: int) -> None:
-        """Handle mining status updates.
-
-        Args:
-            active: Whether mining is currently active
-            progress: Mining progress percentage (0-100)
-        """
+        """Handle mining status updates."""
         self.query_one("#mining_status").update(self._mining_status())
 
     def on_network_status_changed(self, height: int, peers: int) -> None:
-        """Handle network status updates.
-
-        Args:
-            height: Current network height
-            peers: Number of connected peers
-        """
+        """Handle network status updates."""
         self.query_one("#peer_count").update(f"Peers: {peers}")
         self.query_one("#network_height").update(f"Height: {height}")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button clicks."""
-        app = self.app
-
-        if event.button.id == "btn_send":
-            app.switch_screen("transactions")
-        elif event.button.id == "btn_mine":
-            app.switch_screen("coins")
-        elif event.button.id == "btn_wallets":
-            app.switch_screen("wallet")
-        elif event.button.id == "btn_network":
-            app.switch_screen("network")
-        elif event.button.id == "btn_trustnets":
-            app.switch_screen("trustnet")
 
     def _format_wallet_info(self) -> str:
         """Format wallet info for display."""

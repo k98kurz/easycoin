@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from rich.text import Text
+from textual import on
 from textual.app import ComposeResult
 from textual.containers import Vertical, Horizontal
 from textual.widgets import RichLog, OptionList, Input, Button, Static
@@ -196,17 +197,16 @@ class EventLog(Vertical):
         if level is not None:
             log_widget.set_filter(level)
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button clicks."""
+
+    @on(Button.Pressed, "#clear_btn")
+    def action_clear_log(self, event = None) -> None:
+        """Clear the log"""
         log_widget = self.query_one("#event_log_display", EventLogDisplay)
+        log_widget.clear()
+        self.app.log_event("Log cleared", "INFO")
 
-        if event.button.id == "clear_btn":
-            log_widget.clear()
-            self.app.log_event("Log cleared", "INFO")
-        elif event.button.id == "export_btn":
-            self.export_log()
-
-    def export_log(self) -> None:
+    @on(Button.Pressed, "#export_btn")
+    def export_log(self, event = None) -> None:
         """Export log entries to a file."""
         log_widget = self.query_one("#event_log_display", EventLogDisplay)
 

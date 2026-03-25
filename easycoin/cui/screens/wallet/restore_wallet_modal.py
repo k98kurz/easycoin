@@ -16,6 +16,10 @@ class RestoreWalletModal(Screen):
         Binding("escape", "cancel", "Cancel"),
     ]
 
+    CSS = """
+        RestoreWalletModal { background: $background 50%; }
+    """
+
     def __init__(self, refresh_callback=None):
         """Initialize restore wallet modal.
 
@@ -27,7 +31,7 @@ class RestoreWalletModal(Screen):
 
     def compose(self) -> ComposeResult:
         """Compose restore wallet modal layout."""
-        with Vertical(id="restore_wallet_modal", classes="modal-container"):
+        with Vertical(id="restore_wallet_modal", classes="modal-container w-50p"):
             yield Static("Restore Wallet", classes="modal-title")
             yield Static("\n")
             yield Static(

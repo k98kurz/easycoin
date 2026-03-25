@@ -1,21 +1,26 @@
-from textual.screen import Screen
+from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical, Horizontal
+from textual.screen import ModalScreen
 from textual.widgets import Static, Input, Button
 from easycoin.models import Wallet
 from easycoin import wordlist
 import random
 
 
-class CreateWalletModal(Screen):
+class CreateWalletModal(ModalScreen):
     """Modal for creating a new wallet with seed phrase and password."""
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+    ]
+
+    CSS = """
+        CreateWalletModal { background: $background 50%; }
+    """
 
     def __init__(self, refresh_callback=None):
-        """Initialize create wallet modal.
-
-        Args:
-            refresh_callback: Optional callback to call after wallet is created
-        """
+        """Initialize create wallet modal."""
         super().__init__()
         self.refresh_callback = refresh_callback
         self.seed_phrase = Wallet.generate_seed_phrase(wordlist())
@@ -31,7 +36,7 @@ class CreateWalletModal(Screen):
 
     def compose(self) -> ComposeResult:
         """Compose create wallet modal layout."""
-        with Vertical(id="create_wallet_modal", classes="modal-container"):
+        with Vertical(id="create_wallet_modal", classes="modal-container w-50p"):
             yield Static("Create New Wallet", classes="modal-title")
             yield Static("\n")
             yield Static(
@@ -75,19 +80,12 @@ class CreateWalletModal(Screen):
         """Set default wallet name in input field on mount."""
         self.query_one("#wallet_name", Input).value = self.default_wallet_name
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button clicks."""
-        if event.button.id == "btn_create":
-            self._create_wallet()
-        elif event.button.id == "btn_cancel":
-            self.app.pop_screen()
+    @on(Button.Pressed, "#btn_cancel")
+    def action_cancel(self, event = None) -> None:
+        self.dismiss()
 
-    def on_key(self, event) -> None:
-        """Handle keyboard events."""
-        if event.key == "escape":
-            self.app.pop_screen()
-
-    def _create_wallet(self) -> None:
+    @on(Button.Pressed, "#btn_create")
+    def action_create_wallet(self) -> None:
         """Create wallet with provided password and seed phrase."""
         wallet_name = self.query_one("#wallet_name", Input).value
         password = self.query_one("#password_input", Input).value
@@ -129,10 +127,10 @@ class CreateWalletModal(Screen):
                 "INFO"
             )
 
-            self.app.pop_screen()
-
             if self.refresh_callback:
                 self.app.call_later(self.refresh_callback)
+
+            self.dismiss()
 
         except Exception as e:
             self.app.notify(f"Failed to create wallet: {e}", severity="error")

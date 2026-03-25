@@ -245,89 +245,21 @@ Screen {
 /* Modal Container */
 Vertical.modal-container {
     height: auto;
-    width: 50%;
     border: solid $primary;
     padding: 1;
     background: $panel-darken-1;
 }
 
 VerticalScroll.modal-container {
-    width: 70%;
     border: solid $primary;
     padding: 1;
     background: $panel-darken-1;
     height: 1fr;
 }
 
-/* Create Wallet Modal */
-CreateWalletModal {
-    background: $background 50%;
-}
-
-/* Restore Wallet Modal */
-RestoreWalletModal {
-    background: $background 50%;
-}
-
-/* Unlock Wallet Modal */
-UnlockWalletModal {
-    background: $background 50%;
-}
-
 /* Confirmation Modal */
 ConfirmationModal {
     background: $background 50%;
-}
-
-/* Wallet Detail Modal */
-WalletDetailModal {
-    background: $background 50%;
-}
-
-/* Make Address Modal - Wider for preview content */
-MakeAddressModal {
-    background: $background 50%;
-}
-
-Vertical#make_address_modal {
-    width: 70%;
-}
-
-/* Export Address Modal - Wider for hex content */
-ExportAddressModal {
-    background: $background 50%;
-}
-
-#export_address_modal {
-    width: 70%;
-}
-
-ImportAddressModal {
-    background: $background 50%;
-}
-
-#import_address_modal {
-    width: 70%;
-}
-
-/* REPL Modal - Wide for code execution */
-ReplModal {
-    background: $background 50%;
-}
-
-#repl_modal {
-    width: 70%;
-}
-
-#repl_output {
-    height: 1fr;
-    min-height: 20;
-    border: solid $primary;
-    padding: 1;
-}
-
-#repl_input {
-    margin-top: 1;
 }
 
 /* Forms */

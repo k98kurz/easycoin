@@ -1,11 +1,17 @@
-from textual.screen import ModalScreen
+from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical, Horizontal
+from textual.screen import ModalScreen
 from textual.widgets import Static, Button
 
 
 class ConfirmationModal(ModalScreen):
     """General purpose confirmation modal dialog."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+    ]
 
     def __init__(
             self, title: str, message: str, *,
@@ -23,7 +29,7 @@ class ConfirmationModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         """Compose confirmation modal layout."""
-        with Vertical(id="confirm_modal", classes="modal-container"):
+        with Vertical(id="confirm_modal", classes="modal-container w-50p"):
             yield Static(self.title, classes="modal-title")
             yield Static("\n")
             yield Static(self.message)
@@ -37,9 +43,11 @@ class ConfirmationModal(ModalScreen):
                     classes=self.cancel_btn_classes,
                 )
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button clicks."""
-        if event.button.id == "btn_confirm":
-            self.dismiss(True)
-        elif event.button.id == "btn_cancel":
-            self.dismiss(False)
+    @on(Button.Pressed, "#btn_confirm")
+    def action_confirm(self, event: Button.Pressed | None = None) -> None:
+        self.dismiss(True)
+
+    @on(Button.Pressed, "#btn_cancel")
+    def action_cancel(self, event: Button.Pressed | None = None) -> None:
+        self.dismiss(False)
+

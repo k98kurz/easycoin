@@ -13,18 +13,18 @@ class ImportAddressModal(Screen):
         Binding("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, success_callback=None):
-        """Initialize import address modal.
+    CSS = """
+        ImportAddressModal { background: $background 50%; }
+    """
 
-        Args:
-            success_callback: Optional callback to call after address is imported
-        """
+    def __init__(self, success_callback=None):
+        """Initialize import address modal."""
         super().__init__()
         self.success_callback = success_callback
 
     def compose(self) -> ComposeResult:
         """Compose import address modal layout."""
-        with Vertical(id="import_address_modal", classes="modal-container"):
+        with Vertical(classes="modal-container w-70p"):
             yield Static("Import Address", classes="modal-title")
             yield Static("\n")
 

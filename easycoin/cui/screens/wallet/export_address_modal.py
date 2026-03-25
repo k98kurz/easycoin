@@ -19,6 +19,10 @@ class ExportAddressModal(Screen):
         Binding("escape", "cancel", "Cancel"),
     ]
 
+    CSS = """
+        ExportAddressModal { background: $background 50%; }
+    """
+
     def __init__(self, address: Address):
         """Initialize export address modal."""
         super().__init__()
@@ -32,7 +36,7 @@ class ExportAddressModal(Screen):
 
     def compose(self) -> ComposeResult:
         """Compose export address modal layout."""
-        with VerticalScroll(id="export_address_modal", classes="modal-container"):
+        with VerticalScroll(classes="modal-container w-70p"):
             yield Static("View/Export Address", classes="modal-title")
             yield Static("")
 

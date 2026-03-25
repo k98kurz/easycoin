@@ -104,7 +104,8 @@ if  (   some_long_condition_goes >= here_first
 - Do NOT write docstrings that are improperly indented
 - Do NOT add empty lines in docstrings
 - Do NOT add "Arg: " and "Returns: " lists
-- ONLY include information that is not obvious from the annotations
+- ONLY include information that is not obvious from the annotations, and write in
+full sentences
 
 Examples:
 ```python
@@ -180,6 +181,8 @@ the selected row
 - Prefer the existing tailwind-like classes over creating a new custom class/whatever
 - If there is an opportunity to make a new tailwind-like class for a style, make it
 - If custom CSS is required, write it to the `CSS` property of the screen/widget
+- DO NOT STYLE BY ID
+- Stop making one-line style declarations for width -- use one of the `w-*` classes
 
 ### Modals
 

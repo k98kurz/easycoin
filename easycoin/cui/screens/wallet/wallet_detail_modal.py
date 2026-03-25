@@ -26,6 +26,8 @@ class WalletDetailModal(Screen):
         Binding("escape", "cancel", "Cancel"),
     ]
 
+    CSS = "WalletDetailModal { background: $background 50%; }"
+
     def __init__(self):
         """Initialize wallet detail modal."""
         super().__init__()
@@ -34,7 +36,7 @@ class WalletDetailModal(Screen):
 
     def compose(self) -> ComposeResult:
         """Compose wallet detail modal layout."""
-        with VerticalScroll(id="wallet_detail", classes="modal-container"):
+        with VerticalScroll(id="wallet_detail", classes="modal-container w-70p"):
             yield Static("Wallet Details", classes="modal-title")
 
             with Vertical(classes="border-solid-primary px-1 h-10 my-1"):
@@ -55,7 +57,7 @@ class WalletDetailModal(Screen):
                         yield Static("Status:", classes="text-muted")
                         yield Static("Loading...", id="wallet_status")
 
-            yield Static("Addresses", classes="py-1 bold")
+            yield Static("Addresses (lock + 4 byte checksum)", classes="py-1 bold")
             yield DataTable(id="address_book", classes="h-min-10")
 
             with ItemGrid(id="modal_actions", min_column_width=18):
