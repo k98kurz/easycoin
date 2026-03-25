@@ -1,1 +1,0 @@
-"""Onboarding screens package."""

@@ -78,8 +78,8 @@ class CoinsScreen(BaseScreen):
                 "#box_active_wallet",
                 Checkbox
             ).value:
-                self.app.wallet.coins.reload()
-                coins = list(self.app.wallet.coins.get())
+                self.app.wallet.coins().reload()
+                coins = self.app.wallet.coins
             else:
                 for chunk in Coin.query().chunk(500):
                     coins.extend(chunk)
@@ -103,7 +103,7 @@ class CoinsScreen(BaseScreen):
 
             try:
                 table.add_row(
-                    self._truncate_id(coin.id),
+                    coin.id,
                     f"{coin.amount:,} EC⁻¹",
                     Wallet.get_lock_type(coin.lock),
                     "Available",
@@ -137,13 +137,3 @@ class CoinsScreen(BaseScreen):
 
         return net_id[:16] + "..."
 
-    def _truncate_id(
-        self,
-        coin_id: str,
-        prefix_len: int = 8,
-        suffix_len: int = 4
-    ) -> str:
-        """Truncate coin ID for display."""
-        if len(coin_id) <= prefix_len + suffix_len:
-            return coin_id
-        return f"{coin_id[:prefix_len]}...{coin_id[-suffix_len:]}"

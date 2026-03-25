@@ -12,6 +12,7 @@ from easycoin.cui.screens.network.placeholder import NetworkScreen
 from easycoin.cui.screens.trustnet.placeholder import TrustNetScreen
 from easycoin.cui.screens.repl.repl_modal import ReplModal
 from easycoin.cui.screens.event_log_modal import EventLogModal
+from easycoin.cui.screens.welcome import WelcomeScreen
 import logging
 
 
@@ -31,6 +32,7 @@ class EasyCoinApp(App):
         "trustnet": TrustNetScreen,
         "repl": ReplModal,
         "event_log": EventLogModal,
+        "welcome": WelcomeScreen,
     }
 
     BINDINGS = [
@@ -40,6 +42,7 @@ class EasyCoinApp(App):
         ("3", "switch_to_coins", "Coins"),
         ("4", "switch_to_transactions", "Transactions"),
         ("ctrl+l", "open_event_log", "Event Log"),
+        ("?", "open_welcome", "Welcome"),
         ("f5", "refresh", "Refresh"),
         ("q", "quit", "Quit"),
     ]
@@ -86,7 +89,12 @@ class EasyCoinApp(App):
 
             self.notify("EasyCoin CUI started")
             self.log_event("EasyCoin CUI started", "INFO")
+
+            if not self.config.get_welcome_shown():
+                self.call_later(self.action_open_welcome)
+
             self.push_screen("dashboard")
+
         except Exception as e:
             self.logger.error(f"Failed to initialize app: {e}")
             self.notify(f"Initialization error: {e}", severity="error")
@@ -125,6 +133,12 @@ class EasyCoinApp(App):
     def action_open_event_log(self) -> None:
         """Open event log modal for viewing and managing logs."""
         self.push_screen("event_log")
+
+    def action_open_welcome(self) -> None:
+        """Open welcome screen."""
+        self.config.set_welcome_shown(True)
+        self.config.save()
+        self.push_screen("welcome")
 
     def log_event(self, message: str, level: str = "INFO") -> None:
         """Append log entry to state. Args:

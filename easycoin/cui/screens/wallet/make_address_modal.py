@@ -62,7 +62,7 @@ class MakeAddressModal(Screen):
                     yield Checkbox(id="use_child_nonce")
 
 
-            with Horizontal(classes="h-2 mt-1"):
+            with Horizontal(classes="h-4 mt-1"):
                 with Vertical():
                     yield Static("Nonce:", classes="form-label")
                     yield Static("Loading...", id="nonce_display")

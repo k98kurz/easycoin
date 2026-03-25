@@ -134,3 +134,18 @@ class ConfigManager:
             visible: `True` for visible, `False` for hidden.
         """
         self.config.set("sidebar_visible", visible)
+
+    def get_welcome_shown(self) -> bool:
+        """Check if welcome screen has been shown. Returns `True` if shown,
+            `False` otherwise.
+        """
+        value = self.config.get("welcome_shown", False)
+        if isinstance(value, bool):
+            return value
+        return False
+
+    def set_welcome_shown(self, shown: bool) -> None:
+        """Set welcome screen shown status. Args:
+            shown: `True` if welcome has been shown, `False` otherwise.
+        """
+        self.config.set("welcome_shown", shown)
