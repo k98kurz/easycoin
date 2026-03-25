@@ -1,6 +1,7 @@
 from __future__ import annotations
 from hashlib import sha256
 from sqloquent import SqlModel, RelatedModel, RelatedCollection
+from .Coin import Coin
 import packify
 
 
@@ -30,10 +31,11 @@ class Output(SqlModel):
         return bytes.fromhex(self.net_id) if self.net_id else b''
 
     @classmethod
-    def from_coin(cls, coin: 'Coin') -> 'Input':
+    def from_coin(cls, coin: Coin) -> Output:
         """Prepare an Output from a Coin, copying all necessary values."""
         return cls({
             'id': coin.id,
+            'wallet_id': coin.wallet_id,
             'net_id': coin.net_id,
             'net_state': coin.net_state,
             'commitment': coin.commitment(coin.data),
@@ -41,7 +43,7 @@ class Output(SqlModel):
 
     def check(self) -> bool:
         """Check that the Output ID is the sha256 of the `net_id`,
-            `net_state`, and `commitment`. Intended to be usef for
+            `net_state`, and `commitment`. Intended to be used for
             verification during pruning.
         """
         return sha256(packify.pack([

@@ -35,9 +35,7 @@ class Address(SqlModel):
 
     def coins(self) -> SqlQueryBuilder:
         """Returns a query builder for the coins associated with this address."""
-        return Coin.query().equal('lock', self.lock).equal(
-            'wallet_id', self.wallet_id
-        )
+        return Coin.query().equal('lock', self.lock)
 
     def pack(self, *, include_wallet_info: bool = False) -> bytes:
         return packify.pack({
