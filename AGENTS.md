@@ -26,10 +26,14 @@ docs/ folder:
     - Confirmation
     - Snapshot
     - Chunk
-- sqloquent.md: sqloquent package
+- sqloquent.md: sqloquent package; the most important to learn are the following:
+    - SqlModel
+    - HashedModel
+    - SqlQueryBuilder
 
 Be sure to grep through the files to find the right line numbers before reading them
-as they are very long.
+as they are very long. DO NOT endlessly search through the codebase for how to use
+sqloquent; SEARCH THE DOCS FIRST.
 
 ## Code Style
 

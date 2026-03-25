@@ -7,7 +7,7 @@ from easycoin.cui.state import StateManager
 from easycoin.cui.screens.dashboard import DashboardScreen
 from easycoin.cui.screens.wallet.main_screen import WalletListScreen
 from easycoin.cui.screens.coins.coins_screen import CoinsScreen
-from easycoin.cui.screens.transactions.placeholder import TransactionsScreen
+from easycoin.cui.screens.transactions.txn_screen import TransactionsScreen
 from easycoin.cui.screens.network.placeholder import NetworkScreen
 from easycoin.cui.screens.trustnet.placeholder import TrustNetScreen
 from easycoin.cui.screens.repl.repl_modal import ReplModal

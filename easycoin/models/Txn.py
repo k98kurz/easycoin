@@ -2,7 +2,7 @@ from __future__ import annotations
 from .Coin import Coin
 from .errors import type_assert, value_assert
 from hashlib import sha256
-from sqloquent import HashedModel, RelatedCollection
+from sqloquent import HashedModel, RelatedCollection, RelatedModel
 from tapescript import run_auth_scripts, Script
 from time import time
 import packify
@@ -42,6 +42,9 @@ class Txn(HashedModel):
     wallet_id: str|None
     inputs: RelatedCollection
     outputs: RelatedCollection
+    wallet: RelatedModel
+    attestations: RelatedCollection
+    confirmation: RelatedModel
 
     @property
     def input_ids(self) -> list[str]:
