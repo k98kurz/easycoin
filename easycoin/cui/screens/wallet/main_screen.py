@@ -210,9 +210,8 @@ class WalletListScreen(BaseScreen):
 
             wallet_name = table.get_row_at(table.cursor_row)[0]
             confirmation_message = (
-                f"Are you sure you want to delete wallet "
-                f"'{wallet_name}' ({self._truncate_id(wallet_id)})? This action "
-                "cannot be undone."
+                f"Are you sure you want to delete wallet '{wallet_name}' "
+                f"({wallet_id})?\n\nThis action cannot be undone."
             )
 
             def confirm_delete(result: bool):

@@ -42,7 +42,7 @@ class CoinsScreen(BaseScreen):
     def on_mount(self) -> None:
         """Initialize coins table on mount."""
         super().on_mount()
-        table = self.query_one("#coins_table", DataTable)
+        table = self.query_one("#coins_table")
         table.cursor_type = "row"
         table.add_columns(
             "Coin ID",
@@ -51,10 +51,21 @@ class CoinsScreen(BaseScreen):
             "Status",
             "Network"
         )
+        self.watch(self.app, "wallet", self.check_wallet_status, init=True)
         self._load_coins()
 
+    def check_wallet_status(self, wallet) -> None:
+        if wallet is None:
+            self.query_one("#box_active_wallet").disabled = True
+        else:
+            self.query_one("#box_active_wallet").disabled = False
+
+    @on(Checkbox.Changed, "#box_active_wallet")
+    def _checkbox_changed(self, event: Checkbox.Changed) -> None:
+        self._load_coins(search_query=self.query_one("#search_input").value)
+
     @on(Input.Changed, "#search_input")
-    def on_input_changed(self, event: Input.Changed) -> None:
+    def _input_changed(self, event: Input.Changed) -> None:
         """Handle search input changes."""
         self._load_coins(search_query=event.value)
 
@@ -62,7 +73,7 @@ class CoinsScreen(BaseScreen):
     def action_refresh_coins(self) -> None:
         """Refresh coins data."""
         self.log_event("Refreshing coins", "INFO")
-        search_input = self.query_one("#search_input", Input)
+        search_input = self.query_one("#search_input")
         self._load_coins(search_query=search_input.value)
 
     @on(Button.Pressed, "#btn_mine_config")
@@ -74,10 +85,7 @@ class CoinsScreen(BaseScreen):
         """Load coins from database and populate table."""
         coins = []
         try:
-            if self.app.wallet and self.query_one(
-                "#box_active_wallet",
-                Checkbox
-            ).value:
+            if self.app.wallet and self.query_one("#box_active_wallet").value:
                 self.app.wallet.coins().reload()
                 coins = self.app.wallet.coins
             else:
@@ -88,7 +96,7 @@ class CoinsScreen(BaseScreen):
             self.app.notify(f"Error loading coins: {e}", severity="error")
             return
 
-        table = self.query_one("#coins_table", DataTable)
+        table = self.query_one("#coins_table")
         table.clear()
 
         sorted_coins = sorted(

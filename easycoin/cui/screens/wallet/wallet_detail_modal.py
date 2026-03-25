@@ -365,18 +365,12 @@ class WalletDetailModal(Screen):
             return address
         return f"{address[:92]}...{address[-8:]}"
 
-    def _truncate_id(self, wallet_id: str) -> str:
-        """Truncate wallet ID for display."""
-        return f"{wallet_id[:16]}..."
-
     def _get_wallet_balance(self, wallet) -> int:
         """Get total balance for a wallet by summing the amounts of all
             coins owned by this wallet (any address).
         """
-        total = 0
-        for coin in Coin.query({'wallet_id': wallet.id}).get():
-            total += coin.amount
-        return total
+        wallet.coins().reload()
+        return sum([c.amount for c in wallet.coins])
 
     def _set_status(self) -> None:
         """Set wallet status display."""

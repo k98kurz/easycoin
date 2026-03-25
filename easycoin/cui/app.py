@@ -51,13 +51,13 @@ class EasyCoinApp(App):
     active_trustnet_id = reactive(None)
     active_trustnet_state = reactive(None)
     sidebar_visible = reactive(False)
+    wallet = reactive(None)
 
     def __init__(self):
         """Initialize the application."""
         super().__init__()
         self.config = ConfigManager("easycoin")
         self.state = StateManager(self)
-        self.wallet = None
         self.logger = logging.getLogger("easycoin")
         self._setup_file_logging()
 
