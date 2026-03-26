@@ -172,7 +172,6 @@ class MiningConfigurationModal(ModalScreen):
         config.set_mining_processes(processes)
         config.save()
 
-        self.app.notify("Mining configuration saved", severity="success")
         self.app.log_event(
             f"Mining config: {mode.value}, processes={processes}, size={size}",
             "INFO"

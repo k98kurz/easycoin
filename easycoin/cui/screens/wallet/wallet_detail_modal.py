@@ -180,7 +180,6 @@ class WalletDetailModal(Screen):
                 self.app.log_event(f"Unlock error: {e}", "ERROR")
                 return
 
-            self.app.notify("Wallet unlocked", severity="success")
             self.app.log_event(f"Wallet unlocked: {self.app.wallet.id[:16]}...", "INFO")
             self._set_button_visibility()
             self._refresh_data()
@@ -254,10 +253,6 @@ class WalletDetailModal(Screen):
             try:
                 self.selected_address.delete()
                 self.selected_address = None
-                self.app.notify(
-                    f"Address deleted: {truncated}",
-                    severity="success"
-                )
                 self._refresh_address_book()
             except Exception as e:
                 self.app.notify(

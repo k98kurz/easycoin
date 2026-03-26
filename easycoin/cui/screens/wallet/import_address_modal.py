@@ -79,7 +79,6 @@ class ImportAddressModal(Screen):
             password = self.query_one("#password_input", Input).value
             address = self.app.wallet.import_address(data, password=password)
             address.save()
-            self.app.notify("Address imported", severity="success")
             self.app.pop_screen()
             if self.success_callback:
                 self.app.call_later(self.success_callback)

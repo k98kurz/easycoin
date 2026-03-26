@@ -138,10 +138,6 @@ class RestoreWalletModal(Screen):
             wallet.unlock(password)
             self.app.wallet = wallet
 
-            self.app.notify(
-                "Wallet restored and activated",
-                severity="success"
-            )
             self.app.log_event(
                 f"Wallet restored and activated: {wallet.id[:16]}...",
                 "INFO"

@@ -145,9 +145,6 @@ class WalletListScreen(BaseScreen):
 
         if (self.app.wallet and self.app.wallet.id == wallet_id
                 and not self.app.wallet.is_locked):
-            self.app.notify(
-                f"Opening wallet: {wallet_id[:16]}...", severity="information"
-            )
             self.app.push_screen(WalletDetailModal())
             return
 
@@ -168,13 +165,9 @@ class WalletListScreen(BaseScreen):
                 return
 
             self.app.wallet = wallet
-            self.app.notify("Wallet unlocked", severity="success")
             self.app.log_event(f"Wallet unlocked: {wallet_id}...", "INFO")
 
             self.log_event(f"Selected wallet: {wallet_id}...", "INFO")
-            self.app.notify(
-                f"Wallet selected: {wallet_id[:16]}...", severity="information"
-            )
             self.app.push_screen(WalletDetailModal())
             self._refresh_table()
 
@@ -224,9 +217,6 @@ class WalletListScreen(BaseScreen):
                         wallet.delete()
                         self.log_event(
                             f"Deleted wallet: {wallet_id[:16]}...", "INFO"
-                        )
-                        self.app.notify(
-                            "Wallet deleted successfully", severity="information"
                         )
                         self._refresh_table()
                     else:

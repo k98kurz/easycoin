@@ -599,10 +599,6 @@ class NewTransactionModal(ModalScreen):
             txn.save()
             utxo.apply(txn, output_coins)
 
-            self.app.notify(
-                "Transaction submitted successfully!",
-                severity="success"
-            )
             self.app.log_event(f"Submitted txn: {txn.id}", "INFO")
 
             self.dismiss()

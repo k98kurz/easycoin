@@ -87,7 +87,6 @@ class EasyCoinApp(App):
             self.active_trustnet_id = self.config.get_active_trustnet_id()
             self.sidebar_visible = self.config.get_sidebar_visible()
 
-            self.notify("EasyCoin CUI started")
             self.log_event("EasyCoin CUI started", "INFO")
 
             if not self.config.get_welcome_shown():

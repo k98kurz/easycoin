@@ -185,8 +185,6 @@ class MakeAddressModal(Screen):
                 self.app.wallet.nonce = nonce + 1
                 self.app.wallet.save()
 
-            truncated = f"{address.hex[:16]}..."
-            self.app.notify(f"Address saved: {truncated}", severity="success")
             self.app.pop_screen()
             if self.success_callback:
                 self.app.call_later(self.success_callback)

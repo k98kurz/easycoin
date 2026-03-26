@@ -118,10 +118,6 @@ class CreateWalletModal(ModalScreen):
             wallet.unlock(password)
             self.app.wallet = wallet
 
-            self.app.notify(
-                "Wallet created and activated",
-                severity="success"
-            )
             self.app.log_event(
                 f"Wallet created and activated: {wallet.id[:16]}...",
                 "INFO"
