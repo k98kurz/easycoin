@@ -9,11 +9,14 @@ from textual.widgets import Button, Footer, Static, TextArea
 from easycoin.cui.widgets import ECTextArea
 
 
-class ReplTextArea(TextArea):
-    """Custom TextArea that handles Enter, Ctrl+O, Ctrl+T/Alt+T for REPL input."""
+class ReplTextArea(ECTextArea):
+    """ECTextArea that handles Enter, Ctrl+O, Ctrl+T/Alt+T for REPL input."""
 
     def on_key(self, event) -> None:
         """Handle key events for submission vs newline."""
+        if self.read_only:
+            return
+
         if event.key == "enter":
             event.prevent_default()
             self.screen.action_submit_code()
@@ -30,6 +33,7 @@ class ReplModal(Screen):
 
     BINDINGS = [
         Binding("escape", "close", "Close"),
+        Binding("ctrl+l", "clear", "Clear"),
     ]
 
     CSS = """

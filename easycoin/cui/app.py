@@ -41,7 +41,7 @@ class EasyCoinApp(App):
         ("2", "switch_to_wallet", "Identity/Wallet"),
         ("3", "switch_to_coins", "Coins"),
         ("4", "switch_to_transactions", "Transactions"),
-        ("ctrl+l", "open_event_log", "Event Log"),
+        ("ctrl+e", "open_event_log", "Event Log"),
         ("ctrl+q", "quit", "Quit"),
         ("?", "open_welcome", "Welcome"),
     ]
