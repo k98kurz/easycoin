@@ -12,6 +12,7 @@ class EditOutputModal(ModalScreen[dict|None]):
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(
@@ -128,3 +129,6 @@ class EditOutputModal(ModalScreen[dict|None]):
     def action_cancel(self) -> None:
         """Cancel and dismiss without saving."""
         self.dismiss(None)
+
+    async def action_quit(self) -> None:
+        await self.app.action_quit()

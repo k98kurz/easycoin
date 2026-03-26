@@ -11,6 +11,7 @@ class TransactionDetailModal(ModalScreen):
 
     BINDINGS = [
         Binding("escape", "close", "Close"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(self, txn_id: str):
@@ -49,3 +50,6 @@ class TransactionDetailModal(ModalScreen):
     @on(Button.Pressed, "#btn_close")
     def action_close(self, event: Button.Pressed | None = None) -> None:
         self.dismiss()
+
+    async def action_quit(self) -> None:
+        await self.app.action_quit()

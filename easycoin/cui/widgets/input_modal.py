@@ -12,6 +12,7 @@ class InputModal(ModalScreen[str|None]):
     BINDINGS = [
         Binding("enter", "submit", "Submit", priority=True),
         Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(
@@ -54,3 +55,6 @@ class InputModal(ModalScreen[str|None]):
     def action_cancel(self) -> None:
         """Dismisses the modal without user input."""
         self.dismiss(None)
+
+    async def action_quit(self) -> None:
+        await self.app.action_quit()

@@ -1,19 +1,20 @@
 from datetime import datetime
 from textual import on
-from textual.screen import Screen
+from textual.screen import ModalScreen
 from textual.app import ComposeResult
 from textual.containers import Vertical, Horizontal
-from textual.widgets import Static, Input, Button
+from textual.widgets import Static, Input, Button, Footer
 from textual.binding import Binding
 from easycoin.models import Wallet
 from easycoin import wordlist
 
 
-class RestoreWalletModal(Screen):
+class RestoreWalletModal(ModalScreen):
     """Modal for restoring a wallet from a 12-word seed phrase."""
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     CSS = """
@@ -71,6 +72,8 @@ class RestoreWalletModal(Screen):
                 yield Button("Restore", id="btn_restore", variant="primary")
                 yield Button("Cancel", id="btn_cancel", variant="default")
 
+        yield Footer()
+
     def on_mount(self) -> None:
         """Set default wallet name and focus seed phrase input on mount."""
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -79,9 +82,10 @@ class RestoreWalletModal(Screen):
         )
         self.query_one("#seed_phrase_input", Input).focus()
 
-    def action_cancel(self) -> None:
+    @on(Button.Pressed, "#btn_cancel")
+    def action_cancel(self, event = None) -> None:
         """Action handler for Escape key."""
-        self.app.pop_screen()
+        self.dismiss()
 
     @on(Button.Pressed, "#btn_restore")
     def _do_restore(self) -> None:
@@ -143,7 +147,7 @@ class RestoreWalletModal(Screen):
                 "INFO"
             )
 
-            self.app.pop_screen()
+            self.dismiss()
 
             if self.refresh_callback:
                 self.app.call_later(self.refresh_callback)
@@ -152,7 +156,5 @@ class RestoreWalletModal(Screen):
             self.app.notify(f"Failed to restore wallet: {e}", severity="error")
             self.app.log_event(f"Wallet restore error: {e}", "ERROR")
 
-    @on(Button.Pressed, "#btn_cancel")
-    def _cancel(self) -> None:
-        """Cancel restore and close modal."""
-        self.app.pop_screen()
+    async def action_quit():
+        await self.app.action_quit()

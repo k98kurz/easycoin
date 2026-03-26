@@ -11,6 +11,7 @@ class ConfirmationModal(ModalScreen):
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(
@@ -50,4 +51,7 @@ class ConfirmationModal(ModalScreen):
     @on(Button.Pressed, "#btn_cancel")
     def action_cancel(self, event: Button.Pressed | None = None) -> None:
         self.dismiss(False)
+
+    async def action_quit(self) -> None:
+        await self.app.action_quit()
 

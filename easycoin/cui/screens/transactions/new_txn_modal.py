@@ -19,6 +19,7 @@ class NewTransactionModal(ModalScreen):
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(self):
@@ -37,7 +38,7 @@ class NewTransactionModal(ModalScreen):
         with VerticalScroll(classes="modal-container w-80p h-70p"):
             yield Static("New Transaction", classes="modal-title")
 
-            with Vertical(id="step_container"):
+            with Vertical(id="step_container", classes="mt-1"):
                 yield from self._compose_step_1_select_inputs()
                 yield from self._compose_step_2_add_outputs()
                 yield from self._compose_step_3_witness()
@@ -444,6 +445,9 @@ class NewTransactionModal(ModalScreen):
     def action_cancel(self) -> None:
         """Cancel and close modal."""
         self.dismiss()
+
+    async def action_quit(self) -> None:
+        await self.app.action_quit()
 
     @on(Button.Pressed, "#btn_add_output")
     def action_add_output(self) -> None:

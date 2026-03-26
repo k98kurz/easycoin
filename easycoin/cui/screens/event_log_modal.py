@@ -11,6 +11,7 @@ class EventLogModal(ModalScreen):
 
     BINDINGS = [
         Binding("escape", "close", "Close"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     DEFAULT_CSS = """
@@ -42,5 +43,8 @@ class EventLogModal(ModalScreen):
             self.app.state.unsubscribe(self)
 
     def action_close(self) -> None:
-        """Close the event log modal."""
+        """Close event log modal."""
         self.dismiss()
+
+    async def action_quit(self) -> None:
+        await self.app.action_quit()

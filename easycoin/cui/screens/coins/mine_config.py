@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, RadioButton, RadioSet, Static
+from textual.widgets import Button, RadioButton, RadioSet, Static, Footer
 from easycoin.config import ConfigManager, MiningMode
 
 
@@ -13,6 +13,7 @@ class MiningConfigurationModal(ModalScreen):
     BINDINGS = [
         Binding("escape", "close", "Cancel"),
         Binding("ctrl+s", "save", "Save"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -66,6 +67,8 @@ class MiningConfigurationModal(ModalScreen):
             with Horizontal(id="modal_actions"):
                 yield Button("Save", id="btn_save", variant="success")
                 yield Button("Cancel", id="btn_cancel", variant="default")
+
+        yield Footer()
 
     def on_mount(self) -> None:
         """Load current configuration into form fields."""
@@ -178,3 +181,6 @@ class MiningConfigurationModal(ModalScreen):
         )
 
         self.dismiss()
+
+    async def action_quit(self) -> None:
+        await self.app.action_quit()

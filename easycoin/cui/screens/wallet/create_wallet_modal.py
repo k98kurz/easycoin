@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Static, Input, Button
+from textual.widgets import Static, Input, Button, Footer
 from easycoin.models import Wallet
 from easycoin import wordlist
 import random
@@ -13,6 +13,7 @@ class CreateWalletModal(ModalScreen):
     """Modal for creating a new wallet with seed phrase and password."""
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     CSS = """
@@ -75,6 +76,7 @@ class CreateWalletModal(ModalScreen):
             with Horizontal(id="modal_actions"):
                 yield Button("Create", id="btn_create", variant="primary")
                 yield Button("Cancel", id="btn_cancel", variant="default")
+        yield Footer()
 
     def on_mount(self) -> None:
         """Set default wallet name in input field on mount."""
@@ -83,6 +85,9 @@ class CreateWalletModal(ModalScreen):
     @on(Button.Pressed, "#btn_cancel")
     def action_cancel(self, event = None) -> None:
         self.dismiss()
+
+    async def action_quit(self) -> None:
+        await self.app.action_quit()
 
     @on(Button.Pressed, "#btn_create")
     def action_create_wallet(self) -> None:
