@@ -158,6 +158,15 @@ import packify # external package
 
 ## Textual CUI
 
+### Notifications
+
+- Toast notifications are created with `self.app.notify(message, severity)`
+- Do NOT create notifications for things that are already fucking obvious, e.g.
+"App started" when the app starts or "Wallet unlocked" when the wallet detail
+modal opens. That retarded bullshit slows down the app. Stop doing it.
+- ONLY create notifications that are valuable for users and provide clarity when
+no other UI updates indicate what happened.
+
 ### Event Management
 
 - Prefer using the `BINDINGS` with `action_*()` handlers over `on_key()` 
