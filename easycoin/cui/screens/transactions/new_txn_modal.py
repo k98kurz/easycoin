@@ -11,6 +11,7 @@ from textual.widgets.data_table import RowKey
 from easycoin.cui.screens.transactions.edit_output_modal import EditOutputModal
 from easycoin.models import Txn, Coin, Output, Address, Wallet
 from easycoin.UTXOSet import UTXOSet
+from easycoin.cui.helpers import format_balance, truncate_text
 from tapescript import Script
 
 
@@ -101,8 +102,8 @@ class NewTransactionModal(ModalScreen):
                         with Horizontal(id=f"witness_row_{i}", classes="my-1"):
                             with Vertical(classes="w-1fr"):
                                 yield Label(
-                                    f"Input: {self._truncate_id(output.id)} "
-                                    f"({output.coin.amount:,} EC⁻¹)",
+                                    f"Input: {truncate_text(output.id, prefix_len=8, suffix_len=4)} "
+                                    f"({format_balance(output.coin.amount, exact=True)})",
                                     classes="form-label"
                                 )
                                 lock_type = Wallet.get_lock_type(output.coin.lock)
@@ -140,8 +141,8 @@ class NewTransactionModal(ModalScreen):
                 else:
                     for output in self.selected_outputs:
                         yield Static(
-                            f"  • {self._truncate_id(output.id)} - "
-                            f"{output.coin.amount:,} EC⁻¹",
+                            f"  • {truncate_text(output.id, prefix_len=8, suffix_len=4)} - "
+                            f"{format_balance(output.coin.amount, exact=True)}",
                             classes="mb-1"
                         )
                     yield Static("")
@@ -169,7 +170,7 @@ class NewTransactionModal(ModalScreen):
                 fee = max(0, total_input - total_output)
 
                 yield Static("Fee:", classes="text-bold")
-                yield Static(f"  Estimated Fee: {fee:,} EC⁻¹", classes="mb-1")
+                yield Static(f"  Estimated Fee: {format_balance(fee, exact=True)}", classes="mb-1")
                 yield Static("")
 
                 yield Static("Status:", classes="text-bold")
@@ -255,8 +256,8 @@ class NewTransactionModal(ModalScreen):
             for output in outputs:
                 try:
                     row_key = table.add_row(
-                        self._truncate_id(output.id),
-                        f"{output.coin.amount:,} EC⁻¹",
+                        truncate_text(output.id, prefix_len=8, suffix_len=4),
+                        format_balance(output.coin.amount, exact=True),
                         Wallet.get_lock_type(output.coin.lock),
                         "✓" if output.id in [o.id for o in self.selected_outputs] else " ",
                         key=output.id
@@ -281,7 +282,7 @@ class NewTransactionModal(ModalScreen):
             summary = self.query_one("#input_summary")
             summary.update(
                 f"Selected: {len(self.selected_outputs)} coins | "
-                f"Total: {total_amount:,} EC⁻¹"
+                f"Total: {format_balance(total_amount, exact=True)}"
             )
         except Exception:
             pass
@@ -384,10 +385,6 @@ class NewTransactionModal(ModalScreen):
                 )
 
         return witnesses
-
-    def _truncate_id(self, coin_id: str) -> str:
-        """Truncate coin ID for display."""
-        return f"{coin_id[:8]}...{coin_id[-4:]}"
 
     @on(Button.Pressed, "#btn_next")
     def action_next(self) -> None:
@@ -640,9 +637,9 @@ class NewTransactionModal(ModalScreen):
             estimated_fee = max(0, total_input - total_output)
             summary = self.query_one("#output_summary")
             summary.update(
-                f"Total Input: {total_input:,} EC⁻¹ | "
-                f"Total Output: {total_output:,} EC⁻¹ | "
-                f"Estimated Fee: {estimated_fee:,} EC⁻¹"
+                f"Total Input: {format_balance(total_input, exact=True)} | "
+                f"Total Output: {format_balance(total_output, exact=True)} | "
+                f"Estimated Fee: {format_balance(estimated_fee, exact=True)}"
             )
         except Exception as e:
             self.app.log_event(f"Error updating output summary: {e}", "DEBUG")
@@ -687,8 +684,8 @@ class NewTransactionModal(ModalScreen):
                     row = Horizontal(id=f"witness_row_{i}", classes="my-1")
                     col = Vertical(classes="w-1fr")
                     label = Label(
-                        f"Input: {self._truncate_id(output.id)} "
-                        f"({output.coin.amount:,} EC⁻¹)",
+                        f"Input: {truncate_text(output.id, prefix_len=8, suffix_len=4)} "
+                        f"({format_balance(output.coin.amount, exact=True)})",
                         classes="form-label"
                     )
 
@@ -733,8 +730,8 @@ class NewTransactionModal(ModalScreen):
                 for output in self.selected_outputs:
                     review_summary.mount(
                         Static(
-                            f"  • {self._truncate_id(output.id)} - "
-                            f"{output.coin.amount:,} EC⁻¹",
+                            f"  • {truncate_text(output.id, prefix_len=8, suffix_len=4)} - "
+                            f"{format_balance(output.coin.amount, exact=True)}",
                             classes="mb-1"
                         )
                     )
@@ -767,7 +764,7 @@ class NewTransactionModal(ModalScreen):
             fee = max(0, total_input - total_output)
 
             review_summary.mount(Static("Fee:", classes="text-bold"))
-            review_summary.mount(Static(f"  Estimated Fee: {fee:,} EC⁻¹", classes="mb-1"))
+            review_summary.mount(Static(f"  Estimated Fee: {format_balance(fee, exact=True)}", classes="mb-1"))
             review_summary.mount(Static(""))
 
             review_summary.mount(Static("Status:", classes="text-bold"))
@@ -789,8 +786,8 @@ class NewTransactionModal(ModalScreen):
             for output in self.available_outputs:
                 is_selected = output in self.selected_outputs
                 table.add_row(
-                    self._truncate_id(output.id),
-                    f"{output.coin.amount:,} EC⁻¹",
+                    truncate_text(output.id, prefix_len=8, suffix_len=4),
+                    format_balance(output.coin.amount, exact=True),
                     Wallet.get_lock_type(output.coin.lock),
                     "✓" if is_selected else " ",
                     key=output.id

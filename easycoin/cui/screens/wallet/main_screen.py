@@ -4,6 +4,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Static
 from easycoin.models import Wallet, Coin
 from ..base import BaseScreen
+from easycoin.cui.helpers import format_balance, truncate_text
 from easycoin.cui.widgets import ConfirmationModal, InputModal
 from .create_wallet_modal import CreateWalletModal
 from .restore_wallet_modal import RestoreWalletModal
@@ -90,13 +91,13 @@ class WalletListScreen(BaseScreen):
                         else:
                             status = "Locked" if wallet.is_locked else "Unlocked"
                         balance = self._get_wallet_balance(wallet)
-                        display_id = self._truncate_id(wallet.id)
+                        display_id = truncate_text(wallet.id, suffix_len=0)
 
                         table.add_row(
                             wallet.name or '',
                             display_id,
                             status,
-                            str(balance),
+                            format_balance(balance),
                             active_marker,
                             wallet.tags or ''
                         )
@@ -165,9 +166,9 @@ class WalletListScreen(BaseScreen):
                 return
 
             self.app.wallet = wallet
-            self.app.log_event(f"Wallet unlocked: {wallet_id}...", "INFO")
+            self.app.log_event(f"Wallet unlocked: {wallet_id}", "INFO")
 
-            self.log_event(f"Selected wallet: {wallet_id}...", "INFO")
+            self.log_event(f"Selected wallet: {wallet_id}", "INFO")
             self.app.push_screen(WalletDetailModal())
             self._refresh_table()
 
@@ -216,7 +217,7 @@ class WalletListScreen(BaseScreen):
                     if wallet:
                         wallet.delete()
                         self.log_event(
-                            f"Deleted wallet: {wallet_id[:16]}...", "INFO"
+                            f"Deleted wallet: {wallet_id}", "INFO"
                         )
                         self._refresh_table()
                     else:
@@ -255,13 +256,13 @@ class WalletListScreen(BaseScreen):
                         else:
                             status = "Locked" if wallet.is_locked else "Unlocked"
                         balance = self._get_wallet_balance(wallet)
-                        display_id = self._truncate_id(wallet.id)
+                        display_id = truncate_text(wallet.id, suffix_len=0)
 
                         table.add_row(
                             wallet.name or '',
                             display_id,
                             status,
-                            str(balance),
+                            format_balance(balance),
                             active_marker,
                             wallet.tags or ''
                         )
@@ -287,10 +288,6 @@ class WalletListScreen(BaseScreen):
         except Exception as e:
             self.log_event(f"Error calculating wallet balance: {e}", "ERROR")
         return total
-
-    def _truncate_id(self, wallet_id: str) -> str:
-        """Truncate wallet ID for display."""
-        return f"{wallet_id[:16]}..."
 
     def _update_button_state(self) -> None:
         """Enable/disable Select and Delete buttons based on wallet count."""

@@ -124,7 +124,7 @@ class CreateWalletModal(ModalScreen):
             self.app.wallet = wallet
 
             self.app.log_event(
-                f"Wallet created and activated: {wallet.id[:16]}...",
+                f"Wallet created and activated: {wallet.id}",
                 "INFO"
             )
 

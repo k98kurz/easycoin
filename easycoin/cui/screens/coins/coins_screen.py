@@ -4,6 +4,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Checkbox, DataTable, Input, Static
 from easycoin.models import Coin, TrustNet, Wallet
 from ..base import BaseScreen
+from easycoin.cui.helpers import format_balance, truncate_text
 from .mine_config import MiningConfigurationModal
 
 
@@ -112,7 +113,7 @@ class CoinsScreen(BaseScreen):
             try:
                 table.add_row(
                     coin.id,
-                    f"{coin.amount:,} EC⁻¹",
+                    format_balance(coin.amount, exact=True),
                     Wallet.get_lock_type(coin.lock),
                     "Available",
                     self._get_network_name(coin.net_id)
@@ -143,5 +144,5 @@ class CoinsScreen(BaseScreen):
         except Exception as e:
             self.log_event(f"Error finding trustnet: {e}", "DEBUG")
 
-        return net_id[:16] + "..."
+        return truncate_text(net_id, suffix_len=0)
 

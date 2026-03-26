@@ -143,7 +143,7 @@ class RestoreWalletModal(ModalScreen):
             self.app.wallet = wallet
 
             self.app.log_event(
-                f"Wallet restored and activated: {wallet.id[:16]}...",
+                f"Wallet restored and activated: {wallet.id}",
                 "INFO"
             )
 

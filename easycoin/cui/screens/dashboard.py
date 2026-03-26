@@ -3,6 +3,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, Container
 from textual.css.query import NoMatches
 from textual.widgets import Button, Static
+from easycoin.cui.helpers import format_balance
 from .base import BaseScreen
 
 
@@ -80,7 +81,7 @@ class DashboardScreen(BaseScreen):
     def _format_wallet_info(self) -> str:
         """Format wallet info for display."""
         info = self.app.state.wallet_info
-        text = f"{info['balance']:,} EC⁻¹\n"
+        text = f"{format_balance(info['balance'])}\n"
         text += f"{info['coins']:,} coins\n"
         if len(info['stamps']):
             text += "Stamps:\n"

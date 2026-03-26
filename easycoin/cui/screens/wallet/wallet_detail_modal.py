@@ -6,6 +6,7 @@ from textual.screen import Screen
 from textual.widgets import Button, DataTable, Static, Footer
 from textual.widgets.data_table import RowKey
 from easycoin.cui.clipboard import universal_copy
+from easycoin.cui.helpers import format_balance, truncate_text
 from easycoin.cui.widgets import ConfirmationModal, InputModal
 from easycoin.models import Wallet, Address, Coin
 from .export_address_modal import ExportAddressModal
@@ -111,7 +112,7 @@ class WalletDetailModal(Screen):
 
         balance = self._get_wallet_balance(self.app.wallet)
         self.query_one("#wallet_balance", Static).update(
-            f"{balance:,} EC⁻¹"
+            format_balance(balance)
         )
 
         status_static = self.query_one("#wallet_status", Static)
@@ -253,7 +254,9 @@ class WalletDetailModal(Screen):
             return
 
         address_hex = self.selected_address.hex
-        truncated = self._truncate_address(address_hex)
+        truncated = address_hex if len(address_hex) < 100 else truncate_text(
+            address_hex, prefix_len=92, suffix_len=8
+        )
         message = (
             f"Are you sure you want to delete address "
             f"'{truncated}'? This action cannot be undone."
@@ -368,12 +371,6 @@ class WalletDetailModal(Screen):
 
         return entries
 
-    def _truncate_address(self, address: str) -> str:
-        """Truncate address for display."""
-        if len(address) < 100:
-            return address
-        return f"{address[:92]}...{address[-8:]}"
-
     def _get_wallet_balance(self, wallet) -> int:
         """Get total balance for a wallet by summing the amounts of all
             coins owned by this wallet (any address).
@@ -419,7 +416,7 @@ class WalletDetailModal(Screen):
         self._set_status()
         balance = self._get_wallet_balance(self.app.wallet)
         self.query_one("#wallet_balance", Static).update(
-            f"Balance: {balance:,} EC⁻¹"
+            f"Balance: {format_balance(balance)}"
         )
 
     def _refresh_status(self) -> None:
@@ -459,7 +456,9 @@ class WalletDetailModal(Screen):
                 str(balance),
                 status,
                 lock_type,
-                self._truncate_address(address_hex)
+                address_hex if len(address_hex) < 100 else truncate_text(
+                    address_hex, prefix_len=92, suffix_len=8
+                )
             )
             self._row_coin_count[row_key] = count
             if not addr:

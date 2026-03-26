@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Callable
 from easycoin.models import Txn, Confirmation, Attestation
 from ..base import BaseScreen
+from easycoin.cui.helpers import format_balance, format_timestamp, truncate_text
 from .new_txn_modal import NewTransactionModal
 from .txn_detail_modal import TransactionDetailModal
 
@@ -274,13 +275,13 @@ class TransactionsScreen(BaseScreen):
 
             table = self.query_one("#transactions_table")
             row_key = table.add_row(
-                self._truncate_id(txn.id),
-                self._format_timestamp(txn.timestamp),
+                truncate_text(txn.id, prefix_len=8, suffix_len=4),
+                format_timestamp(txn.timestamp),
                 len(txn.input_ids),
                 len(txn.output_ids),
-                f"{in_amount:,} EC⁻¹",
-                f"{burned:,} EC⁻¹",
-                f"{out_amount:,} EC⁻¹",
+                format_balance(in_amount),
+                format_balance(burned),
+                format_balance(out_amount),
                 attestation_count,
                 is_confirmed
             )
@@ -299,11 +300,3 @@ class TransactionsScreen(BaseScreen):
         except Exception as e:
             self.log_event(f"Error calculating amounts for {txn.id}: {e}", "DEBUG")
             return 0, 0, 0
-
-    def _format_timestamp(self, ts: int) -> str:
-        """Format unix timestamp as YYYY-MM-DD HH:MM."""
-        return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
-
-    def _truncate_id(self, txn_id: str) -> str:
-        """Truncate transaction ID for display."""
-        return f"{txn_id[:8]}...{txn_id[-4:]}"

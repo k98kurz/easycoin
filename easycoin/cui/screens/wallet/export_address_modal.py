@@ -215,7 +215,3 @@ class ExportAddressModal(Screen):
                 secrets_display.text = (decrypted.decode('utf-8'))
             except Exception:
                 secrets_display.text = (decrypted.hex())
-
-    def _truncate_address(self, address: str) -> str:
-        """Truncate address for display."""
-        return f"{address[:16]}...{address[-8:]}"
