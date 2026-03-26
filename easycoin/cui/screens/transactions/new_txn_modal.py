@@ -21,6 +21,9 @@ class NewTransactionModal(ModalScreen):
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+q", "quit", "Quit"),
+        Binding("a", "add_output", "Add Output"),
+        Binding("e", "edit_output", "Edit Output"),
+        Binding("delete", "delete_output", "Delete Output"),
     ]
 
     def __init__(self):
@@ -49,7 +52,6 @@ class NewTransactionModal(ModalScreen):
                 yield Button("Back", id="btn_back", variant="default")
                 yield Button("Next", id="btn_next", variant="primary")
                 yield Button("Submit", id="btn_submit", variant="success")
-                yield Button("Delete Output", id="btn_delete_output", variant="error")
                 yield Button("Cancel", id="btn_cancel", variant="default")
 
         yield Footer()
@@ -84,7 +86,10 @@ class NewTransactionModal(ModalScreen):
                 classes="mb-1"
             )
             yield DataTable(id="outputs_table", classes="h-min-10")
-            yield Button("Add Output", id="btn_add_output", variant="default")
+            with Horizontal(id="output_actions"):
+                yield Button("Add Output", id="btn_add_output", variant="default")
+                yield Button("Edit Output", id="btn_edit_output", variant="default")
+                yield Button("Delete Output", id="btn_delete_output", variant="error")
 
     def _compose_step_3_witness(self) -> ComposeResult:
         """Compose Step 3: Witness inputs."""
@@ -206,6 +211,7 @@ class NewTransactionModal(ModalScreen):
         btn_back = self.query_one("#btn_back")
         btn_next = self.query_one("#btn_next")
         btn_submit = self.query_one("#btn_submit")
+        btn_edit = self.query_one("#btn_edit_output")
         btn_delete = self.query_one("#btn_delete_output")
 
         btn_back.display = "block" if self.current_step > 0 else "none"
@@ -222,9 +228,13 @@ class NewTransactionModal(ModalScreen):
             btn_submit.display = "block"
             btn_submit.disabled = False
 
-        btn_delete.display = (
-            "block" if self.current_step == 1 and self.outputs else "none"
-        )
+        has_selection = False
+        if self.current_step == 1 and self.outputs:
+            table = self.query_one("#outputs_table")
+            has_selection = table.cursor_row is not None and table.cursor_row < len(self.outputs)
+
+        btn_edit.display = "block" if has_selection else "none"
+        btn_delete.display = "block" if self.current_step == 1 and self.outputs else "none"
 
     def _load_available_outputs(self) -> None:
         """Load available unspent outputs for the wallet."""
@@ -458,7 +468,8 @@ class NewTransactionModal(ModalScreen):
             })
             self._refresh_outputs_table()
             self._update_output_summary()
-            self.query_one("#inputs_table").focus()
+            self._update_button_visibility()
+            self.query_one("#outputs_table").focus()
 
         total_out = sum([o['amount'] for o in self.outputs])
         total_in = sum(o.coin.amount for o in self.selected_outputs)
@@ -485,6 +496,8 @@ class NewTransactionModal(ModalScreen):
                 }
                 self._refresh_outputs_table()
                 self._update_output_summary()
+                self._update_button_visibility()
+                self.query_one("#outputs_table").focus()
 
             current = self.outputs[output_index]
             total_out = sum([o['amount'] for o in self.outputs])
@@ -509,8 +522,43 @@ class NewTransactionModal(ModalScreen):
                 self._refresh_outputs_table()
                 self._update_output_summary()
                 self._update_button_visibility()
+                self.query_one("#outputs_table").focus()
         except Exception as e:
             self.app.log_event(f"Error deleting output: {e}", "ERROR")
+
+    @on(Button.Pressed, "#btn_edit_output")
+    def action_edit_output(self) -> None:
+        """Edit currently selected output."""
+        try:
+            table = self.query_one("#outputs_table")
+            if table.cursor_row is not None and table.cursor_row < len(self.outputs):
+                output_index = table.cursor_row
+                def on_dismiss(result):
+                    if not result:
+                        return
+                    self.outputs[result['info']] = {
+                        'address': result['address'],
+                        'amount': result['amount']
+                    }
+                    self._refresh_outputs_table()
+                    self._update_output_summary()
+                    self._update_button_visibility()
+                    self.query_one("#outputs_table").focus()
+
+                current = self.outputs[output_index]
+                total_out = sum([o['amount'] for o in self.outputs])
+                total_in = sum(o.coin.amount for o in self.selected_outputs)
+                self.app.push_screen(
+                    EditOutputModal(
+                        address=current.get('address', ''),
+                        amount=int(current.get('amount', 0)),
+                        info=output_index,
+                        max_amount=total_in - total_out - self.fee
+                    ),
+                    on_dismiss
+                )
+        except Exception as e:
+            self.app.log_event(f"Error editing output: {e}", "ERROR")
 
     @on(DataTable.RowSelected, "#inputs_table")
     def _toggle_selection(self, event: DataTable.RowSelected) -> None:
@@ -652,15 +700,15 @@ class NewTransactionModal(ModalScreen):
 
             if len(table.columns) == 0:
                 table.add_columns(
-                    ("Address", "address"),
                     ("Amount (EC⁻¹)", "amount"),
+                    ("Address", "address"),
                 )
             table.cursor_type = "row"
 
             for i, output in enumerate(self.outputs):
                 table.add_row(
-                    output.get('address', ''),
                     str(output.get('amount', '')),
+                    output.get('address', ''),
                     key=i
                 )
         except Exception as e:

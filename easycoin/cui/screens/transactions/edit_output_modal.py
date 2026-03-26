@@ -5,12 +5,14 @@ from textual.containers import Vertical, VerticalScroll, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static, Input, Footer
 from easycoin.models import Address
+from easycoin.cui.helpers import format_balance
 
 
 class EditOutputModal(ModalScreen[dict|None]):
     """Modal for editing transaction outputs."""
 
     BINDINGS = [
+        Binding("ctrl+s", "save", "Save"),
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
@@ -28,6 +30,10 @@ class EditOutputModal(ModalScreen[dict|None]):
         self.info = info
         self.max_amount = max_amount
         self.remaining_amount = max_amount or 0
+
+    def on_mount(self) -> None:
+        """Focus address input on mount."""
+        self.query_one("#address_input").focus()
 
     def compose(self) -> ComposeResult:
         """Compose edit output modal layout."""
@@ -53,9 +59,9 @@ class EditOutputModal(ModalScreen[dict|None]):
                     classes="form-input"
                 )
                 if self.max_amount:
-                    yield Static(f"Max: {self.max_amount}", classes="my-1")
+                    yield Static(f"Max: {format_balance(self.max_amount, exact=True)}", classes="my-1")
                     yield Static(
-                        f"Remaining: {self.remaining_amount}",
+                        f"Remaining: {format_balance(self.remaining_amount, exact=True)}",
                         id="remaining_amount", classes="my-1",
                     )
 
@@ -74,7 +80,7 @@ class EditOutputModal(ModalScreen[dict|None]):
             if self.max_amount:
                 self.remaining_amount = self.max_amount - amount
                 self.query_one("#remaining_amount").update(
-                    f"Remaining: {self.remaining_amount}"
+                    f"Remaining: {format_balance(self.remaining_amount, exact=True)}"
                 )
         except ValueError:
             self.app.notify("Amount must be an integer", severity="warning")
