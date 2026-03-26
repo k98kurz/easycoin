@@ -2,11 +2,12 @@ from textual import on
 from textual.screen import Screen
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll, Horizontal, ItemGrid
-from textual.widgets import Button, Static, Input, TextArea, Footer
+from textual.widgets import Button, Static, Input, TextArea, Footer, Checkbox
 from textual.binding import Binding
 from tapescript import Script
 from easycoin.cui.clipboard import universal_copy
 from easycoin.models import Address
+import packify
 
 
 class ExportAddressModal(Screen):
@@ -38,13 +39,24 @@ class ExportAddressModal(Screen):
         """Compose export address modal layout."""
         with VerticalScroll(classes="modal-container w-70p"):
             yield Static("View/Export Address", classes="modal-title")
-            yield Static("")
 
-            yield Static(f"Address: {self.address.hex}", classes="text-bold")
+            yield Static(f"Address: {self.address.hex}", classes="text-bold mt-1")
+
+            with Horizontal(id="secrets_container", classes="mt-1 h-3"):
+                yield Checkbox(
+                    "Show Secrets",
+                    id="show_secrets_checkbox",
+                    value=False
+                )
+                yield TextArea(
+                    "", read_only=True, show_line_numbers=False, soft_wrap=True,
+                    id="secrets_display", classes="hidden",
+                )
+
             yield Static("Lock (Decompiled):\n", classes="form-label mt-1")
             yield TextArea(
                 self.decompiled_lock, read_only=True, show_line_numbers=False,
-                soft_wrap=True, id="lock_display", classes="h-10"
+                soft_wrap=True, id="lock_display", classes="h-8"
             )
 
             yield Static("Exported Data:\n", classes="form-label mt-1")
@@ -156,6 +168,53 @@ class ExportAddressModal(Screen):
     def action_cancel(self) -> None:
         """Action handler for Escape key."""
         self.app.pop_screen()
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        """Handle Show Secrets checkbox toggle."""
+        if event.checkbox.id == "show_secrets_checkbox":
+            secrets_container = self.query_one("#secrets_container")
+            secrets_display = self.query_one("#secrets_display")
+
+            if event.value:
+                secrets_container.remove_class("h-3")
+                secrets_container.add_class("h-10")
+                secrets_display.remove_class("hidden")
+                self._populate_secrets()
+            else:
+                secrets_container.remove_class("h-10")
+                secrets_container.add_class("h-3")
+                secrets_display.add_class("hidden")
+
+    def _populate_secrets(self) -> None:
+        """Decrypt and display address secrets."""
+        secrets_display = self.query_one("#secrets_display")
+
+        if not self.app.wallet:
+            secrets_display.text = "Wallet not available"
+            return
+
+        if self.app.wallet.is_locked:
+            secrets_display.text = ("Wallet must be unlocked to view secrets")
+            return
+
+        if not self.address.secrets:
+            secrets_display.text = ("No secrets available for this address")
+            return
+
+        try:
+            decrypted = self.app.wallet.decrypt(self.address.secrets)
+        except Exception as e:
+            secrets_display.text = (f"Failed to decrypt secrets: {e}")
+            return
+
+        try:
+            unpacked = packify.unpack(decrypted)
+            secrets_display.text = (str(unpacked))
+        except Exception:
+            try:
+                secrets_display.text = (decrypted.decode('utf-8'))
+            except Exception:
+                secrets_display.text = (decrypted.hex())
 
     def _truncate_address(self, address: str) -> str:
         """Truncate address for display."""

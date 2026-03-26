@@ -21,10 +21,10 @@ class WalletListScreen(BaseScreen):
         self._wallet_id_map = {}
 
     BINDINGS = [
-        ("n", "create_wallet", "New Wallet"),
-        ("r", "restore_wallet", "Restore Wallet"),
-        ("s", "select_wallet", "Select Wallet"),
-        ("d", "delete_wallet", "Delete Wallet"),
+        ("n", "create_wallet", "New"),
+        ("r", "restore_wallet", "Restore"),
+        ("s", "select_wallet", "Select"),
+        ("d", "delete_wallet", "Delete"),
     ]
 
     def compose(self) -> ComposeResult:

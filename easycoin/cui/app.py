@@ -42,9 +42,8 @@ class EasyCoinApp(App):
         ("3", "switch_to_coins", "Coins"),
         ("4", "switch_to_transactions", "Transactions"),
         ("ctrl+l", "open_event_log", "Event Log"),
+        ("ctrl+q", "quit", "Quit"),
         ("?", "open_welcome", "Welcome"),
-        ("f5", "refresh", "Refresh"),
-        ("q", "quit", "Quit"),
     ]
 
     network_connected = reactive(False)

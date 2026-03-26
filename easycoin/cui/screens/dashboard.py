@@ -11,10 +11,6 @@ class DashboardScreen(BaseScreen):
 
     TAB_ID = "tab_dashboard"
 
-    BINDINGS = [
-        ("f5", "refresh_data", "Refresh"),
-    ]
-
     def compose(self) -> ComposeResult:
         """Compose dashboard layout."""
         yield from super().compose()
