@@ -33,6 +33,7 @@ class WalletDetailModal(Screen):
         super().__init__()
         self.selected_address = None
         self._row_map = {}
+        self._row_coin_count = {}
 
     def compose(self) -> ComposeResult:
         """Compose wallet detail modal layout."""
@@ -126,7 +127,7 @@ class WalletDetailModal(Screen):
         self._set_button_visibility()
 
         table = self.query_one("#address_book", DataTable)
-        table.add_columns("Address", "Status", "Coins", "Balance")
+        table.add_columns("Coins", "Balance", "Status", "Lock Type", "Address")
 
         self._refresh_address_book()
 
@@ -239,6 +240,18 @@ class WalletDetailModal(Screen):
             self.app.notify("No address selected", severity="warning")
             return
 
+        table = self.query_one("#address_book", DataTable)
+        cursor = table.cursor_coordinate
+        if cursor is None:
+            return
+        row_key = table.coordinate_to_cell_key(cursor).row_key
+
+        if row_key in self._row_coin_count and self._row_coin_count[row_key] > 0:
+            self.app.notify(
+                "Cannot delete address with coins", severity="warning"
+            )
+            return
+
         address_hex = self.selected_address.hex
         truncated = self._truncate_address(address_hex)
         message = (
@@ -294,6 +307,7 @@ class WalletDetailModal(Screen):
 
         is_known = row_key in self._row_map
         is_unlocked = not self.app.wallet.is_locked
+        has_coins = row_key in self._row_coin_count and self._row_coin_count[row_key] > 0
         if is_known and is_unlocked:
             self.selected_address = self._row_map[row_key]
             self.query_one(
@@ -304,7 +318,7 @@ class WalletDetailModal(Screen):
             ).disabled = False
             self.query_one(
                 "#btn_delete_address", Button
-            ).disabled = False
+            ).disabled = has_coins
         else:
             self.selected_address = None
             self.query_one(
@@ -439,11 +453,18 @@ class WalletDetailModal(Screen):
         self._row_map = {}
         address_book = self._get_address_book()
         for status, address_hex, balance, count, addr in address_book:
+            lock_type = Wallet.get_lock_type(Address.parse(address_hex))
             row_key = table.add_row(
-                self._truncate_address(address_hex),
-                status,
                 str(count),
-                str(balance)
+                str(balance),
+                status,
+                lock_type,
+                self._truncate_address(address_hex)
             )
-            if addr:
-                self._row_map[row_key] = addr
+            self._row_coin_count[row_key] = count
+            if not addr:
+                addr = Address({
+                    'id': 'never',
+                    'lock': Address.parse(address_hex),
+                })
+            self._row_map[row_key] = addr

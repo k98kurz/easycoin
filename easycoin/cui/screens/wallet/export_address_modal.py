@@ -41,23 +41,20 @@ class ExportAddressModal(Screen):
             yield Static("")
 
             yield Static(f"Address: {self.address.hex}", classes="text-bold")
-            yield Static("")
-            yield Static("Lock (Decompiled):\n", classes="form-label")
+            yield Static("Lock (Decompiled):\n", classes="form-label mt-1")
             yield TextArea(
                 self.decompiled_lock, read_only=True, show_line_numbers=False,
                 soft_wrap=True, id="lock_display", classes="h-10"
             )
-            yield Static("")
 
-            yield Static("Exported Data:\n", classes="form-label")
+            yield Static("Exported Data:\n", classes="form-label mt-1")
             yield Static(
                 "Click Export to generate",
                 id="export_display",
                 classes="text-muted"
             )
-            yield Static("")
 
-            with Horizontal(classes="h-min-5"):
+            with Horizontal(classes="h-min-5 mt-1"):
                 with Vertical():
                     yield Static(
                         "Password (optional):\n",

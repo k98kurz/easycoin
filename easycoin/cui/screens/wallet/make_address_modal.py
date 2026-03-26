@@ -46,7 +46,7 @@ class MakeAddressModal(Screen):
 
             with Horizontal(classes="h-10 mt-1"):
                 with Vertical():
-                    yield Static("Address Type:", classes="form-label")
+                    yield Static("Address Type:", classes="form-label mb-1")
                     yield OptionList(
                         *[
                             Option(
@@ -58,17 +58,17 @@ class MakeAddressModal(Screen):
                     )
 
                 with Vertical():
-                    yield Static("Use child nonce:", classes="form-label")
+                    yield Static("Use child nonce:", classes="form-label mb-1")
                     yield Checkbox(id="use_child_nonce")
 
 
             with Horizontal(classes="h-4 mt-1"):
                 with Vertical():
-                    yield Static("Nonce:", classes="form-label")
+                    yield Static("Nonce:", classes="form-label mb-1")
                     yield Static("Loading...", id="nonce_display")
 
                 with Vertical():
-                    yield Static("Child nonce:", classes="form-label")
+                    yield Static("Child nonce:", classes="form-label mb-1")
                     yield Input(
                         placeholder="Enter child nonce int",
                         id="child_nonce_input",
@@ -76,19 +76,19 @@ class MakeAddressModal(Screen):
                     )
 
             with Vertical(id="custom_container", classes="hidden h-5 mt-1"):
-                yield Static("Custom Script:", classes="form-label")
+                yield Static("Custom Script:", classes="form-label mb-1")
                 yield TextArea( "", id="custom_script")
 
             with Vertical(classes="mt-1 h-auto"):
-                yield Static("Locking Script:", classes="form-label")
+                yield Static("Locking Script:", classes="form-label mb-1")
                 yield Static(
                     "Generating...",
                     id="lock_script_display",
                     classes="text-muted"
                 )
 
-            with Vertical(classes="h-2 my-1"):
-                yield Static("Address:", classes="form-label")
+            with Vertical(classes="h-3 my-1"):
+                yield Static("Address:", classes="form-label mb-1")
                 yield Static(
                     "Generating...",
                     id="address_display",
@@ -216,6 +216,7 @@ class MakeAddressModal(Screen):
 
         lock = None
         committed_script = None
+        self.script_error = None
         if self.selected_type == "P2PK":
             lock = self.app.wallet.get_p2pk_lock(
                 nonce, child_nonce=self.current_child_nonce
@@ -231,7 +232,6 @@ class MakeAddressModal(Screen):
                     committed_script = Script.from_src(
                         self.custom_script_src
                     )
-                    self.script_error = None
                 except BaseException as e:
                     self.script_error = f"{type(e).__name__}: {e}"
                     committed_script = None
@@ -256,7 +256,6 @@ class MakeAddressModal(Screen):
             else:
                 try:
                     lock = Script.from_src(self.custom_script_src)
-                    self.script_error = None
                 except BaseException as e:
                     self.script_error = f"{type(e).__name__}: {e}"
                     lock = None

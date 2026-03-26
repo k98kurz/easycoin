@@ -220,7 +220,7 @@ class Wallet(HashedModel):
             f'address must be Address, not {type(address)}')
         type_assert(type(password) is str,
             f'password must be str, not {type(password)}')
-        secrets = self.decrypt(address.secrets)
+        secrets = self.decrypt(address.secrets) if address.secrets else ''
         if password:
             key = pbkdf2_hmac(
                 'sha256', password.encode(), sha256(b'easycoin').digest(), 10000

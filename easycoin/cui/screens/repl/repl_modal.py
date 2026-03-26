@@ -111,10 +111,6 @@ class ReplModal(Screen):
 
     def on_key(self, event) -> None:
         """Handle keyboard events."""
-        if event.key == "escape":
-            self.action_close()
-            return
-
         input_widget = self.query_one("#repl_input")
 
         if event.key == "up":
