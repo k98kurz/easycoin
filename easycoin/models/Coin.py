@@ -60,7 +60,7 @@ class Coin(HashedModel):
         return bytes.fromhex(self.generate_id(self.data))
 
     @property
-    def lock(self) -> Script:
+    def lock(self) -> bytes:
         return self.data['lock']
     @lock.setter
     def lock(self, val: bytes|Script):

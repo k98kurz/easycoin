@@ -53,16 +53,17 @@ class EditOutputModal(ModalScreen[dict|None]):
             with Vertical():
                 yield Static("Amount (EC⁻¹):", classes="form-label my-1")
                 yield Input(
-                    placeholder="Enter amount",
-                    id="amount_input",
-                    value=str(self.amount),
-                    classes="form-input"
+                    placeholder="Enter amount", id="amount_input",
+                    value=str(self.amount), classes="form-input"
                 )
                 if self.max_amount:
-                    yield Static(f"Max: {format_balance(self.max_amount, exact=True)}", classes="my-1")
                     yield Static(
-                        f"Remaining: {format_balance(self.remaining_amount, exact=True)}",
-                        id="remaining_amount", classes="my-1",
+                        f"Max: {format_balance(self.max_amount, exact=True)}",
+                        classes="my-1"
+                    )
+                    bal = format_balance(self.remaining_amount, exact=True)
+                    yield Static(
+                        f"Remaining: {bal}", id="remaining_amount", classes="my-1",
                     )
 
             with Horizontal(id="modal_actions"):

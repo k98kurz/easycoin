@@ -31,6 +31,15 @@
 .h-18 { height: 18; }
 .h-19 { height: 19; }
 .h-20 { height: 20; }
+.h-21 { height: 21; }
+.h-22 { height: 22; }
+.h-23 { height: 23; }
+.h-24 { height: 24; }
+.h-25 { height: 25; }
+.h-26 { height: 26; }
+.h-27 { height: 27; }
+.h-28 { height: 28; }
+.h-29 { height: 29; }
 .h-30 { height: 30; }
 .h-40 { height: 40; }
 .h-50 { height: 50; }

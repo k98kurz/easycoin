@@ -6,6 +6,11 @@ The environment has been set up in venv/.
 Use `source venv/bin/activate` before running any python commands that require the
 local environment.
 
+When you run a command, if you forget to do this, it will error with a missing
+dependency. DO NOT simply write this off as "oh, it's just a missing dependency from
+the project". Re-run the command with the correct environment. There are no missing
+dependencies.
+
 ## Git
 
 Do NOT stage changes unless explicitly instructed to.
@@ -166,6 +171,12 @@ import packify # external package
 modal opens. That retarded bullshit slows down the app. Stop doing it.
 - ONLY create notifications that are valuable for users and provide clarity when
 no other UI updates indicate what happened.
+
+### compose() rules
+
+- Do NOT use conditionals in compose(), e.g.
+`if something: yield Static("DOES NOT WORK")`
+- ALL reactivity MUST be managed via dynamic access
 
 ### Event Management
 
