@@ -53,20 +53,20 @@ class CreateWalletModal(ModalScreen):
             )
             yield Static("\n")
 
-            yield Static("Wallet name:\n", classes="form-label")
+            yield Static("Wallet name:\n", classes="text-bold")
             yield Input(id="wallet_name")
             yield Static("\n")
 
             with Horizontal():
                 with Vertical():
-                    yield Static("Password:\n", classes="form-label")
+                    yield Static("Password:\n", classes="text-bold")
                     yield Input(
                         placeholder="Enter password",
                         password=True,
                         id="password_input"
                     )
                 with Vertical():
-                    yield Static("Confirm Password:\n", classes="form-label")
+                    yield Static("Confirm Password:\n", classes="text-bold")
                     yield Input(
                         placeholder="Confirm password",
                         password=True,

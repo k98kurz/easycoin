@@ -113,7 +113,7 @@ class CoinsScreen(BaseScreen):
             try:
                 table.add_row(
                     coin.id,
-                    format_balance(coin.amount, exact=True),
+                    format_balance(coin.amount),
                     Wallet.get_lock_type(coin.lock),
                     "Available",
                     self._get_network_name(coin.net_id)

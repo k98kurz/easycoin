@@ -41,27 +41,27 @@ class RestoreWalletModal(ModalScreen):
             )
             yield Static("")
 
-            yield Static("Seed phrase:\n", classes="form-label")
+            yield Static("Seed phrase:\n", classes="text-bold")
             yield Input(
                 placeholder="word1 word2 word3 ... word12",
                 id="seed_phrase_input"
             )
             yield Static("")
 
-            yield Static("Wallet name:\n", classes="form-label")
+            yield Static("Wallet name:\n", classes="text-bold")
             yield Input(id="wallet_name_input")
             yield Static("")
 
             with Horizontal():
                 with Vertical():
-                    yield Static("Password:\n", classes="form-label")
+                    yield Static("Password:\n", classes="text-bold")
                     yield Input(
                         placeholder="Enter password",
                         password=True,
                         id="password_input"
                     )
                 with Vertical():
-                    yield Static("Confirm Password:\n", classes="form-label")
+                    yield Static("Confirm Password:\n", classes="text-bold")
                     yield Input(
                         placeholder="Confirm password",
                         password=True,

@@ -286,11 +286,6 @@ ConfirmationModal {
     margin: 1 0;
 }
 
-.form-label {
-    width: 20;
-    text-style: bold;
-}
-
 .form-input {
     width: 1fr;
 }

@@ -42,7 +42,7 @@ class EditOutputModal(ModalScreen[dict|None]):
             yield Static(title, classes="modal-title")
 
             with Vertical():
-                yield Static("Recipient Address:", classes="form-label m-1")
+                yield Static("Recipient Address:", classes="text-bold m-1")
                 yield Input(
                     placeholder="Enter recipient address",
                     id="address_input",
@@ -51,7 +51,7 @@ class EditOutputModal(ModalScreen[dict|None]):
                 )
 
             with Vertical():
-                yield Static("Amount (EC⁻¹):", classes="form-label my-1")
+                yield Static("Amount (EC⁻¹):", classes="text-bold my-1")
                 yield Input(
                     placeholder="Enter amount", id="amount_input",
                     value=str(self.amount), classes="form-input"

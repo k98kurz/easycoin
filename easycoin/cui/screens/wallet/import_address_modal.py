@@ -28,7 +28,7 @@ class ImportAddressModal(Screen):
             yield Static("Import Address", classes="modal-title")
             yield Static("\n")
 
-            yield Static("Address hex:\n", classes="form-label")
+            yield Static("Address hex:\n", classes="text-bold")
             yield Input(
                 placeholder="Enter address hex data",
                 id="address_input"

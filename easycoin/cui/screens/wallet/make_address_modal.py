@@ -45,9 +45,9 @@ class MakeAddressModal(Screen):
         with VerticalScroll(classes="modal-container w-70p"):
             yield Static("Make Address", classes="modal-title")
 
-            with Horizontal(classes="h-10 mt-1"):
+            with Horizontal(classes="h-11 mt-1"):
                 with Vertical():
-                    yield Static("Address Type:", classes="form-label mb-1")
+                    yield Static("Address Type:", classes="text-bold mb-1")
                     yield OptionList(
                         *[
                             Option(
@@ -59,17 +59,17 @@ class MakeAddressModal(Screen):
                     )
 
                 with Vertical():
-                    yield Static("Use child nonce:", classes="form-label mb-1")
+                    yield Static("Use child nonce:", classes="text-bold mb-1")
                     yield Checkbox(id="use_child_nonce")
 
 
             with Horizontal(classes="h-5 mt-1"):
                 with Vertical():
-                    yield Static("Nonce:", classes="form-label mb-1")
+                    yield Static("Nonce:", classes="text-bold mb-1")
                     yield Static("Loading...", id="nonce_display")
 
                 with Vertical():
-                    yield Static("Child nonce:", classes="form-label mb-1")
+                    yield Static("Child nonce:", classes="text-bold mb-1")
                     yield Input(
                         placeholder="Enter child nonce int",
                         id="child_nonce_input",
@@ -77,11 +77,11 @@ class MakeAddressModal(Screen):
                     )
 
             with Vertical(id="custom_container", classes="hidden h-5 mt-1"):
-                yield Static("Custom Script:", classes="form-label mb-1")
+                yield Static("Custom Script:", classes="text-bold mb-1")
                 yield TextArea( "", id="custom_script")
 
             with Vertical(classes="mt-1 h-auto"):
-                yield Static("Locking Script:", classes="form-label mb-1")
+                yield Static("Locking Script:", classes="text-bold mb-1")
                 yield Static(
                     "Generating...", markup=False,
                     id="lock_script_display",
@@ -89,7 +89,7 @@ class MakeAddressModal(Screen):
                 )
 
             with Vertical(classes="h-3 my-1"):
-                yield Static("Address:", classes="form-label mb-1")
+                yield Static("Address:", classes="text-bold mb-1")
                 yield Static(
                     "Generating...",
                     id="address_display",
