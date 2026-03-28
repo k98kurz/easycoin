@@ -507,7 +507,7 @@ class Wallet(HashedModel):
         )
 
     def get_p2gt_witness_scriptspend(
-            self, nonce: int, surrogate_script: Script|str,
+            self, nonce: int, surrogate_script: Script,
             child_nonce: int|None = None, sigflags = 'fa'
         ) -> Script:
         """..."""

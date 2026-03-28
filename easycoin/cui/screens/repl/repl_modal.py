@@ -204,4 +204,4 @@ class ReplModal(Screen):
             for line in tb_lines:
                 output.text += f"  {line}\n"
 
-        output.scroll_end()
+        output.scroll_end(animate=False)

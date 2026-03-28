@@ -95,9 +95,9 @@ class NewTransactionModal(ModalScreen):
         if self.current_step < 3:
             btn_next.display = "block"
             if self.current_step == 0:
-                btn_next.disabled = len(self.txn_data.selected_outputs) == 0
+                btn_next.disabled = len(self.txn_data.selected_inputs) == 0
             elif self.current_step == 1:
-                btn_next.disabled = len(self.txn_data.outputs) == 0
+                btn_next.disabled = len(self.txn_data.new_output_coins) == 0
             else:
                 btn_next.disabled = False
             btn_submit.display = "none"
@@ -144,11 +144,11 @@ class NewTransactionModal(ModalScreen):
                 self.app.notify("Wallet must be unlocked", severity="error")
                 return
 
-            if not self.txn_data.selected_outputs:
+            if not self.txn_data.selected_inputs:
                 self.app.notify("No inputs selected", severity="error")
                 return
 
-            if not self.txn_data.outputs:
+            if not self.txn_data.new_output_coins:
                 self.app.notify("No outputs specified", severity="error")
                 return
 
@@ -168,71 +168,9 @@ class NewTransactionModal(ModalScreen):
 
     def _validate_and_submit_transaction(self) -> None:
         """Validate and submit the transaction."""
-        try:
-            txn = Txn()
-            txn.input_ids = [o.id for o in self.txn_data.selected_outputs]
+        return
+        self.dismiss()
 
-            output_coins = {}
-            for form in self.txn_data.outputs:
-                address_str = form.get('address', '').strip()
-                amount_str = form.get('amount', '').strip()
-
-                if not address_str or not amount_str:
-                    continue
-
-                try:
-                    amount = int(amount_str)
-                    if amount <= 0:
-                        self.app.notify(
-                            f"Invalid amount: {amount_str}",
-                            severity="error"
-                        )
-                        return
-
-                    lock_bytes = Address.parse(address_str)
-                    coin = Coin.create(lock_bytes, amount)
-                    output_coins[coin.id] = coin
-                    txn.output_ids.append(coin.id)
-                except Exception as e:
-                    self.app.notify(
-                        f"Invalid address: {address_str}",
-                        severity="error"
-                    )
-                    self.app.log_event(f"Address parse error: {e}", "DEBUG")
-                    return
-
-            if not txn.output_ids:
-                self.app.notify("No valid outputs", severity="error")
-                return
-
-            # NOTE: everything below this line will need to be changed manually
-            txn.witness = self.step_3.generate_witnesses()
-            txn.set_timestamp()
-
-            if not txn.validate():
-                self.app.notify(
-                    "Transaction validation failed",
-                    severity="error"
-                )
-                self.app.log_event("Transaction validation failed", "DEBUG")
-                return
-
-            utxo = UTXOSet()
-            if not utxo.can_apply(txn):
-                self.app.notify(
-                    "Transaction cannot be applied to UTXOSet",
-                    severity="error"
-                )
-                self.app.log_event("UTXO validation failed", "DEBUG")
-                return
-
-            txn.save()
-            utxo.apply(txn, output_coins)
-
-            self.app.log_event(f"Submitted txn: {txn.id}", "INFO")
-
-            self.dismiss()
-
-        except Exception as e:
-            self.app.log_event(f"Error in validation: {e}", "ERROR")
-            self.app.notify(f"Error: {e}", severity="error")
+#        except Exception as e:
+#            self.app.log_event(f"Error in validation: {e}", "ERROR")
+#            self.app.notify(f"Error: {e}", severity="error")

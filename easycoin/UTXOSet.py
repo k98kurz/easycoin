@@ -120,11 +120,16 @@ class UTXOSet:
 
         return True
 
-    def apply(self, txn: Txn, coins: dict[str, Coin] = {}):
+    def apply(self, txn: Txn, coins: dict[str, Coin] = None):
         """Attempt to apply the transaction, persisting the changes to
             the database. Raises `ValueError` if it cannot be applied or
-            if there is ephemeral data in the `UTXOSet` instance.
+            if there is ephemeral data in the `UTXOSet` instance. The
+            `coins` dict should map the `Coin` IDs in the `Txn` to
+            actual `Coin` instances; it is used to create `Input`s and
+            `Output`s with better detail than just the IDs, which is
+            important for tracking `Wallet` association in a node.
         """
+        coins = coins or {}
         ephemeral = len(self.sub_outputs) + len(self.add_outputs)
         ephemeral = len(self.sub_inputs) + len(self.add_inputs)
         if ephemeral:
@@ -154,12 +159,17 @@ class UTXOSet:
                     outputs.append({'id': i})
             Output.insert_many(outputs)
 
-    def reverse(self, txn: Txn, coins: dict[str, Coin] = {}):
+    def reverse(self, txn: Txn, coins: dict[str, Coin] = None):
         """Attempt to reverse (or un-apply) the transaction, persisting
             the changes to the database. Raises `ValueError` if it
             cannot be reversed or if there is ephemeral data in the
-            `UTXOSet` instance.
+            `UTXOSet` instance. The `coins` dict should map the `Coin`
+            IDs in the `Txn` to actual `Coin` instances; it is used to
+            create `Input`s and `Output`s with better detail than just
+            the IDs, which is important for tracking `Wallet`
+            association in a node.
         """
+        coins = coins or {}
         ephemeral = len(self.sub_outputs) + len(self.add_outputs)
         ephemeral = len(self.sub_inputs) + len(self.add_inputs)
         if ephemeral:

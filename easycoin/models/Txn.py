@@ -143,7 +143,7 @@ class Txn(HashedModel):
     @staticmethod
     def minimum_fee(txn: Txn) -> int:
         """Calculates the minimum burn required for the transaction."""
-        witlen = len(txn.data.get('witness', _empty) or b'')
+        witlen = len(txn.data.get('witness', None) or _empty)
         witfee = int(witlen * _witfee_mult)
         witfee = int(witfee ** _witfee_exp)
         out_count = len(txn.output_ids)
@@ -192,7 +192,9 @@ class Txn(HashedModel):
             try:
                 coin.details = coin.details
             except ValueError:
-                print(f'ValueError raised from large coin.details ({debug})') if debug else ''
+                print(
+                    f'ValueError raised from large coin.details ({debug})'
+                ) if debug else ''
                 return False
 
         # ensure total spent is less than total funding of EC⁻¹

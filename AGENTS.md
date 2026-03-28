@@ -1,5 +1,22 @@
 # Instructions for Agents
 
+## Basic Design Concepts
+
+The core concepts are the following:
+1) Coins are secured with cryptographic locks via tapescript.
+2) To prevent double spending, Coin IDs are tracked as Txn Inputs and Outputs.
+3) An Output is an unspent Coin.
+4) A valid Txn uses a previously unspent Coin as an Input and creates new Coins as
+Outputs.
+5) Coins can have data stamped onto them, including arbitrary data and tapescript
+covenants that enforce spending rules.
+6) The purpose of a TrustNet is to attest the validity of Txns and create Snapshots
+of Inputs (spend Coin IDs) and Outputs (unspent Coin IDs).
+7) Only the wallet that owns a specific Coin or is party to a specific Txn needs to
+have the full Coin or Txn data. Everyone else in the network needs to maintain an
+accurate UTXOSet comprised of Inputs and Outputs.
+8) Input and Output IDs are Coin IDs.
+
 ## Environment
 
 The environment has been set up in venv/.
@@ -48,9 +65,8 @@ sqloquent; SEARCH THE DOCS FIRST.
     - ALL such errors should crash the app with a stack trace naturally
     - Catching and suppressing errors made from assumptions about the UI structure
     is actively detrimental to the development of this project, so stop doing it
-- Catch ONLY errors that are known to occur due to invalid user inputs, e.g. bad
-passwords that fail to unlock a wallet and raise a ValueError, or potential database
-inconsistencies
+- Using try/except is FORBIDDEN except when the human EXPLICITLY describes why it is
+being used
 
 ### Line length
 

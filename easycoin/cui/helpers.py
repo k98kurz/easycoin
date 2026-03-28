@@ -55,3 +55,38 @@ def truncate_text(text: str, prefix_len: int = 16, suffix_len: int = 8) -> str:
         return f"{text[:prefix_len]}...{text[-suffix_len:]}"
     else:
         return f"{text[:prefix_len]}..."
+
+
+def estimate_fee_for_witness(lock_type: str, extra_script_len: int = 0) -> int:
+    """Estimate the required fee for a witness type. Assumes unchanged
+        `_witfee_mult` and `_witfee_exp` from the `Txn` model file.
+    """
+    if extra_script_len < 256:
+        wlen = extra_script_len
+    else:
+        wlen = 1 + extra_script_len
+
+    if lock_type in "P2PK":
+        wlen = 66
+    elif lock_type == "P2PKH":
+        wlen = 100
+    elif lock_type in "P2TR":
+        if not extra_script_len:
+            wlen = 66
+        else:
+            wlen = 2 + extra_script_len + 34
+    elif lock_type == "P2SH":
+        wlen = 2 + extra_script_len
+    elif lock_type == "P2GR":
+        if not extra_script_len:
+            wlen = 67
+        else:
+            wlen = 66 + (2 + extra_script_len) + 1
+    elif lock_type == "P2GT":
+        if not extra_script_len:
+            wlen = 66
+        else:
+            wlen = 64 + (2 + extra_script_len) + (2 + 41) + 34
+
+    return wlen
+

@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, Static, Footer, TextArea
+from textual.widgets import Button, Checkbox, Static, Footer, TextArea
 from tapescript import Script
 from easycoin.cui.helpers import format_balance, truncate_text
 from easycoin.cui.screens.transactions.new_txn.data import TransactionData
@@ -11,7 +11,7 @@ from easycoin.cui.widgets import ECTextArea
 from easycoin.models import Address, Output, Wallet
 
 
-class EditWitnessModal(ModalScreen[dict|None]):
+class EditWitnessModal(ModalScreen[bool|None]):
     """Modal for editing witness scripts for transaction inputs."""
 
     BINDINGS = [
@@ -24,51 +24,10 @@ class EditWitnessModal(ModalScreen[dict|None]):
         super().__init__()
         self.output = output
         self.txn_data = txn_data
+        self.lock_type = "Unknown"
         self.is_known = False
         self.requires_custom = True
         self.address = None
-
-    def on_mount(self) -> None:
-        self._check_lock()
-        self._update_ui()
-
-    def _check_lock(self) -> None:
-        if not self.app.wallet or self.app.wallet.is_locked:
-            self.app.notify("WALLET IS NOT UNLOCKED??? How did you get here???")
-            self.is_known = False
-            return
-
-        #self.app.log_event(f"EWM {self.output.coin.lock.hex()=}")
-        for addr in self.app.wallet.addresses:
-            #self.app.log_event(f"EWM {addr.hex=}")
-            #self.app.log_event(f"EWM {addr.lock.hex()=}")
-            self.address = Address({"lock": self.output.coin.lock}).hex
-            if addr.lock == self.output.coin.lock:
-                #self.app.log_event(f"EWM MATCHED")
-                self.is_known = True
-                if Wallet.get_lock_type(addr.lock) not in (
-                        "P2TR", "P2GR", "P2GT", "Unknown"
-                    ):
-                    self.requires_custom = False
-                return
-
-    def _update_ui(self) -> None:
-        addr_display = self.query_one("#address_hex").update(self.address)
-        decompiled = Script.from_bytes(self.output.coin.lock).src
-        self.query_one("#decompiled_lock").text = decompiled
-        if self.is_known:
-            self.query_one("#address_known_status").update("From wallet")
-        else:
-            self.query_one("#address_known_status").update("Not from wallet")
-
-        if self.requires_custom:
-            self.query_one("#textarea_section").remove_class("hidden")
-            self.query_one("#witness_textarea").focus()
-            btn_save = self.query_one("#btn_save")
-            btn_save.label = "Save"
-        else:
-            btn_save = self.query_one("#btn_save")
-            btn_save.label = "Done"
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(classes="modal-container w-70p"):
@@ -103,16 +62,36 @@ class EditWitnessModal(ModalScreen[dict|None]):
             with Horizontal(classes="h-12"):
                 with Vertical():
                     yield Static("Decompiled Lock", classes="text-bold my-1")
-                    yield TextArea(
+                    yield ECTextArea(
                         id="decompiled_lock", read_only=True, classes="h-8"
                     )
-                with Vertical(id="textarea_section", classes="hidden"):
+
+                with Vertical(id="generate_witness_section", classes="hidden"):
+                    with Horizontal(classes="h-4"):
+                        yield Checkbox(
+                            "Script spend",
+                            id="box_script_spend",
+                            classes="hidden",
+                        )
+                        yield Button(
+                            "Generate",
+                            id="btn_generate",
+                        )
+                    yield ECTextArea(
+                        "",
+                        id="generated_witness_textarea",
+                        placeholder="Generated witness will go here",
+                        read_only=True,
+                        classes="h-5"
+                    )
+
+                with Vertical(id="custom_script_section", classes="hidden"):
                     yield Static(
                         "Custom Witness Script:", classes="text-bold my-1"
                     )
                     yield ECTextArea(
                         "",
-                        id="witness_textarea",
+                        id="custom_witness_textarea",
                         placeholder="Enter tapescript source",
                         classes="h-8"
                     )
@@ -128,12 +107,51 @@ class EditWitnessModal(ModalScreen[dict|None]):
 
         yield Footer()
 
-    def action_save(self) -> None:
-        if self.is_known and not self.requires_custom:
-            self.dismiss(None)
+    def on_mount(self) -> None:
+        self._check_lock()
+        self._update_ui()
+
+    def _check_lock(self) -> None:
+        if not self.app.wallet or self.app.wallet.is_locked:
+            self.app.notify("WALLET IS NOT UNLOCKED??? How did you get here???")
+            self.is_known = False
             return
 
-        text_area = self.query_one("#witness_textarea")
+        #self.app.log_event(f"EWM {self.output.coin.lock.hex()=}")
+        self.address = Address({"lock": self.output.coin.lock}).hex
+        self.lock_type = Wallet.get_lock_type(self.output.coin.lock)
+        for addr in self.app.wallet.addresses:
+            #self.app.log_event(f"EWM {addr.hex=}")
+            #self.app.log_event(f"EWM {addr.lock.hex()=}")
+            if addr.lock == self.output.coin.lock:
+                #self.app.log_event(f"EWM MATCHED")
+                self.is_known = True
+                if self.lock_type not in ("P2TR", "P2GR", "P2GT", "Unknown"):
+                    self.requires_custom = False
+                return
+
+    def _update_ui(self) -> None:
+        addr_display = self.query_one("#address_hex").update(self.address)
+        decompiled = Script.from_bytes(self.output.coin.lock).src
+        self.query_one("#decompiled_lock").text = decompiled
+
+        if self.is_known:
+            self.query_one("#address_known_status").update("From wallet")
+        else:
+            self.query_one("#address_known_status").update("Not from wallet")
+
+        if self.lock_type != "Unknown":
+            self.query_one("#generate_witness_section").remove_class("hidden")
+        else:
+            self.query_one("#generate_witness_section").add_class("hidden")
+
+        if self.requires_custom:
+            self.query_one("#custom_script_section").remove_class("hidden")
+            self.query_one("#custom_witness_textarea").focus()
+
+    @on(Button.Pressed, "#btn_save")
+    def action_save(self) -> None:
+        text_area = self.query_one("#custom_witness_textarea")
         witness_src = text_area.text.strip()
 
         if not witness_src:
@@ -152,18 +170,24 @@ class EditWitnessModal(ModalScreen[dict|None]):
             )
             return
 
-        self.dismiss({
-            'coin_id_bytes': self.output.coin.id_bytes,
-            'witness': witness_script.bytes,
-        })
+        self.txn_data.witness_scripts[
+            self.output.coin.id_bytes
+        ] = witness_script.bytes
+        txn = self.txn_data.txn
+        txn.witness = {
+            **txn.witness,
+            self.output.coin.id_bytes: witness_script.bytes
+        }
+        self.dismiss(True)
 
-    @on(Button.Pressed, "#btn_save")
-    def _on_save_pressed(self) -> None:
-        self.action_save()
+    @on(Checkbox.Changed, "#box_script_spend")
+    def _toggle_use_custom_script(self, event: Checkbox.Changed) -> None:
+        self.requires_custom = event.checkbox.value
+        self._update_ui()
 
     @on(Button.Pressed, "#btn_cancel")
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self.dismiss(False)
 
     async def action_quit(self) -> None:
         await self.app.action_quit()

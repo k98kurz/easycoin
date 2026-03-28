@@ -41,7 +41,7 @@ class SelectInputsContainer(Vertical):
 
     def validate_step(self) -> tuple[bool, str]:
         """Validate that at least one output is selected."""
-        if not self.txn_data.selected_outputs:
+        if not self.txn_data.selected_inputs:
             return False, "Please select at least one input"
         return True, ""
 
@@ -55,7 +55,7 @@ class SelectInputsContainer(Vertical):
             table = self.query_one("#inputs_table")
             table.clear()
             self.row_keys.clear()
-            self.txn_data.available_outputs.clear()
+            self.txn_data.available_inputs.clear()
 
             if len(table.columns) == 0:
                 table.add_columns(
@@ -77,12 +77,12 @@ class SelectInputsContainer(Vertical):
                         format_balance(output.coin.amount, exact=True),
                         Wallet.get_lock_type(output.coin.lock),
                         ("✓" if output.id in [
-                            o.id for o in self.txn_data.selected_outputs
+                            o.id for o in self.txn_data.selected_inputs
                         ] else " "),
                         key=output.id
                     )
                     self.row_keys.append(row_key)
-                    self.txn_data.available_outputs.append(output)
+                    self.txn_data.available_inputs.append(output)
                 except Exception as e:
                     parent.app.log_event(
                         f"Error loading output {output.id}: {e}",
@@ -97,10 +97,10 @@ class SelectInputsContainer(Vertical):
     def update_summary(self) -> None:
         """Update input summary display."""
         try:
-            total_amount = sum(o.coin.amount for o in self.txn_data.selected_outputs)
+            total_amount = sum(o.coin.amount for o in self.txn_data.selected_inputs)
             summary = self.query_one("#input_summary")
             summary.update(
-                f"Selected: {len(self.txn_data.selected_outputs)} coins | "
+                f"Selected: {len(self.txn_data.selected_inputs)} coins | "
                 f"Total: {format_balance(total_amount, exact=True)}"
             )
         except Exception:
@@ -112,17 +112,26 @@ class SelectInputsContainer(Vertical):
         table = event.data_table
         try:
             output = next(
-                (o for o in self.txn_data.available_outputs
+                (o for o in self.txn_data.available_inputs
                     if o.id == event.row_key),
                 None
             )
 
             if output:
-                if output in self.txn_data.selected_outputs:
-                    self.txn_data.selected_outputs.remove(output)
+                if output in self.txn_data.selected_inputs:
+                    self.txn_data.selected_inputs.remove(output)
+                    if output.id in self.txn_data.txn.input_ids:
+                        self.txn_data.txn.input_ids = [
+                            oid for oid in self.txn_data.txn.input_ids
+                            if oid != output.id
+                        ]
                     table.update_cell(event.row_key, "selected", " ")
                 else:
-                    self.txn_data.selected_outputs.append(output)
+                    self.txn_data.selected_inputs.append(output)
+                    if output.id not in self.txn_data.txn.input_ids:
+                        self.txn_data.txn.input_ids = [
+                            output.id, *self.txn_data.txn.input_ids
+                        ]
                     table.update_cell(event.row_key, "selected", "✓")
 
                 self.update_summary()
@@ -143,8 +152,8 @@ class SelectInputsContainer(Vertical):
             table = self.query_one("#inputs_table")
             table.clear()
 
-            for output in self.txn_data.available_outputs:
-                is_selected = output in self.txn_data.selected_outputs
+            for output in self.txn_data.available_inputs:
+                is_selected = output in self.txn_data.selected_inputs
                 table.add_row(
                     truncate_text(output.id, prefix_len=8, suffix_len=4),
                     format_balance(output.coin.amount, exact=True),

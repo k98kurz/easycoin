@@ -62,7 +62,7 @@ class MakeAddressModal(Screen):
                     yield Checkbox(id="use_child_nonce")
 
 
-            with Horizontal(classes="h-4 mt-1"):
+            with Horizontal(classes="h-5 mt-1"):
                 with Vertical():
                     yield Static("Nonce:", classes="form-label mb-1")
                     yield Static("Loading...", id="nonce_display")
@@ -82,7 +82,7 @@ class MakeAddressModal(Screen):
             with Vertical(classes="mt-1 h-auto"):
                 yield Static("Locking Script:", classes="form-label mb-1")
                 yield Static(
-                    "Generating...",
+                    "Generating...", markup=False,
                     id="lock_script_display",
                     classes="text-muted"
                 )
@@ -103,6 +103,7 @@ class MakeAddressModal(Screen):
     def on_mount(self) -> None:
         """Initialize preview on mount."""
         self._update_preview()
+        self.query_one("#address_type_selector").focus()
 
     def on_option_list_option_highlighted(
             self, event: OptionList.OptionHighlighted

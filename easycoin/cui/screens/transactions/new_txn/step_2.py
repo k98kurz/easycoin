@@ -6,6 +6,8 @@ from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
 from easycoin.cui.helpers import format_balance
 from easycoin.cui.screens.transactions.edit_output_modal import EditOutputModal
+from easycoin.cui.helpers import estimate_fee_for_witness
+from easycoin.models import Address, Coin, Txn, Wallet
 
 
 class AddOutputsContainer(Vertical):
@@ -31,7 +33,7 @@ class AddOutputsContainer(Vertical):
         )
         yield Static(
             "Total Input: 0 EC⁻¹ | Total Output: 0 EC⁻¹ | "
-            "Estimated Fee: 0 EC⁻¹",
+            "Minimum Fee: 0 EC⁻¹ | Actual Burn: - EC⁻¹",
             id="output_summary",
             classes="mb-1"
         )
@@ -55,57 +57,51 @@ class AddOutputsContainer(Vertical):
 
     def validate_step(self) -> tuple[bool, str]:
         """Validate that at least one output is specified."""
-        if not self.txn_data.outputs:
+        if not self.txn_data.new_output_coins:
             return False, "Please add at least one output"
         return True, ""
 
     def refresh_table(self) -> None:
-        """Refresh the outputs table with current output forms."""
-        try:
-            table = self.query_one("#outputs_table")
-            table.clear()
+        """Refresh the outputs table with current output coins."""
+        table = self.query_one("#outputs_table")
+        table.clear()
 
-            if len(table.columns) == 0:
-                table.add_columns(
-                    ("Amount (EC⁻¹)", "amount"),
-                    ("Address", "address"),
-                )
-            table.cursor_type = "row"
+        if len(table.columns) == 0:
+            table.add_columns(
+                ("Amount (EC⁻¹)", "amount"),
+                ("Data Size", "data_size"),
+                ("Address", "address"),
+            )
+        table.cursor_type = "row"
 
-            for i, output in enumerate(self.txn_data.outputs):
-                table.add_row(
-                    str(output.get('amount', '')),
-                    output.get('address', ''),
-                    key=i
-                )
-        except Exception as e:
-            parent = self.app.screen if hasattr(self.app, 'screen') else None
-            if parent:
-                parent.app.log_event(f"Error refreshing outputs table: {e}", "ERROR")
+        for i, coin in enumerate(self.txn_data.new_output_coins):
+            table.add_row(
+                format_balance(coin.amount, exact=True),
+                len(coin.data.get('details', b'')),
+                Address({'lock': coin.lock}).hex,
+                key=i
+            )
 
     def update_summary(self) -> None:
         """Update output summary display."""
-        try:
-            total_input = sum(o.coin.amount for o in self.txn_data.selected_outputs)
-            total_output = 0
-            for form in self.txn_data.outputs:
-                try:
-                    amount = int(form.get('amount', '0'))
-                    total_output += amount
-                except (ValueError, TypeError):
-                    pass
+        total_input = sum(o.coin.amount for o in self.txn_data.selected_inputs)
+        total_output = 0
+        for coin in self.txn_data.new_output_coins:
+            total_output += coin.amount
 
-            estimated_fee = max(0, total_input - total_output)
-            summary = self.query_one("#output_summary")
-            summary.update(
-                f"Total Input: {format_balance(total_input, exact=True)} | "
-                f"Total Output: {format_balance(total_output, exact=True)} | "
-                f"Estimated Fee: {format_balance(estimated_fee, exact=True)}"
+        self.txn_data.fee = Txn.minimum_fee(self.txn_data.txn)
+        for o in self.txn_data.selected_inputs:
+            self.txn_data.fee += estimate_fee_for_witness(
+                Wallet.get_lock_type(o.coin.lock)
             )
-        except Exception as e:
-            parent = self.app.screen if hasattr(self.app, 'screen') else None
-            if parent:
-                parent.app.log_event(f"Error updating output summary: {e}", "DEBUG")
+        actual_burn = total_input - total_output
+        summary = self.query_one("#output_summary")
+        summary.update(
+            f"Total Input: {format_balance(total_input, exact=True)} | "
+            f"Total Output: {format_balance(total_output, exact=True)} | "
+            f"Min Fee Estimate: {format_balance(self.txn_data.fee, exact=True)} | "
+            f"Actual Burn: {format_balance(actual_burn, exact=True)}"
+        )
 
     def update_button_visibility(self) -> None:
         """Update button visibility based on table state."""
@@ -113,31 +109,33 @@ class AddOutputsContainer(Vertical):
         btn_delete = self.query_one("#btn_delete_output")
 
         has_selection = False
-        if self.txn_data.outputs:
+        if self.txn_data.new_output_coins:
             table = self.query_one("#outputs_table")
             has_selection = (
                 table.cursor_row is not None
-                and table.cursor_row < len(self.txn_data.outputs)
+                and table.cursor_row < len(self.txn_data.new_output_coins)
             )
 
         btn_edit.display = "block" if has_selection else "none"
-        btn_delete.display = "block" if self.txn_data.outputs else "none"
+        btn_delete.display = "block" if has_selection else "none"
         self.app.screen.update_button_visibility()
 
     @on(Button.Pressed, "#btn_add_output")
     def action_add_output(self) -> None:
         """Open EditOutputModal to add new output."""
-        parent = self.app.screen if hasattr(self.app, 'screen') else None
-        if not parent:
-            return
-
         def on_dismiss(result):
             if not result:
                 return
-            self.txn_data.outputs.append({
-                'address': result['address'],
-                'amount': result['amount']
-            })
+            coin = Coin.create(
+                lock=Address.parse(result['address']),
+                amount=result['amount'],
+            )
+            coin.id = coin.generate_id(coin.data)
+            self.txn_data.txn.output_ids = [
+                *self.txn_data.txn.output_ids,
+                coin.id,
+            ]
+            self.txn_data.new_output_coins.append(coin)
             self.refresh_table()
             self.update_summary()
             self.update_button_visibility()
@@ -146,9 +144,9 @@ class AddOutputsContainer(Vertical):
             except Exception:
                 pass
 
-        total_out = sum([o['amount'] for o in self.txn_data.outputs])
-        total_in = sum(o.coin.amount for o in self.txn_data.selected_outputs)
-        parent.app.push_screen(
+        total_out = sum([c.amount for c in self.txn_data.new_output_coins])
+        total_in = sum(o.coin.amount for o in self.txn_data.selected_inputs)
+        self.app.push_screen(
             EditOutputModal(
                 address=None, amount=0, info=None,
                 max_amount=total_in - total_out - self.txn_data.fee
@@ -156,23 +154,26 @@ class AddOutputsContainer(Vertical):
             on_dismiss
         )
 
+    @on(Button.Pressed, "#btn_edit_output")
     @on(DataTable.RowSelected, "#outputs_table")
-    def _edit_output(self, event: DataTable.RowSelected) -> None:
+    def action_edit_output(self) -> None:
         """Open EditOutputModal to edit selected output."""
-        output_index = event.row_key.value
+        table = self.query_one("#outputs_table")
+        output_index = table.cursor_row
 
-        if 0 <= output_index < len(self.txn_data.outputs):
-            parent = self.app.screen if hasattr(self.app, 'screen') else None
-            if not parent:
-                return
-
+        if 0 <= output_index < len(self.txn_data.new_output_coins):
             def on_dismiss(result):
                 if not result:
                     return
-                self.txn_data.outputs[result['info']] = {
-                    'address': result['address'],
-                    'amount': result['amount']
-                }
+                coin = self.txn_data.new_output_coins[result['info']]
+                prev_id = coin.id
+                coin.lock = Address.parse(result['address'])
+                coin.amount = result['amount']
+                coin.id = coin.generate_id(coin.data)
+                self.txn_data.txn.output_ids = [
+                    coin.id,
+                    *[oid for oid in self.txn_data.txn.output_ids if oid != prev_id],
+                ]
                 self.refresh_table()
                 self.update_summary()
                 self.update_button_visibility()
@@ -181,13 +182,14 @@ class AddOutputsContainer(Vertical):
                 except Exception:
                     pass
 
-            current = self.txn_data.outputs[output_index]
-            total_out = sum([o['amount'] for o in self.txn_data.outputs])
-            total_in = sum(o.coin.amount for o in self.txn_data.selected_outputs)
-            parent.app.push_screen(
+            current = self.txn_data.new_output_coins[output_index]
+            total_out = sum([o.amount for o in self.txn_data.new_output_coins])
+            total_out -= current.amount
+            total_in = sum(o.coin.amount for o in self.txn_data.selected_inputs)
+            self.app.push_screen(
                 EditOutputModal(
-                    address=current.get('address', ''),
-                    amount=int(current.get('amount', 0)),
+                    address=Address({'lock': current.lock}).hex,
+                    amount=current.amount,
                     info=output_index,
                     max_amount=total_in - total_out - self.txn_data.fee
                 ),
@@ -197,67 +199,21 @@ class AddOutputsContainer(Vertical):
     @on(Button.Pressed, "#btn_delete_output")
     def action_delete_output(self) -> None:
         """Delete currently selected output."""
+        table = self.query_one("#outputs_table")
+        coin = self.txn_data.new_output_coins[table.cursor_row]
+        txn = self.txn_data.txn
+        txn.output_ids = [
+            oid for oid in txn.output_ids
+            if oid != coin.id
+        ]
+        del self.txn_data.new_output_coins[table.cursor_row]
+        self.refresh_table()
+        self.update_summary()
+        self.update_button_visibility()
         try:
-            table = self.query_one("#outputs_table")
-            if (table.cursor_row is not None
-                    and table.cursor_row < len(self.txn_data.outputs)):
-                del self.txn_data.outputs[table.cursor_row]
-                self.refresh_table()
-                self.update_summary()
-                self.update_button_visibility()
-                try:
-                    self.query_one("#outputs_table").focus()
-                except Exception:
-                    pass
-        except Exception as e:
-            parent = self.app.screen if hasattr(self.app, 'screen') else None
-            if parent:
-                parent.app.log_event(f"Error deleting output: {e}", "ERROR")
-
-    @on(Button.Pressed, "#btn_edit_output")
-    def action_edit_output(self) -> None:
-        """Edit currently selected output."""
-        try:
-            table = self.query_one("#outputs_table")
-            if (table.cursor_row is not None
-                    and table.cursor_row < len(self.txn_data.outputs)):
-                output_index = table.cursor_row
-                parent = self.app.screen if hasattr(self.app, 'screen') else None
-                if not parent:
-                    return
-
-                def on_dismiss(result):
-                    if not result:
-                        return
-                    self.txn_data.outputs[result['info']] = {
-                        'address': result['address'],
-                        'amount': result['amount']
-                    }
-                    self.refresh_table()
-                    self.update_summary()
-                    self.update_button_visibility()
-                    try:
-                        self.query_one("#outputs_table").focus()
-                    except Exception:
-                        pass
-
-                current = self.txn_data.outputs[output_index]
-                total_out = sum([o['amount'] for o in self.txn_data.outputs])
-                total_in = sum(o.coin.amount for o in self.txn_data.selected_outputs)
-                total_out -= current['amount']
-                parent.app.push_screen(
-                    EditOutputModal(
-                        address=current.get('address', ''),
-                        amount=int(current.get('amount', 0)),
-                        info=output_index,
-                        max_amount=total_in - total_out - self.txn_data.fee
-                    ),
-                    on_dismiss
-                )
-        except Exception as e:
-            parent = self.app.screen if hasattr(self.app, 'screen') else None
-            if parent:
-                parent.app.log_event(f"Error editing output: {e}", "ERROR")
+            self.query_one("#outputs_table").focus()
+        except Exception:
+            pass
 
     @on(DataTable.RowHighlighted, "#outputs_table")
     def _on_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
