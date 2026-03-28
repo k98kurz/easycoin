@@ -4,15 +4,13 @@ from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll, Horizontal
 from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
-
-from easycoin.cui.helpers import format_balance, truncate_text
-from easycoin.models import Output, Wallet, Coin, Txn, Address
 from tapescript import Script
-
+from easycoin.cui.helpers import format_balance, truncate_text
 from easycoin.cui.screens.transactions.new_txn.data import TransactionData
 from easycoin.cui.screens.transactions.new_txn.edit_witness_modal import (
     EditWitnessModal
 )
+from easycoin.models import Output, Wallet, Coin, Txn, Address
 
 
 class WitnessInputsContainer(Vertical):
@@ -68,9 +66,8 @@ class WitnessInputsContainer(Vertical):
     def _get_witness_len(self, output: Output) -> int:
         """Get witness script length for an output."""
         try:
-            coin_id_bytes = output.coin.id_bytes
-            if coin_id_bytes in self.txn_data.witness_scripts:
-                return len(self.txn_data.witness_scripts[coin_id_bytes])
+            if output.id in self.txn_data.witness_scripts:
+                return len(self.txn_data.witness_scripts[output.id].bytes)
         except Exception:
             pass
         return 0

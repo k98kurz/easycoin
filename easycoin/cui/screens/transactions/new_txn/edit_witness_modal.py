@@ -30,7 +30,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
         self.address = None
 
     def compose(self) -> ComposeResult:
-        with VerticalScroll(classes="modal-container w-70p"):
+        with VerticalScroll(classes="modal-container w-80p"):
             yield Static("Edit Witness", classes="modal-title")
 
             with Vertical(classes="h-3 my-1"):
@@ -59,30 +59,30 @@ class EditWitnessModal(ModalScreen[bool|None]):
                     classes="text-muted"
                 )
 
-            with Horizontal(classes="h-12"):
-                with Vertical():
-                    yield Static("Decompiled Lock", classes="text-bold my-1")
-                    yield ECTextArea(
-                        id="decompiled_lock", read_only=True, classes="h-8"
-                    )
+            with Vertical():
+                yield Static("Decompiled Lock", classes="text-bold my-1")
+                yield ECTextArea(
+                    id="decompiled_lock", read_only=True, classes="h-8"
+                )
 
+            with Horizontal(classes="h-12"):
                 with Vertical(id="generate_witness_section", classes="hidden"):
                     with Horizontal(classes="h-4"):
-                        yield Checkbox(
-                            "Script spend",
-                            id="box_script_spend",
-                            classes="hidden",
-                        )
                         yield Button(
                             "Generate",
                             id="btn_generate",
+                        )
+                        yield Checkbox(
+                            "Script spend",
+                            id="box_script_spend",
+                            classes="hidden mt-1",
                         )
                     yield ECTextArea(
                         "",
                         id="generated_witness_textarea",
                         placeholder="Generated witness will go here",
                         read_only=True,
-                        classes="h-5"
+                        classes="h-6 mt-1"
                     )
 
                 with Vertical(id="custom_script_section", classes="hidden"):
@@ -117,16 +117,12 @@ class EditWitnessModal(ModalScreen[bool|None]):
             self.is_known = False
             return
 
-        #self.app.log_event(f"EWM {self.output.coin.lock.hex()=}")
         self.address = Address({"lock": self.output.coin.lock}).hex
         self.lock_type = Wallet.get_lock_type(self.output.coin.lock)
         for addr in self.app.wallet.addresses:
-            #self.app.log_event(f"EWM {addr.hex=}")
-            #self.app.log_event(f"EWM {addr.lock.hex()=}")
             if addr.lock == self.output.coin.lock:
-                #self.app.log_event(f"EWM MATCHED")
                 self.is_known = True
-                if self.lock_type not in ("P2TR", "P2GR", "P2GT", "Unknown"):
+                if self.lock_type not in ("P2SH", "Unknown"):
                     self.requires_custom = False
                 return
 
@@ -142,12 +138,27 @@ class EditWitnessModal(ModalScreen[bool|None]):
 
         if self.lock_type != "Unknown":
             self.query_one("#generate_witness_section").remove_class("hidden")
+            if self.output.id in self.txn_data.witness_scripts:
+                self.query_one("#generated_witness_textarea").text = (
+                    self.txn_data.witness_scripts[self.output.id].src
+                )
         else:
             self.query_one("#generate_witness_section").add_class("hidden")
 
+        if self.lock_type in ("P2TR", "P2GR", "P2GT"):
+            self.query_one("#box_script_spend").remove_class("hidden")
+        else:
+            self.query_one("#box_script_spend").add_class("hidden")
+
         if self.requires_custom:
             self.query_one("#custom_script_section").remove_class("hidden")
+            if self.output.id in self.txn_data.witness_scripts:
+                self.query_one("#custom_witness_textarea").text = (
+                    self.txn_data.witness_scripts[self.output.id].src
+                )
             self.query_one("#custom_witness_textarea").focus()
+        else:
+            self.query_one("#custom_script_section").add_class("hidden")
 
     @on(Button.Pressed, "#btn_save")
     def action_save(self) -> None:
@@ -171,8 +182,8 @@ class EditWitnessModal(ModalScreen[bool|None]):
             return
 
         self.txn_data.witness_scripts[
-            self.output.coin.id_bytes
-        ] = witness_script.bytes
+            self.output.id
+        ] = witness_script
         txn = self.txn_data.txn
         txn.witness = {
             **txn.witness,
@@ -182,6 +193,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
 
     @on(Checkbox.Changed, "#box_script_spend")
     def _toggle_use_custom_script(self, event: Checkbox.Changed) -> None:
+        self.app.log_event(f"{event.checkbox.value=}", "DEBUG")
         self.requires_custom = event.checkbox.value
         self._update_ui()
 

@@ -7,7 +7,7 @@ from textual.widgets import (
     Button, Static, OptionList, Input, Checkbox, Footer, TextArea
 )
 from textual.widgets.option_list import Option
-from tapescript import Script
+from tapescript import Script, make_scripthash_lock
 
 
 class MakeAddressModal(Screen):
@@ -23,6 +23,7 @@ class MakeAddressModal(Screen):
         ("P2TR", "Pay to Taproot"),
         ("P2GR", "Pay to Graftroot"),
         ("P2GT", "Pay to Graftap (GR-in-TR)"),
+        ("P2SH", "Pay to Script Hash"),
         ("Custom", "Custom"),
     ]
 
@@ -110,7 +111,7 @@ class MakeAddressModal(Screen):
         ) -> None:
         """Handle address type selection."""
         self.selected_type = event.option.id
-        if self.selected_type in ("P2TR", "Custom"):
+        if self.selected_type in ("P2TR", "P2SH", "Custom"):
             self.query_one("#custom_container").remove_class("hidden")
         else:
             self.query_one("#custom_container").add_class("hidden")
@@ -167,7 +168,7 @@ class MakeAddressModal(Screen):
         try:
             nonce = self.app.wallet.nonce
             committed_script = None
-            if self.selected_type == "P2TR" and self.custom_script_src:
+            if self.selected_type in ("P2TR", "P2SH") and self.custom_script_src:
                 committed_script = Script.from_src(self.custom_script_src)
             address = self.app.wallet.make_address(
                 self.current_lock, nonce,
@@ -248,7 +249,7 @@ class MakeAddressModal(Screen):
             lock = self.app.wallet.get_p2gt_lock(
                 nonce, child_nonce=self.current_child_nonce
             )
-        else:  # Custom
+        else:  # P2SH and Custom
             lock = None
             if not self.custom_script_src:
                 self.script_error = (
@@ -257,6 +258,9 @@ class MakeAddressModal(Screen):
             else:
                 try:
                     lock = Script.from_src(self.custom_script_src)
+                    if self.selected_type == "P2SH":
+                        lock = make_scripthash_lock(lock)
+
                 except BaseException as e:
                     self.script_error = f"{type(e).__name__}: {e}"
                     lock = None

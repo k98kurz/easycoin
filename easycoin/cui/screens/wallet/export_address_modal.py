@@ -53,11 +53,23 @@ class ExportAddressModal(Screen):
                     id="secrets_display", classes="hidden",
                 )
 
-            yield Static("Lock (Decompiled):\n", classes="form-label mt-1")
-            yield TextArea(
-                self.decompiled_lock, read_only=True, show_line_numbers=False,
-                soft_wrap=True, id="lock_display", classes="h-8"
-            )
+            with Horizontal(classes="mt-1 h-10"):
+                with Vertical():
+                    yield Static("Lock (Decompiled):\n", classes="form-label")
+                    yield TextArea(
+                        self.decompiled_lock, read_only=True,
+                        show_line_numbers=False, soft_wrap=True,
+                        id="lock_display", classes="h-8"
+                    )
+                with Vertical(id="committed_script_container", classes="hidden"):
+                    yield Static(
+                        "Committed Script (Decompiled):\n", classes="text-bold"
+                    )
+                    yield TextArea(
+                        "", read_only=True, show_line_numbers=False,
+                        soft_wrap=True, id="committed_script_display",
+                        classes="h-8"
+                    )
 
             yield Static("Exported Data:\n", classes="form-label mt-1")
             yield Static(
@@ -97,6 +109,13 @@ class ExportAddressModal(Screen):
                 )
                 yield Button("Cancel", id="btn_cancel", variant="default")
         yield Footer()
+
+    def on_mount(self):
+        if self.address.committed_script:
+            self.query_one("#committed_script_container").remove_class("hidden")
+            self.query_one("#committed_script_display").text = (
+                Script.from_bytes(self.address.committed_script).src
+            )
 
     @on(Button.Pressed, "#btn_export")
     def action_export(self) -> None:
