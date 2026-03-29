@@ -484,7 +484,7 @@ class Wallet(HashedModel):
         """..."""
         return make_graftroot_witness_surrogate(
             self.get_seed(nonce, child_nonce),
-            script
+            surrogate_script
         )
 
     def get_p2gt_lock(
@@ -513,6 +513,6 @@ class Wallet(HashedModel):
         """..."""
         return make_graftap_witness_scriptspend(
             self.get_seed(nonce, child_nonce),
-            script
+            surrogate_script
         )
 

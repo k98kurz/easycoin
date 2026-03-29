@@ -36,6 +36,7 @@ class MakeAddressModal(Screen):
         self.selected_type = "P2PK"
         self.current_lock = None
         self.custom_script_src = None
+        self.default_script_src = 'false'
         self.script_error = None
         self.child_nonce_enabled = False
         self.current_child_nonce = None
@@ -228,8 +229,12 @@ class MakeAddressModal(Screen):
                 nonce, child_nonce=self.current_child_nonce
             )
         elif self.selected_type == "P2TR":
+            self.default_script_src = f'push d{nonce} false return' 
             lock, committed_script = None, None
-            if self.custom_script_src:
+            script_src = self.custom_script_src
+            if not self.custom_script_src:
+                self.query_one("#custom_script").placeholder = self.default_script_src
+            else:
                 try:
                     committed_script = Script.from_src(
                         self.custom_script_src
@@ -237,6 +242,7 @@ class MakeAddressModal(Screen):
                 except BaseException as e:
                     self.script_error = f"{type(e).__name__}: {e}"
                     committed_script = None
+
             lock = self.app.wallet.get_p2tr_lock(
                 nonce, script=committed_script,
                 child_nonce=self.current_child_nonce
@@ -251,9 +257,10 @@ class MakeAddressModal(Screen):
             )
         else:  # P2SH and Custom
             lock = None
+            self.query_one("#custom_script").placeholder = "..."
             if not self.custom_script_src:
                 self.script_error = (
-                    "Custom script required for Custom address type"
+                    f"Custom script required for {self.selected_type} address type"
                 )
             else:
                 try:
@@ -279,7 +286,9 @@ class MakeAddressModal(Screen):
 
         try:
             address = self.app.wallet.make_address(
-                lock, nonce, committed_script=committed_script
+                lock, nonce, committed_script=(
+                    committed_script or Script.from_src(self.default_script_src)
+                )
             )
             address.child_nonce = self.current_child_nonce
         except Exception as e:

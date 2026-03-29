@@ -27,7 +27,9 @@ class EditWitnessModal(ModalScreen[bool|None]):
         self.lock_type = "Unknown"
         self.is_known = False
         self.requires_custom = True
+        self.scriptspend = False
         self.address = None
+        self.generated_witness = None
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(classes="modal-container w-80p"):
@@ -65,7 +67,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                     id="decompiled_lock", read_only=True, classes="h-8"
                 )
 
-            with Horizontal(classes="h-12"):
+            with Horizontal(classes="h-14"):
                 with Vertical(id="generate_witness_section", classes="hidden"):
                     with Horizontal(classes="h-4"):
                         yield Button(
@@ -82,7 +84,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                         id="generated_witness_textarea",
                         placeholder="Generated witness will go here",
                         read_only=True,
-                        classes="h-6 mt-1"
+                        classes="h-8 mt-1"
                     )
 
                 with Vertical(id="custom_script_section", classes="hidden"):
@@ -93,7 +95,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                         "",
                         id="custom_witness_textarea",
                         placeholder="Enter tapescript source",
-                        classes="h-8"
+                        classes="h-10"
                     )
                     yield Static(
                         "Provide a valid tapescript witness script to "
@@ -117,17 +119,18 @@ class EditWitnessModal(ModalScreen[bool|None]):
             self.is_known = False
             return
 
-        self.address = Address({"lock": self.output.coin.lock}).hex
+        self.address = Address({"lock": self.output.coin.lock})
         self.lock_type = Wallet.get_lock_type(self.output.coin.lock)
         for addr in self.app.wallet.addresses:
             if addr.lock == self.output.coin.lock:
                 self.is_known = True
+                self.address = addr
                 if self.lock_type not in ("P2SH", "Unknown"):
                     self.requires_custom = False
                 return
 
     def _update_ui(self) -> None:
-        addr_display = self.query_one("#address_hex").update(self.address)
+        addr_display = self.query_one("#address_hex").update(self.address.hex)
         decompiled = Script.from_bytes(self.output.coin.lock).src
         self.query_one("#decompiled_lock").text = decompiled
 
@@ -150,7 +153,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
         else:
             self.query_one("#box_script_spend").add_class("hidden")
 
-        if self.requires_custom:
+        if self.requires_custom or self.scriptspend:
             self.query_one("#custom_script_section").remove_class("hidden")
             if self.output.id in self.txn_data.witness_scripts:
                 self.query_one("#custom_witness_textarea").text = (
@@ -160,24 +163,97 @@ class EditWitnessModal(ModalScreen[bool|None]):
         else:
             self.query_one("#custom_script_section").add_class("hidden")
 
+    @on(Button.Pressed, "#btn_generate")
+    def action_generate_witness(self) -> None:
+        self.generated_witness = None
+        custom_witness = self.query_one("#custom_witness_textarea").text.strip()
+
+        if self.requires_custom:
+            try:
+                custom_witness = Script.from_src(custom_witness)
+            except Exception as e:
+                self.app.notify(f"Auth error: {e}", severity="warning")
+
+        if self.lock_type == "P2PK":
+            self.generated_witness = self.app.wallet.get_p2pk_witness(
+                self.address.nonce, self.txn_data.txn, self.output.coin,
+                child_nonce=self.address.child_nonce,
+            )
+        elif self.lock_type == "P2PKH":
+            self.generated_witness = self.app.wallet.get_p2pkh_witness(
+                self.address.nonce, self.txn_data.txn, self.output.coin,
+                child_nonce=self.address.child_nonce,
+            )
+        elif self.lock_type == "P2TR":
+            if self.scriptspend:
+                self.generated_witness = self.app.wallet.get_p2tr_witness_scriptspend(
+                    self.address.nonce,
+                    script=self.address.committed_script,
+                    child_nonce=self.address.child_nonce,
+                )
+            else:
+                self.generated_witness = self.app.wallet.get_p2tr_witness_keyspend(
+                    self.address.nonce, self.txn_data.txn, self.output.coin,
+                    child_nonce=self.address.child_nonce,
+                    script=self.address.committed_script,
+                )
+        elif self.lock_type == "P2GR":
+            if self.scriptspend:
+                self.generated_witness = self.app.wallet.get_p2gr_witness_surrogate(
+                    self.address.nonce, custom_witness,
+                    child_nonce=self.address.child_nonce,
+                )
+            else:
+                self.generated_witness = self.app.wallet.get_p2gr_witness_keyspend(
+                    self.address.nonce, self.txn_data.txn, self.output.coin,
+                    child_nonce=self.address.child_nonce,
+                )
+        elif self.lock_type == "P2GT":
+            if self.scriptspend:
+                self.generated_witness = self.app.wallet.get_p2gt_scriptspend(
+                    self.address.nonce, custom_witness,
+                    child_nonce=self.address.child_nonce,
+                )
+            else:
+                self.generated_witness = self.app.wallet.get_p2gt_witness_keyspend(
+                    self.address.nonce, self.txn_data.txn, self.output.coin,
+                    child_nonce=self.address.child_nonce,
+                )
+
+        if self.generated_witness:
+            textarea = self.query_one("#generated_witness_textarea")
+            textarea.text = self.generated_witness.src
+
     @on(Button.Pressed, "#btn_save")
     def action_save(self) -> None:
         text_area = self.query_one("#custom_witness_textarea")
         witness_src = text_area.text.strip()
+        witness_script = None
 
-        if not witness_src:
+        if self.lock_type not in ("P2SH", "Unknown"):
+            witness_script = self.generated_witness
+
+        if self.requires_custom:
+            if not witness_src:
+                self.app.notify(
+                    "Witness script is required",
+                    severity="warning"
+                )
+                return
+
+            try:
+                witness_script = Script.from_src(witness_src)
+            except Exception as e:
+                self.app.notify(
+                    f"Invalid tapescript: {e}",
+                    severity="error"
+                )
+                return
+
+        if not witness_script:
             self.app.notify(
-                "Witness script is required",
+                "No witness script to save",
                 severity="warning"
-            )
-            return
-
-        try:
-            witness_script = Script.from_src(witness_src)
-        except Exception as e:
-            self.app.notify(
-                f"Invalid tapescript: {e}",
-                severity="error"
             )
             return
 
@@ -194,7 +270,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
     @on(Checkbox.Changed, "#box_script_spend")
     def _toggle_use_custom_script(self, event: Checkbox.Changed) -> None:
         self.app.log_event(f"{event.checkbox.value=}", "DEBUG")
-        self.requires_custom = event.checkbox.value
+        self.scriptspend = event.checkbox.value
         self._update_ui()
 
     @on(Button.Pressed, "#btn_cancel")
