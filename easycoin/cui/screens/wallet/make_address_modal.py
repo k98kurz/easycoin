@@ -34,12 +34,12 @@ class MakeAddressModal(Screen):
         super().__init__()
         self.success_callback = success_callback
         self.selected_type = "P2PK"
-        self.current_lock = None
         self.custom_script_src = None
         self.default_script_src = 'false'
         self.script_error = None
         self.child_nonce_enabled = False
         self.current_child_nonce = None
+        self.address = None
 
     def compose(self) -> ComposeResult:
         """Compose make address modal layout."""
@@ -162,21 +162,12 @@ class MakeAddressModal(Screen):
             self.app.notify("Wallet must be unlocked", severity="error")
             return
 
-        if not self.current_lock:
-            self.app.notify("No lock generated", severity="error")
+        if not self.address:
+            self.app.notify("No address generated", severity="error")
             return
 
         try:
-            nonce = self.app.wallet.nonce
-            committed_script = None
-            if self.selected_type in ("P2TR", "P2SH") and self.custom_script_src:
-                committed_script = Script.from_src(self.custom_script_src)
-            address = self.app.wallet.make_address(
-                self.current_lock, nonce,
-                committed_script=committed_script
-            )
-            address.child_nonce = self.current_child_nonce
-            address.save()
+            self.address.save()
 
             custom_type_used = self.selected_type == "Custom"
             child_nonce_used = (
@@ -185,7 +176,7 @@ class MakeAddressModal(Screen):
             )
 
             if not (child_nonce_used or custom_type_used):
-                self.app.wallet.nonce = nonce + 1
+                self.app.wallet.nonce = self.app.wallet.nonce + 1
                 self.app.wallet.save()
 
             self.app.pop_screen()
@@ -201,7 +192,9 @@ class MakeAddressModal(Screen):
         self.app.pop_screen()
 
     def _update_preview(self) -> None:
-        """Update the preview display based on selected address type."""
+        """Recalculate Address and update the preview display based on
+            selected address type.
+        """
         if not self.app.wallet:
             return
 
@@ -255,6 +248,13 @@ class MakeAddressModal(Screen):
             lock = self.app.wallet.get_p2gt_lock(
                 nonce, child_nonce=self.current_child_nonce
             )
+            committed_script = self.app.wallet.get_p2gt_committed_script(
+                nonce, child_nonce=self.current_child_nonce
+            )
+            self.app.log_event(
+                f"make P2GT: {lock.src=} {committed_script.src=}",
+                "DEBUG"
+            )
         else:  # P2SH and Custom
             lock = None
             self.query_one("#custom_script").placeholder = "..."
@@ -272,8 +272,6 @@ class MakeAddressModal(Screen):
                     self.script_error = f"{type(e).__name__}: {e}"
                     lock = None
 
-        self.current_lock = lock
-
         if self.script_error:
             self.query_one("#lock_script_display").update(
                 self.script_error
@@ -285,10 +283,13 @@ class MakeAddressModal(Screen):
         self.query_one("#lock_script_display").update(lock.src)
 
         try:
+            secrets = None
+            if self.selected_type == "P2GT":
+                secrets = {"P2GT": True}
             address = self.app.wallet.make_address(
                 lock, nonce, committed_script=(
                     committed_script or Script.from_src(self.default_script_src)
-                )
+                ), secrets=secrets
             )
             address.child_nonce = self.current_child_nonce
         except Exception as e:
@@ -298,6 +299,7 @@ class MakeAddressModal(Screen):
             self.app.log_event(f"Error generating address: {e}", "DEBUG")
             return
 
+        self.address = address
         self.query_one("#address_display", Static).update(address.hex)
         self.query_one("#btn_save", Button).disabled = False
 

@@ -25,6 +25,7 @@ from tapescript import (
     make_graftap_witness_scriptspend,
     clamp_scalar,
 )
+from tapescript.tools import _make_graftap_committed_script
 import os
 import packify
 
@@ -262,12 +263,15 @@ class Wallet(HashedModel):
         return addr
 
     @staticmethod
-    def get_lock_type(lock: Script|bytes) -> str:
+    def get_lock_type(
+            lock: Script | bytes, address_secrets: dict | None = None
+        ) -> str:
         """Get lock type string from lock bytes."""
         # ensure it is compiled and decompiled
         if isinstance(lock, Script):
             lock = lock.bytes
         lock = Script.from_bytes(lock)
+        address_secrets = address_secrets or {}
 
         tokens = lock.src.split()
 
@@ -285,6 +289,8 @@ class Wallet(HashedModel):
                 and tokens[:2] == ['OP_PUSH1', 'd32']
                 and tokens[-2] == 'OP_TAPROOT'
             ):
+            if address_secrets and "P2GT" in address_secrets:
+                return "P2GT" # graftap: graftroot-in-taproot
             return "P2TR" # taproot
         elif (  len(tokens) == 8
                 and tokens[:2] == ['OP_DUP', 'OP_SHAKE256']
@@ -346,6 +352,7 @@ class Wallet(HashedModel):
         pubkeys = self.pubkeys
         pubkeys[(nonce, child_nonce)] = bytes(vkey)
         self.pubkeys = pubkeys
+        self.save()
         return vkey
 
     def get_p2pk_lock(
@@ -408,10 +415,10 @@ class Wallet(HashedModel):
             self, nonce: int, script: Script|None = None,
             child_nonce: int|None = None, sigflags = 'fa'
         ) -> Script:
-        """Generate the pay-to-taproot lock for the given nonce and
-            child_nonce. If script is not supplied, an unspendable
+        """Generate the pay-to-taproot lock for the given `nonce` and
+            `child_nonce`. If script is not supplied, an unspendable
             locking script is generated, which will allow only the
-            keyspend witness path. Raises ValueError if the wallet is
+            keyspend witness path. Raises `ValueError` if the wallet is
             locked and the necessary pubkey has not yet been generated.
             Default sigflags require committing to sigfield1 (input
             hash) and sigfield3 (hash of all output hashes).
@@ -427,11 +434,11 @@ class Wallet(HashedModel):
             child_nonce: int|None = None, sigflags = 'fa'
         ) -> Script:
         """Generate the pay-to-taproot keyspend witness for the given
-            nonce and child_nonce. If script is not supplied, an
+            `nonce` and `child_nonce`. If script is not supplied, an
             unspendable locking script is generated and used instead.
-            Raises ValueError if the wallet is locked. Default sigflags
-            commit to just sigfield1 (input hash) and sigfield3 (hash of
-            all output hashes).
+            Raises `ValueError` if the wallet is locked. Default
+            sigflags commit to just sigfield1 (input hash) and sigfield3
+            (hash of all output hashes).
         """
         if not script:
             script = Script.from_src(f'push d{nonce} false return')
@@ -447,8 +454,8 @@ class Wallet(HashedModel):
             child_nonce: int|None = None
         ) -> Script:
         """Generate the pay-to-taproot keyspend witness for the given
-            nonce and child_nonce. Raises ValueError if the wallet is
-            locked. Default sigflags commit to just sigfield1 (input
+            `nonce` and `child_nonce`. Raises `ValueError` if the wallet
+            is locked. Default sigflags commit to just sigfield1 (input
             hash) and sigfield3 (all outputs). Note that any constraints
             within the committed script must be satisfied externally to
             this method call -- this only unlocks the scriptspend path.
@@ -461,7 +468,11 @@ class Wallet(HashedModel):
     def get_p2gr_lock(
             self, nonce: int, child_nonce: int|None = None, sigflags: str = 'fa'
         ) -> Script:
-        """..."""
+        """Generate the pay-to-graftroot lock for the given `nonce` and
+            `child_nonce`. Can be unlocked with a keyspend or surrogate
+            script path. Raises `ValueError` if the wallet is locked and
+            the necessary pubkey has not yet been generated.
+        """
         return make_graftroot_lock(
             self.get_pubkey(nonce, child_nonce), sigflags=sigflags
         )
@@ -470,7 +481,12 @@ class Wallet(HashedModel):
             self, nonce: int, txn: 'Txn', coin: 'Coin',
             child_nonce: int|None = None, sigflags = 'fa'
         ) -> Script:
-        """..."""
+        """Generate the pay-to-graftroot keyspend witness for the given
+            `nonce` and `child_nonce`, which is a signature and a
+            boolean control signal. Raises `ValueError` if the wallet is
+            locked. Default sigflags commit to just sigfield1 (input
+            hash) and sigfield3 (hash of all output hashes).
+        """
         return make_graftroot_witness_keyspend(
             self.get_seed(nonce, child_nonce),
             txn.runtime_cache(coin),
@@ -481,7 +497,16 @@ class Wallet(HashedModel):
             self, nonce: int, surrogate_script: Script|str,
             child_nonce: int|None = None, sigflags = 'fa'
         ) -> Script:
-        """..."""
+        """Generate the pay-to-graftroot surrogate script witness for
+            the given `nonce` and `child_nonce`, which pushes the
+            surrogate script, a signature for the surrogate script, and
+            a boolean control flag. Raises `ValueError` if the wallet is
+            locked. Default sigflags commit to just sigfield1 (input
+            hash) and sigfield3 (all outputs). Note that any constraints
+            within the surrogate script must be satisfied externally to
+            this method call -- this only authorizes and prepares the
+            execution of the surrogate script.
+        """
         return make_graftroot_witness_surrogate(
             self.get_seed(nonce, child_nonce),
             surrogate_script
@@ -490,16 +515,37 @@ class Wallet(HashedModel):
     def get_p2gt_lock(
             self, nonce: int, child_nonce: int|None = None
         ) -> Script:
-        """..."""
+        """Generate the pay-to-graftap (P2GR in P2TR envelope) lock for
+            the given `nonce` and `child_nonce`. Unlike regular P2GR,
+            the keyspend path is a regular P2TR keyspend, while the
+            scriptspend path is exclusively for executing surrogate
+            scripts. Raises `ValueError` if the wallet is locked and the
+            necessary pubkey has not yet been generated.
+        """
         return make_graftap_lock(
             self.get_pubkey(nonce, child_nonce)
         )
+
+    def get_p2gt_committed_script(
+            self, nonce: int, child_nonce: int|None = None
+        ) -> Script:
+        """Generate the pay-to-graftap committed script that allows
+            executing a signed surrogate script via the scripspend path
+            of the P2TR envelope. Raises `ValueError` if the wallet is
+            locked and the necessary pubkey has not yet been generated.
+        """
+        return _make_graftap_committed_script(self.get_pubkey(nonce, child_nonce))
 
     def get_p2gt_witness_keyspend(
             self, nonce: int, txn: 'Txn', coin: 'Coin',
             child_nonce: int|None = None, sigflags = 'fa'
         ) -> Script:
-        """..."""
+        """Generate the pay-to-graftap keyspend witness for the given
+            `nonce` and `child_nonce`. This is indistinguishable from
+            any other P2TR keyspend witness. Raises `ValueError` if the
+            wallet is locked. Default sigflags commit to just sigfield1
+            (input hash) and sigfield3 (hash of all output hashes).
+        """
         return make_graftap_witness_keyspend(
             self.get_seed(nonce, child_nonce),
             txn.runtime_cache(coin),
@@ -510,7 +556,20 @@ class Wallet(HashedModel):
             self, nonce: int, surrogate_script: Script,
             child_nonce: int|None = None, sigflags = 'fa'
         ) -> Script:
-        """..."""
+        """Generate the pay-to-taproot scriptspend witness for the given
+            `nonce` and `child_nonce`, which supplies the committed P2GR
+            script and internal pubkey to unlock the P2TR envelope's
+            scriptspend path, as well as the P2GR surrogate script and
+            signature. This is slightly different from raw P2GR in that
+            the control boolean is excluded since keyspend is handled by
+            the P2TR envelope. Raises `ValueError` if the wallet is
+            locked. Default sigflags commit to just sigfield1 (input
+            hash) and sigfield3 (all outputs). Note that any constraints
+            within the surrogate script must be satisfied externally to
+            this method call -- this only authorizes and prepares the
+            execution of the surrogate script via the scriptspend path
+            of the P2TR envelope.
+        """
         return make_graftap_witness_scriptspend(
             self.get_seed(nonce, child_nonce),
             surrogate_script

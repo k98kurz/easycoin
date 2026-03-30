@@ -9,6 +9,7 @@ from easycoin.cui.helpers import format_balance, truncate_text
 from easycoin.cui.screens.transactions.new_txn.data import TransactionData, Witness
 from easycoin.cui.widgets import ECTextArea
 from easycoin.models import Address, Output, Wallet
+import packify
 
 
 class EditWitnessModal(ModalScreen[bool|None]):
@@ -45,18 +46,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
 
             with Vertical(classes="h-3 my-1"):
                 yield Static("Input Details:", classes="text-bold")
-                truncated_id = truncate_text(
-                    self.output.id, prefix_len=8, suffix_len=4
-                )
-                amount_str = format_balance(
-                    self.output.coin.amount, exact=True
-                )
-                lock_type = Wallet.get_lock_type(self.output.coin.lock)
-                yield Static(
-                    f"ID: {truncated_id} | Amount: {amount_str} | "
-                    f"Lock Type: {lock_type}",
-                    classes="text-muted"
-                )
+                yield Static("...", id="input_info", classes="text-muted")
 
             with Vertical(classes="h-3 mb-1"):
                 yield Static("Address:", classes="text-bold")
@@ -140,6 +130,12 @@ class EditWitnessModal(ModalScreen[bool|None]):
             if addr.lock == self.output.coin.lock:
                 self.is_known = True
                 self.address = addr
+                secrets = packify.unpack(
+                    self.app.wallet.decrypt(addr.secrets)
+                ) if addr else None
+                self.witness.lock_type = Wallet.get_lock_type(
+                    addr.lock, secrets
+                )
                 if self.witness.lock_type not in ("P2SH", "Unknown"):
                     self.requires_custom = False
                 if self.witness.lock_type == "P2TR":
@@ -152,6 +148,17 @@ class EditWitnessModal(ModalScreen[bool|None]):
         decompiled = Script.from_bytes(self.output.coin.lock).src
         self.query_one("#decompiled_lock").text = decompiled
         scriptspend, generated, custom = False, '', ''
+
+        truncated_id = truncate_text(
+            self.output.id, prefix_len=8, suffix_len=4
+        )
+        amount_str = format_balance(
+            self.output.coin.amount, exact=True
+        )
+        self.query_one("#input_info").update(
+            f"ID: {truncated_id} | Amount: {amount_str} | "
+            f"Lock Type: {self.witness.lock_type}",
+        )
 
         if self.is_known:
             self.query_one("#address_known_status").update("From wallet")
@@ -260,7 +267,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                 )
         elif self.witness.lock_type == "P2GT":
             if self.witness.scriptspend:
-                self.witness.generated = self.app.wallet.get_p2gt_scriptspend(
+                self.witness.generated = self.app.wallet.get_p2gt_witness_scriptspend(
                     self.address.nonce, self.witness.custom,
                     child_nonce=self.address.child_nonce,
                 )

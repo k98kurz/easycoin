@@ -12,6 +12,7 @@ from easycoin.models import Wallet, Address, Coin
 from .export_address_modal import ExportAddressModal
 from .import_address_modal import ImportAddressModal
 from .make_address_modal import MakeAddressModal
+import packify
 
 
 class WalletDetailModal(Screen):
@@ -450,7 +451,10 @@ class WalletDetailModal(Screen):
         self._row_map = {}
         address_book = self._get_address_book()
         for status, address_hex, balance, count, addr in address_book:
-            lock_type = Wallet.get_lock_type(Address.parse(address_hex))
+            secrets = packify.unpack(
+                self.app.wallet.decrypt(addr.secrets)
+            ) if addr else None
+            lock_type = Wallet.get_lock_type(Address.parse(address_hex), secrets)
             row_key = table.add_row(
                 str(count),
                 str(balance),

@@ -3,9 +3,9 @@ from textual.app import ComposeResult
 from textual.containers import VerticalScroll, Vertical
 from textual.widgets import Static, DataTable
 from textual.widgets.data_table import RowKey
-
 from easycoin.cui.helpers import format_balance, truncate_text
-from easycoin.models import Output, Wallet
+from easycoin.models import Address, Output, Wallet
+import packify
 
 
 class SelectInputsContainer(Vertical):
@@ -71,11 +71,15 @@ class SelectInputsContainer(Vertical):
             ).get()
 
             for output in outputs:
+                addr = Address.query().equal('lock', output.coin.lock).first()
+                secrets = packify.unpack(
+                    self.app.wallet.decrypt(addr.secrets)
+                ) if addr else None
                 try:
                     row_key = table.add_row(
                         truncate_text(output.id, prefix_len=8, suffix_len=4),
                         format_balance(output.coin.amount, exact=True),
-                        Wallet.get_lock_type(output.coin.lock),
+                        Wallet.get_lock_type(output.coin.lock, secrets),
                         ("✓" if output.id in [
                             o.id for o in self.txn_data.selected_inputs
                         ] else " "),

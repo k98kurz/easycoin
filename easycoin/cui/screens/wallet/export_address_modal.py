@@ -42,12 +42,18 @@ class ExportAddressModal(Screen):
 
             yield Static(f"Address: {self.address.hex}", classes="text-bold mt-1")
 
-            with Horizontal(id="secrets_container", classes="mt-1 h-3"):
-                yield Checkbox(
-                    "Show Secrets",
-                    id="show_secrets_checkbox",
-                    value=False
-                )
+            with Horizontal(id="secrets_container", classes="mt-1 h-8"):
+                with Vertical(classes="h-7 w-20p"):
+                    yield Static(
+                        "Nonce: ...", id="nonce_display", classes="mb-1"
+                    )
+                    yield Static(
+                        "Child nonce: ", id="child_nonce_display",
+                        classes="mb-1"
+                    )
+                    yield Checkbox(
+                        "Show Secrets", id="show_secrets_checkbox", value=False
+                    )
                 yield TextArea(
                     "", read_only=True, show_line_numbers=False, soft_wrap=True,
                     id="secrets_display", classes="hidden",
@@ -111,6 +117,10 @@ class ExportAddressModal(Screen):
         yield Footer()
 
     def on_mount(self):
+        self.query_one("#nonce_display").update(f"Nonce: {self.address.nonce}")
+        self.query_one("#child_nonce_display").update(
+            f"Child nonce: {self.address.child_nonce}"
+        )
         if self.address.committed_script:
             self.query_one("#committed_script_container").remove_class("hidden")
             self.query_one("#committed_script_display").text = (
@@ -195,13 +205,13 @@ class ExportAddressModal(Screen):
             secrets_display = self.query_one("#secrets_display")
 
             if event.value:
-                secrets_container.remove_class("h-3")
+                secrets_container.remove_class("h-8")
                 secrets_container.add_class("h-10")
                 secrets_display.remove_class("hidden")
                 self._populate_secrets()
             else:
                 secrets_container.remove_class("h-10")
-                secrets_container.add_class("h-3")
+                secrets_container.add_class("h-8")
                 secrets_display.add_class("hidden")
 
     def _populate_secrets(self) -> None:

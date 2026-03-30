@@ -11,6 +11,7 @@ from easycoin.cui.screens.transactions.new_txn.edit_witness_modal import (
     EditWitnessModal
 )
 from easycoin.models import Output, Wallet, Coin, Txn, Address
+import packify
 
 
 class WitnessInputsContainer(Vertical):
@@ -92,7 +93,11 @@ class WitnessInputsContainer(Vertical):
                 truncated_id = truncate_text(
                     output.id, prefix_len=8, suffix_len=4
                 )
-                lock_type = Wallet.get_lock_type(output.coin.lock)
+                addr = Address.query({'lock': output.coin.lock}).first()
+                secrets = packify.unpack(
+                    self.app.wallet.decrypt(addr.secrets)
+                ) if addr else None
+                lock_type = Wallet.get_lock_type(output.coin.lock, secrets)
                 witness_len = self._get_witness_len(output)
                 witness_len_str = str(witness_len) if witness_len > 0 else "-"
                 address = Address({'lock': output.coin.lock}).hex
