@@ -66,8 +66,8 @@ class WitnessInputsContainer(Vertical):
     def _get_witness_len(self, output: Output) -> int:
         """Get witness script length for an output."""
         try:
-            if output.id in self.txn_data.witness_scripts:
-                return len(self.txn_data.witness_scripts[output.id].bytes)
+            if output.id in self.txn_data.witnesses:
+                return len(self.txn_data.witnesses[output.id].full().bytes)
         except Exception:
             pass
         return 0
@@ -117,8 +117,7 @@ class WitnessInputsContainer(Vertical):
             missing_count = 0
             for output in self.txn_data.selected_inputs:
                 try:
-                    coin_id_bytes = output.coin.id_bytes
-                    if coin_id_bytes not in self.txn_data.witness_scripts:
+                    if output.id not in self.txn_data.witnesses:
                         missing_count += 1
                 except Exception:
                     missing_count += 1
@@ -132,56 +131,6 @@ class WitnessInputsContainer(Vertical):
         except Exception as e:
             self.app.log_event(f"Witness validation error: {e}", "ERROR")
             return False, "Failed to validate witness scripts"
-
-    def _generate_witnesses(self) -> dict[bytes, bytes]:
-        """Generate witness scripts for all selected inputs."""
-        witnesses = {}
-        txn = self.txn_data.txn
-
-        if not txn:
-            self.app.log_event("Transaction not reconstructed", "ERROR")
-            return witnesses
-
-        for output in self.txn_data.selected_inputs:
-            coin = output.coin
-            coin_id_bytes = coin.id_bytes
-
-            is_known = coin.lock.hex() in self.addresses
-
-            if not is_known:
-                continue
-
-            addr = self.addresses[coin.lock.hex()]
-            try:
-                lock_type = Wallet.get_lock_type(coin.lock)
-                if lock_type == "P2PK":
-                    witness_script = self.app.wallet.get_p2pk_witness(
-                        nonce=addr.nonce, txn=txn, coin=coin,
-                        child_nonce=addr.child_nonce,
-                    )
-                elif lock_type == "P2PKH":
-                    witness_script = self.app.wallet.get_p2pkh_witness(
-                        nonce=addr.nonce, txn=txn, coin=coin,
-                        child_nonce=addr.child_nonce,
-                    )
-                elif lock_type == "P2TR":
-                    witness_script = (
-                        self.app.wallet.get_p2tr_witness_keyspend(
-                            nonce=addr.nonce, txn=txn, coin=coin,
-                            child_nonce=addr.child_nonce,
-                        )
-                    )
-                else:
-                    witness_script = Script.from_src('true')
-
-                witnesses[coin_id_bytes] = witness_script.bytes
-            except Exception as e:
-                self.app.log_event(
-                    f"Error processing witness for {output.id}: {e}",
-                    "ERROR"
-                )
-
-        return witnesses
 
     @on(DataTable.RowSelected, "#inputs_table")
     @on(Button.Pressed, "#btn_edit_witness")
