@@ -36,6 +36,7 @@ class WalletDetailModal(Screen):
         self.selected_address = None
         self._row_map = {}
         self._row_coin_count = {}
+        self.balance = 0
 
     def compose(self) -> ComposeResult:
         """Compose wallet detail modal layout."""
@@ -90,7 +91,7 @@ class WalletDetailModal(Screen):
 
     def on_mount(self) -> None:
         """Populate wallet info and address book table on mount."""
-        table = self.query_one(DataTable)
+        table = self.query_one("#address_book")
         table.cursor_type = "row"
         self._load_wallet_data()
         table.focus()
@@ -102,36 +103,19 @@ class WalletDetailModal(Screen):
             self.app.pop_screen()
             return
 
-        self.query_one("#wallet_id_display", Static).update(
-            self.app.wallet.id
-        )
+        self.query_one("#wallet_id_display").update(self.app.wallet.id)
 
         wallet_name = self.app.wallet.name if self.app.wallet.name else "<unnamed>"
-        self.query_one("#wallet_name_display", Static).update(
-            wallet_name
-        )
+        self.query_one("#wallet_name_display").update(wallet_name)
 
-        balance = self._get_wallet_balance(self.app.wallet)
-        self.query_one("#wallet_balance", Static).update(
-            format_balance(balance)
-        )
-
-        status_static = self.query_one("#wallet_status", Static)
-        if self.app.wallet.is_locked:
-            status_static.update("Locked")
-            status_static.remove_class("status-ok")
-            status_static.add_class("status-warning")
-        else:
-            status_static.update("Unlocked")
-            status_static.remove_class("status-warning")
-            status_static.add_class("status-ok")
-
-        self._set_button_visibility()
-
-        table = self.query_one("#address_book", DataTable)
+        table = self.query_one("#address_book")
         table.add_columns("Coins", "Balance", "Status", "Lock Type", "Address")
-
         self._refresh_address_book()
+
+        self.query_one("#wallet_balance").update(format_balance(self.balance))
+
+        self._set_status()
+        self._set_button_visibility()
 
     def action_toggle_lock(self) -> None:
         if not self.app.wallet:
@@ -185,8 +169,8 @@ class WalletDetailModal(Screen):
 
             self.app.log_event(f"Wallet unlocked: {self.app.wallet.id[:16]}...", "INFO")
             self._set_button_visibility()
-            self._refresh_data()
-            self._update_selection_for_cursor()
+            self._set_status()
+            self.on_data_table_row_highlighted()
 
         modal_description = f"Wallet: '{self.app.wallet.name}' ({self.app.wallet.id})"
         self.app.push_screen(
@@ -207,11 +191,11 @@ class WalletDetailModal(Screen):
         self.app.wallet.lock()
         self.app.log_event("Wallet locked", "INFO")
         self.selected_address = None
-        self.query_one("#btn_export_address", Button).disabled = True
-        self.query_one("#btn_copy_address", Button).disabled = True
-        self.query_one("#btn_delete_address", Button).disabled = True
+        self.query_one("#btn_export_address").disabled = True
+        self.query_one("#btn_copy_address").disabled = True
+        self.query_one("#btn_delete_address").disabled = True
         self._set_button_visibility()
-        self._refresh_status()
+        self._set_status()
 
     @on(Button.Pressed, "#btn_make_address")
     def action_make_address(self) -> None:
@@ -242,7 +226,7 @@ class WalletDetailModal(Screen):
             self.app.notify("No address selected", severity="warning")
             return
 
-        table = self.query_one("#address_book", DataTable)
+        table = self.query_one("#address_book")
         cursor = table.cursor_coordinate
         if cursor is None:
             return
@@ -285,27 +269,20 @@ class WalletDetailModal(Screen):
         self.app.push_screen(modal, confirm_delete)
 
     def on_data_table_row_highlighted(
-            self, event: DataTable.RowHighlighted
+            self, event: DataTable.RowHighlighted | None = None
         ) -> None:
-        """Handle row highlight in address book table."""
-        self._update_selection_for_cursor(event.row_key)
-
-    def _update_selection_for_cursor(self, row_key: RowKey|None = None) -> None:
-        """Update selection and button states based on cursor position."""
+        """Handle row highlight in address book table: update selection
+            and button states based on cursor position.
+        """
+        row_key = event.row_key if event else None
         if row_key is None:
-            table = self.query_one("#address_book", DataTable)
+            table = self.query_one("#address_book")
             cursor = table.cursor_coordinate
             if cursor is None:
                 self.selected_address = None
-                self.query_one(
-                    "#btn_export_address", Button
-                ).disabled = True
-                self.query_one(
-                    "#btn_copy_address", Button
-                ).disabled = True
-                self.query_one(
-                    "#btn_delete_address", Button
-                ).disabled = True
+                self.query_one("#btn_export_address").disabled = True
+                self.query_one("#btn_copy_address").disabled = True
+                self.query_one("#btn_delete_address").disabled = True
                 return
             row_key = table.coordinate_to_cell_key(cursor).row_key
 
@@ -314,75 +291,19 @@ class WalletDetailModal(Screen):
         has_coins = row_key in self._row_coin_count and self._row_coin_count[row_key] > 0
         if is_known and is_unlocked:
             self.selected_address = self._row_map[row_key]
-            self.query_one(
-                "#btn_export_address", Button
-            ).disabled = False
-            self.query_one(
-                "#btn_copy_address", Button
-            ).disabled = False
-            self.query_one(
-                "#btn_delete_address", Button
-            ).disabled = has_coins
+            self.query_one("#btn_export_address").disabled = False
+            self.query_one("#btn_copy_address").disabled = False
+            self.query_one("#btn_delete_address").disabled = has_coins
         else:
             self.selected_address = None
-            self.query_one(
-                "#btn_export_address", Button
-            ).disabled = True
-            self.query_one(
-                "#btn_copy_address", Button
-            ).disabled = True
-            self.query_one(
-                "#btn_delete_address", Button
-            ).disabled = True
-
-    def _get_address_book(
-            self
-        ) -> list[tuple[str, str, int, int, Address|None]]:
-        """Build address book from wallet's addresses and coins. Returns
-            a list of (status, address_hex, balance, count, address_or_none)
-            tuples. Known addresses get ✓ status, unrecognized coin locks
-            get ? status with None as the address object.
-        """
-        entries = []
-        known_locks = set()
-
-        try:
-            self.app.wallet.addresses().reload()
-        except Exception as e:
-            self.app.log_event(f"Error querying addresses: {e}", "ERROR")
-            return
-
-        for address in self.app.wallet.addresses:
-            known_locks.add(address.lock)
-            balance = 0
-            count = 0
-            for coin in address.coins().get():
-                balance += coin.amount
-                count += 1
-            entries.append(
-                ('✓', address.hex, balance, count, address)
-            )
-
-        for coin in Coin.query({'wallet_id': self.app.wallet.id}).get():
-            if coin.lock in known_locks:
-                continue
-            known_locks.add(coin.lock)
-            address_hex = Address({'lock': coin.lock}).hex
-            entries.append(('?', address_hex, coin.amount, 1, None))
-
-        return entries
-
-    def _get_wallet_balance(self, wallet) -> int:
-        """Get total balance for a wallet by summing the amounts of all
-            coins owned by this wallet (any address).
-        """
-        wallet.coins().reload()
-        return sum([c.amount for c in wallet.coins])
+            self.query_one("#btn_export_address").disabled = True
+            self.query_one("#btn_copy_address").disabled = True
+            self.query_one("#btn_delete_address").disabled = True
 
     def _set_status(self) -> None:
         """Set wallet status display."""
         status = "Locked" if self.app.wallet.is_locked else "Unlocked"
-        status_static = self.query_one("#wallet_status", Static)
+        status_static = self.query_one("#wallet_status")
         status_static.update(status)
         if status == "Locked":
             status_static.remove_class("status-ok")
@@ -399,54 +320,78 @@ class WalletDetailModal(Screen):
             return
 
         if self.app.wallet.is_locked:
-            self.query_one("#btn_lock", Button).display = "none"
-            self.query_one("#btn_unlock", Button).display = "block"
-            self.query_one("#btn_make_address", Button).disabled = True
-            self.query_one("#btn_import_address", Button).disabled = True
+            self.query_one("#btn_lock").display = "none"
+            self.query_one("#btn_unlock").display = "block"
+            self.query_one("#btn_make_address").disabled = True
+            self.query_one("#btn_import_address").disabled = True
         else:
-            self.query_one("#btn_lock", Button).display = "block"
-            self.query_one("#btn_unlock", Button).display = "none"
-            self.query_one("#btn_make_address", Button).disabled = False
-            self.query_one("#btn_import_address", Button).disabled = False
+            self.query_one("#btn_lock").display = "block"
+            self.query_one("#btn_unlock").display = "none"
+            self.query_one("#btn_make_address").disabled = False
+            self.query_one("#btn_import_address").disabled = False
 
-    def _refresh_data(self) -> None:
-        """Refresh wallet data displays after unlock."""
-        if not self.app.wallet:
+    def _get_address_book(
+            self
+        ) -> list[tuple[str, str, int, int, Address|None]]:
+        """Build address book from wallet's addresses and coins. Returns
+            a list of (status, address_hex, balance, count, address_or_none)
+            tuples. Known addresses get ✓ status, unrecognized coin locks
+            get ? status with None as the address object.
+        """
+        entries = []
+        known_locks = set()
+        self.balance = 0
+
+        try:
+            self.app.wallet.addresses().reload()
+        except Exception as e:
+            self.app.log_event(f"Error querying addresses: {e}", "ERROR")
             return
 
-        self._set_status()
-        balance = self._get_wallet_balance(self.app.wallet)
-        self.query_one("#wallet_balance", Static).update(
-            f"Balance: {format_balance(balance)}"
-        )
+        for address in self.app.wallet.addresses:
+            known_locks.add(address.lock)
+            balance = 0
+            count = 0
+            for coin in address.coins().equal(spent=False).get():
+                balance += coin.amount
+                count += 1
+            entries.append(
+                ('✓', address.hex, balance, count, address)
+            )
+            self.balance += balance
 
-    def _refresh_status(self) -> None:
-        """Refresh wallet status display and lock/unlock buttons."""
-        if not self.app.wallet:
-            return
+        for coin in Coin.query({
+                'wallet_id': self.app.wallet.id,
+                'spent': False,
+            }).get():
+            if coin.lock in known_locks:
+                continue
+            known_locks.add(coin.lock)
+            balance = coin.amount
+            for coin2 in Coin.query({
+                    'lock': coin.lock,
+                    'spent': False,
+                }).not_equal('id', coin.id).get():
+                balance += coin2.amount
+            address_hex = Address({'lock': coin.lock}).hex
+            entries.append(
+                ('?', address_hex, balance, 1, None)
+            )
+            self.balance += balance
 
-        status_static = self.query_one("#wallet_status", Static)
-        if self.app.wallet.is_locked:
-            status_static.update("Locked")
-            status_static.remove_class("status-ok")
-            status_static.add_class("status-warning")
-        else:
-            status_static.update("Unlocked")
-            status_static.remove_class("status-warning")
-            status_static.add_class("status-ok")
-        self._set_button_visibility()
+        return entries
 
     def _refresh_address_book(self) -> None:
         """Refresh the address book table."""
-        table = self.query_one("#address_book", DataTable)
+        table = self.query_one("#address_book")
         table.clear()
         self._row_map = {}
         self.selected_address = None
 
         # Disable selection-dependent buttons
-        self.query_one("#btn_export_address", Button).disabled = True
-        self.query_one("#btn_copy_address", Button).disabled = True
-        self.query_one("#btn_delete_address", Button).disabled = True
+        self.query_one("#btn_export_address").disabled = True
+        self.query_one("#btn_copy_address").disabled = True
+        self.query_one("#btn_delete_address").disabled = True
 
         self._row_map = {}
         address_book = self._get_address_book()
@@ -457,7 +402,7 @@ class WalletDetailModal(Screen):
             lock_type = Wallet.get_lock_type(Address.parse(address_hex), secrets)
             row_key = table.add_row(
                 str(count),
-                str(balance),
+                format_balance(balance),
                 status,
                 lock_type,
                 address_hex if len(address_hex) < 100 else truncate_text(

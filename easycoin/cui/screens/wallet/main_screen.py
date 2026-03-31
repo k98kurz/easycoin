@@ -283,7 +283,7 @@ class WalletListScreen(BaseScreen):
         """
         total = 0
         try:
-            for coin in Coin.query({'wallet_id': wallet.id}).get():
+            for coin in Coin.query({'wallet_id': wallet.id, 'spent': False}).get():
                 total += coin.amount
         except Exception as e:
             self.log_event(f"Error calculating wallet balance: {e}", "ERROR")
