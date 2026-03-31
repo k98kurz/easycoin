@@ -115,7 +115,7 @@ class CoinsScreen(BaseScreen):
                     coin.id,
                     format_balance(coin.amount),
                     Wallet.get_lock_type(coin.lock),
-                    "Available",
+                    "Spent" if coin.spent else "Unspent",
                     self._get_network_name(coin.net_id)
                 )
             except Exception as e:

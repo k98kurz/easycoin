@@ -170,11 +170,17 @@ class NewTransactionModal(ModalScreen):
         status, msg = step_4.validate_step()
 
         if not status:
+            self.app.log_event(f"New Txn Step 4 failed: {msg}", "WARNING")
             return self.app.notify(msg, severity="warning")
 
         utxoset = UTXOSet()
         txn = self.txn_data.txn
         if not utxoset.can_apply(txn):
+            self.app.log_event(
+                "Txn is invalid: it cannot be applied to the UTXO set "
+                "(double spend?)",
+                "ERROR"
+            )
             return self.app.notify(
                 "Txn is invalid: it cannot be applied to the UTXO set "
                 "(double spend?)",
@@ -186,6 +192,17 @@ class NewTransactionModal(ModalScreen):
             with redirect_stdout(buf):
                 txn.validate("New Txn Modal")
             debug_output = buf.getvalue().strip()
+            self.app.log_event(
+                f"Txn failed validation:\n{debug_output}",
+                "ERROR"
+            )
+            self.app.log_event(f"{txn.data=}", "DEBUG")
+            txn_witness = {
+                k.hex(): v.hex()
+                for k,v in txn.witness.items()
+            }
+            self.app.log_event(f"{txn_witness=}", "DEBUG")
+            self.app.log_event(f"{self.txn_data=}", "DEBUG")
             return self.app.notify(
                 f"Txn failed validation:\n{debug_output}",
                 severity="error"
