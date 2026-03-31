@@ -6,7 +6,7 @@ from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
 from easycoin.cui.helpers import format_balance
 from easycoin.cui.screens.transactions.edit_output_modal import EditOutputModal
-from easycoin.cui.helpers import estimate_fee_for_witness
+from easycoin.cui.helpers import estimate_fee_for_witness, truncate_text
 from easycoin.models import Address, Coin, Txn, Wallet
 
 
@@ -71,14 +71,16 @@ class AddOutputsContainer(Vertical):
                 ("Amount (EC⁻¹)", "amount"),
                 ("Data Size", "data_size"),
                 ("Address", "address"),
+                ("Output ID", "output_id"),
             )
         table.cursor_type = "row"
 
         for i, coin in enumerate(self.txn_data.new_output_coins):
             table.add_row(
                 format_balance(coin.amount, exact=True),
-                len(coin.data.get('details', b'')),
+                len(coin.data.get('details', None) or b''),
                 Address({'lock': coin.lock}).hex,
+                truncate_text(coin.id),
                 key=i
             )
 
@@ -90,10 +92,11 @@ class AddOutputsContainer(Vertical):
             total_output += coin.amount
 
         self.txn_data.fee = Txn.minimum_fee(self.txn_data.txn)
-        for o in self.txn_data.selected_inputs:
-            self.txn_data.fee += estimate_fee_for_witness(
-                Wallet.get_lock_type(o.coin.lock)
-            )
+        if len(self.txn_data.txn.witness) == 0:
+            for o in self.txn_data.selected_inputs:
+                self.txn_data.fee += estimate_fee_for_witness(
+                    Wallet.get_lock_type(o.coin.lock)
+                )
         actual_burn = total_input - total_output
         summary = self.query_one("#output_summary")
         summary.update(
@@ -131,9 +134,14 @@ class AddOutputsContainer(Vertical):
                 amount=result['amount'],
             )
             coin.id = coin.generate_id(coin.data)
+            coin.wallet_id = self.app.wallet.id
             self.txn_data.txn.output_ids = [
-                *self.txn_data.txn.output_ids,
                 coin.id,
+                *self.txn_data.txn.output_ids,
+            ]
+            self.txn_data.txn.outputs = [
+                coin,
+                *self.txn_data.txn.outputs,
             ]
             self.txn_data.new_output_coins.append(coin)
             self.refresh_table()
@@ -170,9 +178,14 @@ class AddOutputsContainer(Vertical):
                 coin.lock = Address.parse(result['address'])
                 coin.amount = result['amount']
                 coin.id = coin.generate_id(coin.data)
+                coin.wallet_id = self.app.wallet.id
                 self.txn_data.txn.output_ids = [
                     coin.id,
                     *[oid for oid in self.txn_data.txn.output_ids if oid != prev_id],
+                ]
+                self.txn_data.txn.outputs = [
+                    coin,
+                    *[c for c in self.txn_data.txn.outputs if c.id != prev_id],
                 ]
                 self.refresh_table()
                 self.update_summary()

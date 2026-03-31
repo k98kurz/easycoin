@@ -1,13 +1,13 @@
+from contextlib import redirect_stdout
+from io import StringIO
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll, Vertical, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static, Footer
-
 from easycoin.models import Txn, Coin, Address
 from easycoin.UTXOSet import UTXOSet
-
 from easycoin.cui.screens.transactions.new_txn.data import TransactionData
 from easycoin.cui.screens.transactions.new_txn.step_1 import SelectInputsContainer
 from easycoin.cui.screens.transactions.new_txn.step_2 import AddOutputsContainer
@@ -135,28 +135,23 @@ class NewTransactionModal(ModalScreen):
     @on(Button.Pressed, "#btn_submit")
     def action_submit(self) -> None:
         """Submit transaction."""
-        try:
-            if not self.app.wallet:
-                self.app.notify("No wallet loaded", severity="error")
-                return
+        if not self.app.wallet:
+            self.app.notify("No wallet loaded", severity="error")
+            return
 
-            if self.app.wallet.is_locked:
-                self.app.notify("Wallet must be unlocked", severity="error")
-                return
+        if self.app.wallet.is_locked:
+            self.app.notify("Wallet must be unlocked", severity="error")
+            return
 
-            if not self.txn_data.selected_inputs:
-                self.app.notify("No inputs selected", severity="error")
-                return
+        if not self.txn_data.selected_inputs:
+            self.app.notify("No inputs selected", severity="error")
+            return
 
-            if not self.txn_data.new_output_coins:
-                self.app.notify("No outputs specified", severity="error")
-                return
+        if not self.txn_data.new_output_coins:
+            self.app.notify("No outputs specified", severity="error")
+            return
 
-            self._validate_and_submit_transaction()
-
-        except Exception as e:
-            self.app.log_event(f"Error submitting transaction: {e}", "ERROR")
-            self.app.notify(f"Error: {e}", severity="error")
+        self._validate_and_submit_transaction()
 
     @on(Button.Pressed, "#btn_cancel")
     def action_cancel(self) -> None:
@@ -168,9 +163,56 @@ class NewTransactionModal(ModalScreen):
 
     def _validate_and_submit_transaction(self) -> None:
         """Validate and submit the transaction."""
-        return
+        self.txn_data.txn.set_timestamp()
+        step_4 = self.query_one(f"#step_4_container")
+        status, msg = step_4.validate_step()
+
+        if not status:
+            return self.app.notify(msg, severity="warning")
+
+        utxoset = UTXOSet()
+        txn = self.txn_data.txn
+        if not utxoset.can_apply(txn):
+            return self.app.notify(
+                "Txn is invalid: it cannot be applied to the UTXO set "
+                "(double spend?)",
+                severity="error"
+            )
+
+        if not txn.validate():
+            buf = StringIO()
+            with redirect_stdout(buf):
+                txn.validate("New Txn Modal")
+            debug_output = buf.getvalue().strip()
+            return self.app.notify(
+                f"Txn failed validation:\n{debug_output}",
+                severity="error"
+            )
+
+        # persist new coins to database
+        for coin in self.txn_data.new_output_coins:
+            coin.save()
+
+        # mark coins as spent
+        for coin in txn.inputs:
+            coin.spent = True
+            coin.save()
+
+        # persist txn and changes to UTXOSet
+        txn.save()
+        utxoset.apply(
+            self.txn_data.txn,
+            {c.id: c for c in self.txn_data.new_output_coins}
+        )
+
+        self.app.notify(
+            "Txn has been validated and changes saved to database. "
+            "@todo network stuff"
+        )
+        self.app.log_event(
+            f"Txn persisted to database: {txn.id}",
+            "INFO"
+        )
+
         self.dismiss()
 
-#        except Exception as e:
-#            self.app.log_event(f"Error in validation: {e}", "ERROR")
-#            self.app.notify(f"Error: {e}", severity="error")

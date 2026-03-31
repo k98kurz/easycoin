@@ -1,11 +1,12 @@
+from textual import on
 from textual.app import ComposeResult
-from textual.containers import Vertical
-from textual.widgets import Static
-
+from textual.containers import VerticalScroll
+from textual.widgets import Static, DataTable
 from easycoin.cui.helpers import format_balance, truncate_text
+from easycoin.models import Address
 
 
-class ReviewSubmitContainer(Vertical):
+class ReviewSubmitContainer(VerticalScroll):
     """Step 4: Review and submit transaction."""
 
     def __init__(self, txn_data, **kwargs):
@@ -14,95 +15,139 @@ class ReviewSubmitContainer(Vertical):
 
     def compose(self) -> ComposeResult:
         """Compose Step 4: Review and submit."""
-        with Vertical(id="review_summary", classes="h-min-20"):
-            yield Static("Transaction Summary:", classes="text-bold mb-1")
+        yield Static(
+            "[bold]Step 4 of 4: Review & Submit[/bold]\n\n"
+            "Review all details before submitting.",
+            classes="mb-1"
+        )
 
-            yield Static("Inputs:", classes="text-bold")
-            yield Static(
-                "Loading inputs...", id="review_inputs", classes="mb-1 text-muted"
-            )
+        yield Static("Inputs:", classes="text-bold mb-1")
+        yield DataTable(
+            id="review_inputs_table", classes="h-min-10 mb-1"
+        )
 
-            yield Static("")
+        yield Static("Outputs:", classes="text-bold mb-1")
+        yield DataTable(
+            id="review_outputs_table", classes="h-min-8 mb-1"
+        )
 
-            yield Static("Outputs:", classes="text-bold")
-            yield Static(
-                "Loading outputs...", id="review_outputs", classes="mb-1 text-muted"
-            )
-
-            yield Static("")
-
-            yield Static("Fee:", classes="text-bold")
-            yield Static("Loading fee...", id="review_fee", classes="mb-1")
-            yield Static("")
-
-            yield Static("Status:", classes="text-bold")
-            yield Static(
-                "Ready to submit. Please review all details above.",
-                classes="mb-1"
-            )
+        yield Static("Fee:", classes="text-bold mb-1")
+        yield Static(
+            "Minimum Fee: ... | Actual Fee Burn: ...",
+            id="review_fee",
+            classes="mb-1"
+        )
 
     def on_show(self) -> None:
         """Build review summary when step becomes visible."""
+        self._setup_tables()
         self.refresh_summary()
 
-    def validate_step(self) -> tuple[bool, str]:
-        """Validate step before submission."""
-        return True, ""
+    def _setup_tables(self) -> None:
+        """Set up table columns and cursor type."""
+        inputs_table = self.query_one("#review_inputs_table")
+        if len(inputs_table.columns) == 0:
+            inputs_table.add_columns(
+                ("Coin ID", "coin_id"),
+                ("Amount", "amount"),
+                ("Lock Type", "lock_type"),
+                ("Witness Size", "witness_size"),
+                ("Address", "address"),
+            )
+        inputs_table.cursor_type = "none"
+
+        outputs_table = self.query_one("#review_outputs_table")
+        if len(outputs_table.columns) == 0:
+            outputs_table.add_columns(
+                ("Amount", "amount"),
+                ("Address", "address"),
+            )
+        outputs_table.cursor_type = "none"
 
     def refresh_summary(self) -> None:
         """Refresh the review container with current transaction details."""
-        try:
-            review_inputs = self.query_one("#review_inputs")
-            review_outputs = self.query_one("#review_outputs")
-            review_fee = self.query_one("#review_fee")
+        inputs_table = self.query_one("#review_inputs_table")
+        outputs_table = self.query_one("#review_outputs_table")
+        fee_static = self.query_one("#review_fee")
 
-            review_inputs.remove_children()
-            review_outputs.remove_children()
+        # fill inputs table
+        total_in = 0
+        inputs_table.clear()
+        for output in self.txn_data.selected_inputs:
+            total_in += output.coin.amount
+            inputs_table.add_row(
+                truncate_text(output.coin.id),
+                format_balance(output.coin.amount, exact=True),
+                self.txn_data.witnesses[output.coin.id].lock_type,
+                len(self.txn_data.witnesses[output.coin.id].full().bytes),
+                Address({"lock": output.coin.lock}).hex,
+            )
 
-            if not self.txn_data.selected_outputs:
-                review_inputs.mount(
-                    Static("No inputs selected.", classes="mb-1 text-muted")
+        # fill outputs table
+        total_out = 0
+        outputs_table.clear()
+        for coin in self.txn_data.new_output_coins:
+            total_out += coin.amount
+            outputs_table.add_row(
+                format_balance(coin.amount, exact=True),
+                Address({"lock": coin.lock}).hex,
+            )
+
+        # set fee text
+        txn = self.txn_data.txn
+        actual_burn = total_in - total_out
+        fee_static.update(
+            f"Minimum Fee: {txn.minimum_fee(txn)} | Actual Fee Burn: {actual_burn}"
+        )
+
+    def _check_txn(self) -> tuple[bool, str]:
+        """Check if `txn_data.txn` has gone out-of-sync with the rest of
+            `txn_data`. Sanity check with debug messages.
+        """
+        status = True
+        issues = []
+
+        # ensure it has the correct inputs
+        for output in self.txn_data.selected_inputs:
+            if output.id not in self.txn_data.txn.input_ids:
+                status = False
+                issues.append(f"Txn missing selected input {output.id}")
+                self.app.log_event(
+                    f"Txn out of sync: missing selected input {output.id}",
+                    "DEBUG",
                 )
-            else:
-                for output in self.txn_data.selected_outputs:
-                    truncated_id = truncate_text(
-                        output.id, prefix_len=8, suffix_len=4
-                    )
-                    amount_str = format_balance(output.coin.amount, exact=True)
-                    input_str = f"  • {truncated_id} - {amount_str}"
-                    review_inputs.mount(Static(input_str, classes="mb-1"))
 
-            if not self.txn_data.outputs:
-                review_outputs.mount(
-                    Static("No outputs specified.", classes="mb-1 text-muted")
+        # ensure it has the correct witnesses
+        for coin_id, witness in self.txn_data.witnesses.items():
+            if bytes.fromhex(coin_id) not in self.txn_data.txn.witness:
+                status = False
+                issues.append(f"Txn missing witness for input {coin_id}")
+                self.app.log_event(
+                    f"Txn out of sync: missing witness for input {coin_id}",
+                    "DEBUG"
                 )
-            else:
-                for form in self.txn_data.outputs:
-                    address = form.get('address', 'N/A')
-                    amount = form.get('amount', '0')
-                    review_outputs.mount(
-                        Static(
-                            f"  • {address} - {amount} EC⁻¹",
-                            classes="mb-1"
-                        )
-                    )
-
-            total_input = sum(o.coin.amount for o in self.txn_data.selected_outputs)
-            total_output = 0
-            for form in self.txn_data.outputs:
-                try:
-                    total_output += int(form.get('amount', '0'))
-                except ValueError:
-                    pass
-            fee = max(0, total_input - total_output)
-
-            review_fee.remove_children()
-            review_fee.mount(Static(
-                f"  Estimated Fee: {format_balance(fee, exact=True)}", classes="mb-1"
-            ))
-        except Exception as e:
-            parent = self.app.screen if hasattr(self.app, 'screen') else None
-            if parent:
-                parent.app.log_event(
-                    f"Error refreshing review container: {e}", "ERROR"
+            elif self.txn_data.txn.witness[
+                    bytes.fromhex(coin_id)
+                ] != witness.full().bytes:
+                status = False
+                issues.append(f"Txn has incorrect witness for input {coin_id}")
+                self.app.log_event(
+                    f"Txn out of sync: incorrect witness for input {coin_id}",
+                    "DEBUG"
                 )
+
+        # ensure it has the correct outputs
+        for coin in self.txn_data.new_output_coins:
+            if coin.id not in self.txn_data.txn.output_ids:
+                status = False
+                self.app.log_event(
+                    f"Txn out of sync: missing new output coin {coin.id}",
+                    "DEBUG",
+                )
+
+        return status, "\n".join(issues)
+
+    def validate_step(self) -> tuple[bool, str]:
+        """Validate step before submission."""
+        return self._check_txn()
+

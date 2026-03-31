@@ -144,7 +144,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                 return
 
     def _update_ui(self) -> None:
-        addr_display = self.query_one("#address_hex").update(self.address.hex)
+        self.query_one("#address_hex").update(self.address.hex)
         decompiled = Script.from_bytes(self.output.coin.lock).src
         self.query_one("#decompiled_lock").text = decompiled
         scriptspend, generated, custom = False, '', ''

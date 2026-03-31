@@ -378,7 +378,7 @@ class Txn(HashedModel):
             input 'n' values.
         """
         return Script.from_src('''
-            # set some varibables #
+            # set some variables #
             get_value s"si_len" @= il 1
             get_value s"ii_msh" @= s 1
             get_value s"so_len" @= ol 1

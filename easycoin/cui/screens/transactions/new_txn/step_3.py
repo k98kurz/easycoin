@@ -25,7 +25,6 @@ class WitnessInputsContainer(Vertical):
         super().__init__(**kwargs)
         self.txn_data = txn_data
         self.row_keys: list[RowKey] = []
-        self.addresses: dict[str, str] = {}
         self.add_class("h-19")
 
     def compose(self) -> ComposeResult:
@@ -44,25 +43,11 @@ class WitnessInputsContainer(Vertical):
 
     def on_show(self) -> None:
         """Load inputs table when step becomes visible."""
-        self._load_addresses()
         self.refresh_table()
         try:
             self.query_one("#inputs_table").focus()
         except Exception:
             pass
-
-    def _load_addresses(self) -> None:
-        """Load wallet addresses for display in table."""
-        if not self.app.wallet or self.app.wallet.is_locked:
-            self.addresses.clear()
-            return
-
-        try:
-            self.addresses = {}
-            for address in self.app.wallet.addresses:
-                self.addresses[address.lock.hex()] = address.hex
-        except Exception as e:
-            self.app.log_event(f"Error loading addresses: {e}", "ERROR")
 
     def _get_witness_len(self, output: Output) -> int:
         """Get witness script length for an output."""

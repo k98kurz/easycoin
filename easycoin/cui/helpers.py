@@ -1,5 +1,5 @@
 from datetime import datetime
-from easycoin.models.errors import value_assert
+from easycoin.models.errors import type_assert, value_assert
 
 
 def format_balance(balance: int, exact: bool = False) -> str:
@@ -89,4 +89,35 @@ def estimate_fee_for_witness(lock_type: str, extra_script_len: int = 0) -> int:
             wlen = 64 + (2 + extra_script_len) + (2 + 41) + 34
 
     return wlen
+
+
+def sigflags_hex_to_ints(hex_sigflags: str) -> set[int]:
+    """Extract masked sigfield indices from hex sigflags. Raises
+        `TypeError` or `ValueError` for invalid input.
+    """
+    type_assert(isinstance(hex_sigflags, str), 'hex_sigflags must be str')
+    value_assert(len(hex_sigflags) == 2, 'hex_sigflags must be exactly 2 chars')
+
+    sig_flag = int.from_bytes(bytes.fromhex(hex_sigflags), 'big')
+    masked: set[int] = set()
+    for i in range(8):
+        if sig_flag & (1 << i):
+            masked.add(i + 1)
+    return masked
+
+
+def sigflags_ints_to_hex(sigfield_indices: set[int]) -> str:
+    """Convert masked sigfield indices to hex sigflags. Raises
+        `TypeError` or `ValueError` for invalid input.
+    """
+    type_assert(isinstance(sigfield_indices, set), 'sigfield_indices must be set')
+    value_assert(
+        all(isinstance(i, int) and 1 <= i <= 8 for i in sigfield_indices),
+        'sigfield_indices must contain only ints in range 1-8'
+    )
+
+    sig_flag = 0
+    for idx in sigfield_indices:
+        sig_flag |= 1 << (idx - 1)
+    return sig_flag.to_bytes(1, 'big').hex()
 

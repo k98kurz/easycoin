@@ -19,9 +19,10 @@ class Coin(HashedModel):
     id_column: str = 'id'
     columns: tuple[str] = (
         'id', 'timestamp', 'lock', 'amount', 'details', 'nonce',
-        'net_id', 'net_state', 'wallet_id', 'key_index1', 'key_index2'
+        'net_id', 'net_state', 'wallet_id', 'key_index1', 'key_index2',
+        'spent',
     )
-    columns_excluded_from_hash = ('wallet_id', 'key_index1', 'key_index2')
+    columns_excluded_from_hash = ('wallet_id', 'key_index1', 'key_index2', 'spent')
     id: str
     timestamp: int
     lock: bytes
@@ -33,6 +34,7 @@ class Coin(HashedModel):
     wallet_id: str|None
     key_index1: int|None
     key_index2: int|None
+    spent: bool|Default[False]
     origins: RelatedCollection
     spends: RelatedCollection
     wallet: RelatedModel

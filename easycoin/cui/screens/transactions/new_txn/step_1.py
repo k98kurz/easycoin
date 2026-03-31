@@ -120,21 +120,29 @@ class SelectInputsContainer(Vertical):
                     if o.id == event.row_key),
                 None
             )
+            txn = self.txn_data.txn
 
             if output:
                 if output in self.txn_data.selected_inputs:
                     self.txn_data.selected_inputs.remove(output)
-                    if output.id in self.txn_data.txn.input_ids:
-                        self.txn_data.txn.input_ids = [
-                            oid for oid in self.txn_data.txn.input_ids
+                    if output.id in txn.input_ids:
+                        txn.input_ids = [
+                            oid for oid in txn.input_ids
                             if oid != output.id
+                        ]
+                        txn.inputs = [
+                            i for i in txn.inputs if i.id != output.id
                         ]
                     table.update_cell(event.row_key, "selected", " ")
                 else:
                     self.txn_data.selected_inputs.append(output)
-                    if output.id not in self.txn_data.txn.input_ids:
-                        self.txn_data.txn.input_ids = [
-                            output.id, *self.txn_data.txn.input_ids
+                    if output.id not in txn.input_ids:
+                        txn.input_ids = [
+                            output.id, *txn.input_ids
+                        ]
+                        txn.inputs = [
+                            output.coin,
+                            *txn.inputs
                         ]
                     table.update_cell(event.row_key, "selected", "✓")
 
@@ -149,23 +157,3 @@ class SelectInputsContainer(Vertical):
             parent = self.app.screen if hasattr(self.app, 'screen') else None
             if parent:
                 parent.app.log_event(f"Error toggling selection: {e}", "ERROR")
-
-    def refresh_table(self) -> None:
-        """Refresh the inputs table to show current selections."""
-        try:
-            table = self.query_one("#inputs_table")
-            table.clear()
-
-            for output in self.txn_data.available_inputs:
-                is_selected = output in self.txn_data.selected_inputs
-                table.add_row(
-                    truncate_text(output.id, prefix_len=8, suffix_len=4),
-                    format_balance(output.coin.amount, exact=True),
-                    Wallet.get_lock_type(output.coin.lock),
-                    "✓" if is_selected else " ",
-                    key=output.id
-                )
-        except Exception as e:
-            parent = self.app.screen if hasattr(self.app, 'screen') else None
-            if parent:
-                parent.app.log_event(f"Error refreshing table: {e}", "ERROR")
