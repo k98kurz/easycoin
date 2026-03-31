@@ -12,6 +12,8 @@ class EditOutputModal(ModalScreen[dict|None]):
     """Modal for editing transaction outputs."""
 
     BINDINGS = [
+        Binding("0", "app.open_repl", "REPL"),
+        Binding("ctrl+e", "app.open_event_log", "Event Log"),
         Binding("ctrl+s", "save", "Save"),
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+q", "quit", "Quit"),

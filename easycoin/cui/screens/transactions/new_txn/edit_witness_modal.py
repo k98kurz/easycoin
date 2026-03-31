@@ -16,6 +16,8 @@ class EditWitnessModal(ModalScreen[bool|None]):
     """Modal for editing witness scripts for transaction inputs."""
 
     BINDINGS = [
+        Binding("0", "app.open_repl", "REPL"),
+        Binding("ctrl+e", "app.open_event_log", "Event Log"),
         Binding("ctrl+s", "save", "Save"),
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+q", "quit", "Quit"),

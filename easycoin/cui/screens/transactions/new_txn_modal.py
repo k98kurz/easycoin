@@ -19,6 +19,8 @@ class NewTransactionModal(ModalScreen):
     """Modal for creating new transactions."""
 
     BINDINGS = [
+        Binding("0", "app.open_repl", "REPL"),
+        Binding("ctrl+e", "app.open_event_log", "Event Log"),
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+b", "back", "Back"),
