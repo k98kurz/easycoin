@@ -218,7 +218,7 @@ class TestTxn(unittest.TestCase):
         assert t.validate()
 
     def test_validate_accepts_valid_mint_and_spend(self):
-        # first mine a coin and add it to the UTXO set
+        # first mine a coin and save it
         c1 = models.Coin.mine(SINGLE_SIG_LOCK)
         c1.save()
         t = models.Txn({'output_ids': c1.id, 'input_ids': ''})
@@ -311,7 +311,7 @@ class TestTxn(unittest.TestCase):
         tX.set_timestamp()
         assert tX.minimum_fee(tX) + sX.amount < s1.amount, \
             'test fails to reflect correct fee calculation'
-        assert not tX.validate(), 'mixing stamps with different msh should not validate'
+        assert not tX.validate(), 'mixing stamps with different dsh should not validate'
 
         # simple transfer should work
         s2 = models.Coin.stamp(

@@ -307,8 +307,8 @@ class Txn(HashedModel):
         si_n = [i.details.get('n', b'') for i in self.inputs if i.details]
         ii_n = coin.details.get('n', b'')
 
-        # stamp meta-script-hashes
-        so_msh = [
+        # stamp data-script-hashes
+        so_dsh = [
             sha256(packify.pack({
                 k: v for k,v in o.details.items()
                 if k in ('d', 'L', '_', '$')
@@ -316,7 +316,7 @@ class Txn(HashedModel):
             for o in self.outputs
             if o.details
         ]
-        si_msh = [
+        si_dsh = [
             sha256(packify.pack({
                 k: v for k,v in i.details.items()
                 if k in ('d', 'L', '_', '$')
@@ -324,7 +324,7 @@ class Txn(HashedModel):
             for i in self.inputs
             if i.details
         ]
-        ii_msh = sha256(packify.pack({
+        ii_dsh = sha256(packify.pack({
             k: v for k, v in coin.details.items()
             if k in ('d', 'L', '_', '$')
         })).digest()
@@ -334,14 +334,14 @@ class Txn(HashedModel):
             "si_len": si_len,
             "si_det": si_det,
             "ii_det": ii_det,
-            "si_msh": si_msh,
-            "ii_msh": ii_msh,
+            "si_dsh": si_dsh,
+            "ii_dsh": ii_dsh,
             "si_n": si_n,
             "ii_n": ii_n,
             "o_len": o_len,
             "so_len": so_len,
             "so_det": so_det,
-            "so_msh": so_msh,
+            "so_dsh": so_dsh,
             "so_n": so_n,
             "sigfield1": b'Txn',
             "sigfield2": coin.id_bytes,
@@ -373,18 +373,18 @@ class Txn(HashedModel):
     def std_series_covenant() -> Script:
         """Returns the standard covenant ('$' script) for fungible stamps
             in a series. This requires that all stamped inputs and
-            outputs share the same metadata-script-hash, and that the sum
+            outputs share the same data-script-hash, and that the sum
             of output 'n' values is less than or equal to the sum of the
             input 'n' values.
         """
         return Script.from_src('''
             # set some variables #
             get_value s"si_len" @= il 1
-            get_value s"ii_msh" @= s 1
+            get_value s"ii_dsh" @= s 1
             get_value s"so_len" @= ol 1
 
             # ensure all stamped inputs are from the same series #
-            get_value s"si_msh"
+            get_value s"si_dsh"
             @il loop {
                 push d-1 add_ints d2 @= i 1
                 @s equal_verify
@@ -392,7 +392,7 @@ class Txn(HashedModel):
             } pop0
 
             # ensure all stamped outputs are from the same series #
-            get_value s"so_msh"
+            get_value s"so_dsh"
             @ol loop {
                 push d-1 add_ints d2 @= i 1
                 @s equal_verify

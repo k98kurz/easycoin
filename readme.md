@@ -12,9 +12,7 @@ the emphasis on the "fun" part of "functional demonstration".)
 
 ❌ Ethereum uses proof-of-stake consensus.
 
-✅ EasyCoin uses proof-of-concept consensus: the 1st valid spend seen is the
-right one -- no actual consensus, just endless forks. Like I said, it is just
-proof-of-concept until I implement something else.
+✅ EasyCoin uses proof-of-concept consensus.
 
 ## Conceptual Overview
 
@@ -64,15 +62,16 @@ witness data, fail. Once the transaction is verified, the funding coins are
 removed from the UTXO set, and the new coins are added to the UTXO set.
 (Transaction fees are burned and will be set at 1 per byte of txn data.)
 
-Preventing double spending will at first be done by maintaining a log of input
+Preventing double spending will be accomplished by maintaining a log of input
 hashes (i.e. spent coin IDs) and simply adding an input hash whenever a txn is
-received and validated. However, in the future, additional systems may be added,
-such as overlay trust nets with a consensus mechanism for checkpointing the STXO
-and UTXO sets.
+received and validated in the absence of a TrustNet configuration. With a TrustNet
+configured, that TrustNet's consensus mechanism for validating transactions and
+checkpointing the STXO and UTXO sets will be used.
 
 The details of a transaction can be discarded after verification by all but the
-participants in the transaction, since without this data, the outputs cannot be
-spent.
+participants in the transaction, since the outputs cannot be spent without this data,
+but the transaction data itself is of no use to anyone else -- the other participants
+of a TrustNet need only track the inputs and outputs to prevent double spending.
 
 #### EasyCoins can have data and code stamped onto them.
 
@@ -82,7 +81,7 @@ funded output:
 
 ```python
 coin.details = {
-    'id': b'32 bytes sha256 of all other details except msh', # equivalent to "so_det" in runtime
+    'id': b'32 bytes sha256 of all other details except dsh', # equivalent to "so_det" in runtime
     'n': "Stamp note/name/nonce", # str|int|bytes
     'dsh': b'32 bytes sha256 of data and scripts (automatically derived)',
     # all the rest are optional
@@ -138,20 +137,20 @@ values are not equal. This is a covenant that requires that there can be only on
 stamped output in the transaction that sends this Stamp.
 
 It then pulls the `"so_det"` value from the tapescript runtime onto the stack,
-which is the sha256 hash of the `output_coin.details` (less 'id' and 'msh')
+which is the sha256 hash of the `output_coin.details` (less 'id' and 'dsh')
 serialized with `packify.pack`; pushes the sha256 of the `input_coin.details` 
-(less 'id' and 'msh') serialized with `packify.pack` onto the stack; then runs
+(less 'id' and 'dsh') serialized with `packify.pack` onto the stack; then runs
 `OP_EQUAL_VERIFY`. This is a covenant that requires that the Stamp details be
 copied without alteration from the input coin to the new output coin.
 
-#### Stamps can be created in a series identified by the metadata-script-hash.
+#### Stamps can be created in a series identified by the data-script-hash.
 
 It is possible to create fungible stamps in a series, which is where the sha256
-of the metadata and embedded scripts is the same for all such stamps. To use
-these with an integer amount that must be conserved or burnt in transactions
-(except for special stamp issuance transactions that validate against the 'L'
-script), the covenant should ensure 1) that all stamped inputs have the same
-metadata-script-hash, and 2) that the sum of the 'n' values of stamped outputs
+of the data and embedded scripts is the same for all such stamps. To use these
+with an integer amount that must be conserved or burnt in transactions (except
+for special stamp issuance transactions that validate against the 'L' script),
+the covenant should ensure 1) that all stamped inputs have the same
+data-script-hash, and 2) that the sum of the 'n' values of stamped outputs
 is less than or equal to the sum of the 'n' values of stamped inputs.
 
 Thus, the '$' script should have the following form:
@@ -159,11 +158,11 @@ Thus, the '$' script should have the following form:
 ```s
 # set some varibables #
 get_value s"si_len" @= il 1
-get_value s"ii_msh" @= s 1
+get_value s"ii_dsh" @= s 1
 get_value s"so_len" @= ol 1
 
 # ensure all stamped inputs are from the same series #
-get_value s"si_msh"
+get_value s"si_dsh"
 @il loop {
     push d-1 add_ints d2 @= i
     @s equal_verify
@@ -171,7 +170,7 @@ get_value s"si_msh"
 } pop0
 
 # ensure all stamped outputs are from the same series #
-get_value s"so_msh"
+get_value s"so_dsh"
 @ol loop {
     push d-1 add_ints d2 @= i
     @s equal_verify
@@ -209,7 +208,7 @@ with `@il add_ints` and `@ol add_ints`).
 
 If a stamp's details include 'L', validation of the mint transaction will
 execute that tapescript lock. This will occur only when there are no input
-stamps with the same msh.
+stamps with the same dsh.
 
 #### The tapescript runtime cache will have the following serialized values:
 
@@ -217,18 +216,19 @@ stamps with the same msh.
 - `"si_len"`: int number of stamped inputs
 - `"si_det"`: `sha256(packify.pack(input_coin.details)).digest()` for every stamped `input_coin`
 - `"ii_det"`: `sha256(packify.pack(input_coin.details)).digest()` for current `input_coin`
-- `"si_msh"`: sha256 of metadata and scripts in `input_coin.details` for every `input_coin`
-- `"ii_msh"`: sha256 of metadata and scripts in `input_coin.details` for current `input_coin`
+- `"si_dsh"`: sha256 of data and scripts in `input_coin.details` for every `input_coin`
+- `"ii_dsh"`: sha256 of data and scripts in `input_coin.details` for current `input_coin`
 - `"si_n"`: `input_coin.details['n']` for every stamped `input_coin`
 - `"ii_n"`: `input_coin.details['n']` for current `input_coin`
 - `"o_len"`: int number of outputs
 - `"so_len"`: int number of stamped outputs
 - `"so_det"`: `sha256(packify.pack(output_coin.details)).digest()` for every stamped `output_coin`
-- `"so_msh"`: sha256 of metadata and scripts `output_coin.details` for every stamped `output_coin`
+- `"so_dsh"`: sha256 of data and scripts `output_coin.details` for every stamped `output_coin`
 - `"so_n"`: `output_coin.details['n']` for every stamped `output_coin`
-- `"sigfield1"`: the current input hash
-- `"sigfield2"`: sha256 of all input hashes, sorted and concatenated
-- `"sigfield3"`: sha256 of all output hashes, sorted and concatenated
+- `"sigfield1"`: signature scope (e.g. 'Txn')
+- `"sigfield2"`: the current coin hash (input coin or output stamp)
+- `"sigfield3"`: sha256 of all input hashes, sorted and concatenated
+- `"sigfield4"`: sha256 of all output hashes, sorted and concatenated
 - `"timestamp"`: int Unix epoch timestamp (automatically added by tapescript)
 
 The current `input_coin` is the coin whose lock is being evaluated, which may be
@@ -249,6 +249,20 @@ Future developments/experiments include the following:
 2. Overlay network with SpeedyMurmurs for routing between overlapping networks
 3. Novel consensus mechanisms
 4. Attacks against all of the above systems
+
+## Statement Concerning Generative AI Use
+
+Though initially attempted, no vibes were achieved in the creation of this code.
+The use of LLMs was limited to primarily commit messages, and secondarily review
+and Textual CUI scaffolding. At least 99% of the logic created by AIs was wrong
+and had to be replaced; the UI had to be reorganized and pixel-pushed; many
+hallucinations had to be excised. The AGENTS.md file in the repo is the scar
+that bears witness to the many issues that occurred before I largely gave up on
+trying to use coding agents to build out the CUI app.
+
+All core logic is artisanal, free-range, organic, hand-crafted code. Less than
+1% of the code in the underlying libraries that I maintain came from AI, and all
+of that was rewritten before being published anyway.
 
 ## Testing
 
