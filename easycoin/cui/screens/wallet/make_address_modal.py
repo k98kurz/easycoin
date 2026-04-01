@@ -286,10 +286,10 @@ class MakeAddressModal(Screen):
             secrets = None
             if self.selected_type == "P2GT":
                 secrets = {"P2GT": True}
+            if self.selected_type in ("P2TR", "P2SH") and not committed_script:
+                committed_script = Script.from_src(self.default_script_src)
             address = self.app.wallet.make_address(
-                lock, nonce, committed_script=(
-                    committed_script or Script.from_src(self.default_script_src)
-                ), secrets=secrets
+                lock, nonce, committed_script=committed_script, secrets=secrets
             )
             address.child_nonce = self.current_child_nonce
         except Exception as e:

@@ -28,6 +28,7 @@ from tapescript import (
 from tapescript.tools import _make_graftap_committed_script
 import os
 import packify
+import struct
 
 
 _empty_dict = packify.pack({})
@@ -252,10 +253,16 @@ class Wallet(HashedModel):
                 'sha256', password.encode(), sha256(b'easycoin').digest(), 10000
             )
             secrets = unseal(key, secrets)
-        value_assert(type(packify.unpack(secrets)) is dict,
-            'invalid address format: secrets must unpack into dict, '
-            f'not {type(secrets)}'
-        )
+        try:
+            value_assert(type(packify.unpack(secrets)) is dict,
+                'invalid address format: secrets must unpack into dict, '
+                f'not {type(secrets)}'
+            )
+        except struct.error:
+            raise ValueError(
+                'invalid address format: secrets must unpack into dict; '
+                'missing password?'
+            )
         secrets = self.encrypt(secrets)
         addr = Address.unpack(address['data'])
         addr.wallet_id = self.id

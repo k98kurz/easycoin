@@ -20,6 +20,8 @@ SEED_PHRASE = ['test', 'obviously', 'not', 'secure']
 PASSWORD = 'testp4ssword'
 WALLET_NAME = 'test wallet'
 ANYONE_CAN_SPEND_LOCK = Script.from_src('true')
+INSECURE_PASSWORD_LOCK = Script.from_src('push s"password" equal')
+NOBODY_CAN_SPEND_LOCK = Script.from_src('false')
 
 
 class TestWalletAndAddress(unittest.TestCase):
@@ -153,31 +155,66 @@ class TestWalletAndAddress(unittest.TestCase):
         w = models.Wallet.create(SEED_PHRASE, PASSWORD, WALLET_NAME)
         w.unlock(PASSWORD)
         hdw_i = (123, 32)
-        coin = models.Coin.mine(ANYONE_CAN_SPEND_LOCK)
-        coin.save()
-        txn = models.Txn({'output_ids': coin.id, 'input_ids': ''})
+        nonce = hdw_i[0]
+        coin1 = models.Coin.create(NOBODY_CAN_SPEND_LOCK, 100_000)
+        coin1.save()
+        coin2 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 90_000)
+        coin2.timestamp += 60
+        coin2.save()
+        txn = models.Txn({'output_ids': coin2.id, 'input_ids': coin1.id})
+        txn.set_timestamp()
+        assert not txn.validate(), 'txn should not validate'
 
         # p2pk
-        lock = w.get_p2pk_lock(*hdw_i)
-        witness = w.get_p2pk_witness(hdw_i[0], txn, coin, hdw_i[1])
-        assert run_auth_scripts([witness, lock], txn.runtime_cache(coin))
+        for child_nonce in (hdw_i[1], None):
+            lock = w.get_p2pk_lock(nonce, child_nonce=child_nonce)
+            coin1 = models.Coin.create(lock, 100_000).save()
+            txn.input_ids = [coin1.id]
+            txn.inputs().reload()
+            witness = w.get_p2pk_witness(nonce, txn, coin1, child_nonce)
+            txn.witness = {coin1.id_bytes: witness.bytes}
+            assert run_auth_scripts([witness, lock], txn.runtime_cache(coin1))
+            assert txn.validate('line 177')
 
         # p2pkh
-        lock = w.get_p2pkh_lock(*hdw_i)
-        witness = w.get_p2pkh_witness(hdw_i[0], txn, coin, hdw_i[1])
-        assert run_auth_scripts([witness, lock], txn.runtime_cache(coin))
+        for child_nonce in (hdw_i[1], None):
+            lock = w.get_p2pkh_lock(nonce, child_nonce=child_nonce)
+            coin1 = models.Coin.create(lock, 100_000).save()
+            txn.input_ids = [coin1.id]
+            txn.inputs().reload()
+            witness = w.get_p2pkh_witness(nonce, txn, coin1, child_nonce)
+            txn.witness = {coin1.id_bytes: witness.bytes}
+            assert run_auth_scripts([witness, lock], txn.runtime_cache(coin1))
+            assert txn.validate('line 188')
 
         # p2tr keyspend
-        lock = w.get_p2tr_lock(hdw_i[0], child_nonce=hdw_i[1])
-        witness = w.get_p2tr_witness_keyspend(hdw_i[0], txn, coin, child_nonce=hdw_i[1])
-        assert run_auth_scripts([witness, lock], txn.runtime_cache(coin))
+        for child_nonce in (hdw_i[1], None):
+            lock = w.get_p2tr_lock(nonce, child_nonce=child_nonce)
+            coin1 = models.Coin.create(lock, 100_000).save()
+            txn.input_ids = [coin1.id]
+            txn.inputs().reload()
+            witness = w.get_p2tr_witness_keyspend(
+                nonce, txn, coin1, child_nonce=child_nonce
+            )
+            txn.witness = {coin1.id_bytes: witness.bytes}
+            assert run_auth_scripts([witness, lock], txn.runtime_cache(coin1))
+            assert txn.validate('line 201')
 
         # p2tr scriptspend
-        lock = w.get_p2tr_lock(hdw_i[0], ANYONE_CAN_SPEND_LOCK, child_nonce=hdw_i[1])
-        witness = w.get_p2tr_witness_scriptspend(
-            hdw_i[0], ANYONE_CAN_SPEND_LOCK, child_nonce=hdw_i[1]
-        )
-        assert run_auth_scripts([witness, lock], txn.runtime_cache(coin))
+        for child_nonce in (hdw_i[1], None):
+            lock = w.get_p2tr_lock(
+                nonce, INSECURE_PASSWORD_LOCK, child_nonce=child_nonce
+            )
+            coin1 = models.Coin.create(lock, 100_000).save()
+            txn.input_ids = [coin1.id]
+            txn.inputs().reload()
+            witness = w.get_p2tr_witness_scriptspend(
+                nonce, INSECURE_PASSWORD_LOCK, child_nonce=child_nonce
+            )
+            witness = Script.from_src('push s"password"') + witness
+            txn.witness = {coin1.id_bytes: witness.bytes}
+            assert run_auth_scripts([witness, lock], txn.runtime_cache(coin1))
+            assert txn.validate('line 217')
 
     def test_Wallet_gen_and_pubkey_saving_e2e(self):
         phrase = models.Wallet.generate_seed_phrase(easycoin.wordlist())
