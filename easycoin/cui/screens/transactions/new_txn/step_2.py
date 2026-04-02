@@ -143,6 +143,7 @@ class AddOutputsContainer(Vertical):
                 coin,
                 *self.txn_data.txn.outputs,
             ]
+            self.txn_data.txn.set_timestamp()
             self.txn_data.new_output_coins.append(coin)
             self.refresh_table()
             self.update_summary()
@@ -187,6 +188,7 @@ class AddOutputsContainer(Vertical):
                     coin,
                     *[c for c in self.txn_data.txn.outputs if c.id != prev_id],
                 ]
+                self.txn_data.txn.set_timestamp()
                 self.refresh_table()
                 self.update_summary()
                 self.update_button_visibility()
@@ -219,6 +221,7 @@ class AddOutputsContainer(Vertical):
             oid for oid in txn.output_ids
             if oid != coin.id
         ]
+        self.txn_data.txn.set_timestamp()
         del self.txn_data.new_output_coins[table.cursor_row]
         self.refresh_table()
         self.update_summary()

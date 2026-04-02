@@ -1,8 +1,10 @@
 /* Tailwind-style classes */
 /* Padding and Margins */
+.p-0 { padding: 0; }
 .p-1 { padding: 1; }
 .px-1 { padding: 0 1; }
 .py-1 { padding: 1 0; }
+.m-0 { margin: 0; }
 .m-1 { margin: 1; }
 .mx-1 { margin: 0 1; }
 .my-1 { margin: 1 0; }

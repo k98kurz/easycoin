@@ -9,6 +9,7 @@ class Witness:
     generated: Script = field(default_factory=lambda: Script('', b''))
     custom: Script = field(default_factory=lambda: Script('', b''))
     scriptspend: bool = field(default=False)
+    sigflags: str = field(default='00')
 
     def full(self) -> Script:
         if self.lock_type in ("P2GR", "P2GT", "P2PK", "P2PKH"):

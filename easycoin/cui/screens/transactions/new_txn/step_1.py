@@ -47,56 +47,51 @@ class SelectInputsContainer(Vertical):
 
     def load_outputs(self) -> None:
         """Load available unspent outputs for the wallet."""
-        parent = self.app.screen if hasattr(self.app, 'screen') else None
-        if not parent or not parent.app.wallet:
+        if not self.app.wallet:
             return
 
-        try:
-            table = self.query_one("#inputs_table")
-            table.clear()
-            self.row_keys.clear()
-            self.txn_data.available_inputs.clear()
+        table = self.query_one("#inputs_table")
+        table.clear()
+        self.row_keys.clear()
+        self.txn_data.available_inputs.clear()
 
-            if len(table.columns) == 0:
-                table.add_columns(
-                    ("Coin ID", "coin_id"),
-                    ("Amount", "amount"),
-                    ("Lock Type", "lock_type"),
-                    ("Selected", "selected"),
+        if len(table.columns) == 0:
+            table.add_columns(
+                ("Coin ID", "coin_id"),
+                ("Amount", "amount"),
+                ("Lock Type", "lock_type"),
+                ("Selected", "selected"),
+            )
+        table.cursor_type = "row"
+
+        outputs = Output.query().equal(
+            'wallet_id', self.app.wallet.id
+        ).get()
+
+        for output in outputs:
+            addr = Address.query().equal('lock', output.coin.lock).first()
+            secrets = packify.unpack(
+                self.app.wallet.decrypt(addr.secrets)
+            ) if addr else None
+            try:
+                row_key = table.add_row(
+                    truncate_text(output.id, prefix_len=8, suffix_len=4),
+                    format_balance(output.coin.amount, exact=True),
+                    Wallet.get_lock_type(output.coin.lock, secrets),
+                    ("✓" if output.id in [
+                        o.id for o in self.txn_data.selected_inputs
+                    ] else " "),
+                    key=output.id
                 )
-            table.cursor_type = "row"
+                self.row_keys.append(row_key)
+                self.txn_data.available_inputs.append(output)
+            except Exception as e:
+                self.app.log_event(
+                    f"Error loading output {output.id}: {e}",
+                    "DEBUG"
+                )
 
-            outputs = Output.query().equal(
-                'wallet_id', parent.app.wallet.id
-            ).get()
-
-            for output in outputs:
-                addr = Address.query().equal('lock', output.coin.lock).first()
-                secrets = packify.unpack(
-                    self.app.wallet.decrypt(addr.secrets)
-                ) if addr else None
-                try:
-                    row_key = table.add_row(
-                        truncate_text(output.id, prefix_len=8, suffix_len=4),
-                        format_balance(output.coin.amount, exact=True),
-                        Wallet.get_lock_type(output.coin.lock, secrets),
-                        ("✓" if output.id in [
-                            o.id for o in self.txn_data.selected_inputs
-                        ] else " "),
-                        key=output.id
-                    )
-                    self.row_keys.append(row_key)
-                    self.txn_data.available_inputs.append(output)
-                except Exception as e:
-                    parent.app.log_event(
-                        f"Error loading output {output.id}: {e}",
-                        "DEBUG"
-                    )
-
-            self.update_summary()
-
-        except Exception as e:
-            parent.app.log_event(f"Error loading outputs: {e}", "ERROR")
+        self.update_summary()
 
     def update_summary(self) -> None:
         """Update input summary display."""

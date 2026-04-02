@@ -8,6 +8,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 from tapescript import Script, make_scripthash_lock
+from easycoin.cui.widgets import SigflagsModal
 
 
 class MakeAddressModal(Screen):
@@ -15,6 +16,7 @@ class MakeAddressModal(Screen):
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("f", "open_sigflags_modal", "Sigflags"),
     ]
 
     ADDRESS_TYPES = [
@@ -40,6 +42,7 @@ class MakeAddressModal(Screen):
         self.child_nonce_enabled = False
         self.current_child_nonce = None
         self.address = None
+        self.sigflags = 'f4'
 
     def compose(self) -> ComposeResult:
         """Compose make address modal layout."""
@@ -60,8 +63,12 @@ class MakeAddressModal(Screen):
                     )
 
                 with Vertical():
-                    yield Static("Use child nonce:", classes="text-bold mb-1")
-                    yield Checkbox(id="use_child_nonce")
+                    yield Static("Other Details:", classes="text-bold mb-1")
+                    with Horizontal():
+                        yield Checkbox("Use child nonce", id="use_child_nonce")
+                        yield Button(
+                            "Set sigflags", id="btn_sigflags", classes="m-0"
+                        )
 
 
             with Horizontal(classes="h-5 mt-1"):
@@ -131,6 +138,20 @@ class MakeAddressModal(Screen):
                 child_nonce_input.value = ""
                 self.current_child_nonce = None
             self._update_preview()
+
+    @on(Button.Pressed, "#btn_sigflags")
+    def action_open_sigflags_modal(self) -> None:
+        def on_sigflags(result):
+            if not result:
+                return
+
+            if result != self.sigflags:
+                self.sigflags = result
+                self._update_preview()
+
+        msg = "Set which sigfields can be excluded from signatures."
+        modal = SigflagsModal(self.sigflags, msg=msg)
+        self.app.push_screen(modal, on_sigflags)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle child nonce input changes."""
@@ -215,14 +236,14 @@ class MakeAddressModal(Screen):
         self.script_error = None
         if self.selected_type == "P2PK":
             lock = self.app.wallet.get_p2pk_lock(
-                nonce, child_nonce=self.current_child_nonce
+                nonce, child_nonce=self.current_child_nonce, sigflags=self.sigflags
             )
         elif self.selected_type == "P2PKH":
             lock = self.app.wallet.get_p2pkh_lock(
-                nonce, child_nonce=self.current_child_nonce
+                nonce, child_nonce=self.current_child_nonce, sigflags=self.sigflags
             )
         elif self.selected_type == "P2TR":
-            self.default_script_src = f'push d{nonce} false return' 
+            self.default_script_src = f'push d{nonce} false return'
             lock, committed_script = None, None
             script_src = self.custom_script_src
             if not self.custom_script_src:
@@ -238,11 +259,11 @@ class MakeAddressModal(Screen):
 
             lock = self.app.wallet.get_p2tr_lock(
                 nonce, script=committed_script,
-                child_nonce=self.current_child_nonce
+                child_nonce=self.current_child_nonce, sigflags=self.sigflags
             )
         elif self.selected_type == "P2GR":
             lock = self.app.wallet.get_p2gr_lock(
-                nonce, child_nonce=self.current_child_nonce
+                nonce, child_nonce=self.current_child_nonce, sigflags=self.sigflags
             )
         elif self.selected_type == "P2GT":
             lock = self.app.wallet.get_p2gt_lock(
@@ -266,11 +287,17 @@ class MakeAddressModal(Screen):
                 try:
                     lock = Script.from_src(self.custom_script_src)
                     if self.selected_type == "P2SH":
+                        committed_script = lock
                         lock = make_scripthash_lock(lock)
 
                 except BaseException as e:
                     self.script_error = f"{type(e).__name__}: {e}"
                     lock = None
+
+        if self.selected_type in ("P2GT", "P2SH", "Custom"):
+            self.query_one("#btn_sigflags").add_class("hidden")
+        else:
+            self.query_one("#btn_sigflags").remove_class("hidden")
 
         if self.script_error:
             self.query_one("#lock_script_display").update(

@@ -187,7 +187,7 @@ class NewTransactionModal(ModalScreen):
                 severity="error"
             )
 
-        if not txn.validate():
+        if not txn.validate(reload=False):
             buf = StringIO()
             with redirect_stdout(buf):
                 txn.validate("New Txn Modal")
@@ -208,21 +208,19 @@ class NewTransactionModal(ModalScreen):
                 severity="error"
             )
 
+        # mark coins as spent
+        Coin.query().is_in('id', [c.id for c in txn.inputs]).update({'spent': True})
+
         # persist new coins to database
         for coin in self.txn_data.new_output_coins:
             coin.save()
 
-        # mark coins as spent
-        for coin in txn.inputs:
-            coin.spent = True
-            coin.save()
-
         # persist txn and changes to UTXOSet
         txn.save()
-        utxoset.apply(
-            self.txn_data.txn,
-            {c.id: c for c in self.txn_data.new_output_coins}
-        )
+        coins = {c.id: c for c in self.txn_data.new_output_coins}
+        for c in self.txn_data.selected_inputs:
+            coins[c.id] = c.coin
+        utxoset.apply(self.txn_data.txn, coins)
 
         self.app.notify(
             "Txn has been validated and changes saved to database. "

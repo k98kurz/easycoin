@@ -7,7 +7,7 @@ from textual.widgets import Button, Checkbox, Static, Footer, TextArea
 from tapescript import Script
 from easycoin.cui.helpers import format_balance, truncate_text
 from easycoin.cui.screens.transactions.new_txn.data import TransactionData, Witness
-from easycoin.cui.widgets import ECTextArea
+from easycoin.cui.widgets import ECTextArea, SigflagsModal
 from easycoin.models import Address, Output, Wallet
 import packify
 
@@ -30,13 +30,14 @@ class EditWitnessModal(ModalScreen[bool|None]):
         self.is_known = False
         self.requires_custom = True
         self.address = None
-        if output.id in txn_data.witnesses:
-            witness = txn_data.witnesses[output.id]
+        if output.coin.id in txn_data.witnesses:
+            witness = txn_data.witnesses[output.coin.id]
             self.witness = Witness(
                 witness.lock_type,
                 witness.generated,
                 witness.custom,
                 witness.scriptspend,
+                witness.sigflags,
             )
         else:
             self.witness = Witness()
@@ -77,6 +78,10 @@ class EditWitnessModal(ModalScreen[bool|None]):
             with Horizontal(classes="h-14"):
                 with Vertical(id="generate_witness_section", classes="hidden"):
                     with Horizontal(classes="h-4"):
+                        yield Button(
+                            "Set sigflags", id="btn_sigflags",
+                            classes="hidden",
+                        )
                         yield Button(
                             "Generate",
                             id="btn_generate",
@@ -152,7 +157,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
         scriptspend, generated, custom = False, '', ''
 
         truncated_id = truncate_text(
-            self.output.id, prefix_len=8, suffix_len=4
+            self.output.coin.id, prefix_len=8, suffix_len=4
         )
         amount_str = format_balance(
             self.output.coin.amount, exact=True
@@ -188,6 +193,14 @@ class EditWitnessModal(ModalScreen[bool|None]):
             self.query_one("#box_script_spend").remove_class("hidden")
         else:
             self.query_one("#box_script_spend").add_class("hidden")
+
+        _keyspend_sigflags = {"P2PK", "P2PKH", "P2TR", "P2GR"}
+        if  (   self.witness.lock_type in _keyspend_sigflags
+                and not self.witness.scriptspend
+            ):
+            self.query_one("#btn_sigflags").remove_class("hidden")
+        else:
+            self.query_one("#btn_sigflags").add_class("hidden")
 
         if self.requires_custom or self.witness.scriptspend:
             self.query_one("#custom_script_section").remove_class("hidden")
@@ -228,15 +241,21 @@ class EditWitnessModal(ModalScreen[bool|None]):
                     severity="warning"
                 )
 
+        self.app.log_event(
+            f"runtime cache: {self.txn_data.txn.runtime_cache(self.output.coin)}",
+            "DEBUG"
+        )
         if self.witness.lock_type == "P2PK":
             self.witness.generated = self.app.wallet.get_p2pk_witness(
                 self.address.nonce, self.txn_data.txn, self.output.coin,
                 child_nonce=self.address.child_nonce,
+                sigflags=self.witness.sigflags,
             )
         elif self.witness.lock_type == "P2PKH":
             self.witness.generated = self.app.wallet.get_p2pkh_witness(
                 self.address.nonce, self.txn_data.txn, self.output.coin,
                 child_nonce=self.address.child_nonce,
+                sigflags=self.witness.sigflags,
             )
         elif self.witness.lock_type == "P2TR":
             if self.address.committed_script:
@@ -255,6 +274,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                     self.address.nonce, self.txn_data.txn, self.output.coin,
                     child_nonce=self.address.child_nonce,
                     script=committed_script,
+                    sigflags=self.witness.sigflags,
                 )
         elif self.witness.lock_type == "P2GR":
             if self.witness.scriptspend:
@@ -266,6 +286,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                 self.witness.generated = self.app.wallet.get_p2gr_witness_keyspend(
                     self.address.nonce, self.txn_data.txn, self.output.coin,
                     child_nonce=self.address.child_nonce,
+                    sigflags=self.witness.sigflags,
                 )
         elif self.witness.lock_type == "P2GT":
             if self.witness.scriptspend:
@@ -277,6 +298,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                 self.witness.generated = self.app.wallet.get_p2gt_witness_keyspend(
                     self.address.nonce, self.txn_data.txn, self.output.coin,
                     child_nonce=self.address.child_nonce,
+                    sigflags=self.witness.sigflags,
                 )
 
         if self.witness.generated:
@@ -285,6 +307,19 @@ class EditWitnessModal(ModalScreen[bool|None]):
             cleaned = self.witness.generated.src.split("\n")
             cleaned = '\n'.join([l for l in cleaned if l.strip()])
             textarea.text = cleaned
+
+    @on(Button.Pressed, "#btn_sigflags")
+    def action_open_sigflags_modal(self) -> None:
+        def on_sigflags(result):
+            if not result:
+                return
+            if result != self.witness.sigflags:
+                self.witness.sigflags = result
+                self._update_ui()
+
+        msg = "Set which sigfields are excluded from signatures."
+        modal = SigflagsModal(self.witness.sigflags, msg=msg)
+        self.app.push_screen(modal, on_sigflags)
 
     @on(Button.Pressed, "#btn_save")
     def action_save(self) -> None:
@@ -310,8 +345,8 @@ class EditWitnessModal(ModalScreen[bool|None]):
                     return
 
         if self.witness.lock_type == "P2SH" and self.address.committed_script:
-            self.witness.generated = Script.from_bytes(
-                self.address.committed_script
+            self.witness.generated = Script.from_src(
+                f"push x{self.address.committed_script.hex()}"
             )
 
         if not self.witness.full().bytes:
@@ -322,7 +357,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
             return
 
         self.txn_data.witnesses[
-            self.output.id
+            self.output.coin.id
         ] = self.witness
         txn = self.txn_data.txn
         txn.witness = {

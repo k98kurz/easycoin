@@ -226,8 +226,10 @@ class Txn(HashedModel):
         for coin in self.inputs:
             if coin.id_bytes not in self.witness:
                 print(f'missing witness; adding empty script ({debug})') if debug else ''
-                #return False
-                self.witness[coin.id_bytes] = b''
+                self.witness = {
+                    coin.id_bytes: b'',
+                    **self.witness
+                }
             scripts = []
             if coin.details and '_' in coin.details:
                 scripts.append(coin.details['_'])
