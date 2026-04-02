@@ -5,12 +5,8 @@ from sqloquent import HashedModel, Default, RelatedCollection, RelatedModel
 from tapehash import tapehash3, work, calculate_difficulty
 from tapescript import Script
 from time import time
+from easycoin.constants import _mint_difficulty, _min_coin_mint_size, _max_stamp_size
 import packify
-
-
-_mint_difficulty = 200
-_min_coin_mint_size = 100000
-_max_stamp_size = 10 * 1024
 
 
 class Coin(HashedModel):
@@ -40,7 +36,7 @@ class Coin(HashedModel):
     wallet: RelatedModel
 
     @classmethod
-    def commitment(cls, data: dict) -> bytes:
+    def commitment(cls, data: dict) -> str:
         return super().generate_id({
             k: v
             for k,v in data.items()
@@ -79,12 +75,19 @@ class Coin(HashedModel):
             return {}
         return packify.unpack(self.data['details'])
     @details.setter
-    def details(self, val: dict):
-        type_assert(type(val) is dict, 'details must be dict')
+    def details(self, val: dict|None):
+        type_assert(type(val) is dict or val is None, 'details must be dict|None')
+        if val is None or not len(val):
+            self.data['details'] = None
+            return
         val = packify.pack(val)
         value_assert(len(val) <= _max_stamp_size,
             f'serialized details exceed limit of {_max_stamp_size}')
         self.data['details'] = val
+
+    def check_size(self) -> bool:
+        """Returns True if the serialized details are not too large."""
+        return len(packify.pack(self.details)) < _max_stamp_size
 
     @property
     def net_id_bytes(self) -> bytes:
@@ -120,7 +123,7 @@ class Coin(HashedModel):
             `TypeError` or `ValueError` for invalid parameters.
         """
         ts = int(time())
-        return cls({
+        coin = cls({
             'timestamp': ts,
             'lock': lock if type(lock) is bytes else lock.bytes,
             'amount': amount,
@@ -128,6 +131,8 @@ class Coin(HashedModel):
             'net_id': net_id,
             'net_state': net_state,
         })
+        coin.details = coin.details
+        return coin
 
     @classmethod
     def mine(

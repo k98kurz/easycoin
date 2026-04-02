@@ -1,27 +1,25 @@
 from __future__ import annotations
 from .Coin import Coin
 from .errors import type_assert, value_assert
+from easycoin.constants import (
+    _witfee_mult,
+    _witfee_exp,
+    _outcountfee_mult,
+    _outcountfee_exp,
+    _outfee_mult,
+    _outfee_exp,
+    _infee_mult,
+    _infee_exp,
+    _outscriptfee_mult,
+    _outscriptfee_exp,
+    _max_txn_size,
+    _empty,
+)
 from hashlib import sha256
 from sqloquent import HashedModel, RelatedCollection, RelatedModel
 from tapescript import run_auth_scripts, Script
 from time import time
 import packify
-
-
-_witfee_mult = 1
-_witfee_exp = 1
-_outcountfee_mult = 32
-_outcountfee_exp = 1
-_outfee_mult = 1
-_outfee_exp = 1
-_infee_mult = 1
-_infee_exp = 1
-_outscriptfee_mult = 1
-_outscriptfee_exp = 1
-_max_txn_size = 32*1024
-
-
-_empty = packify.pack({})
 
 
 class Txn(HashedModel):
@@ -189,11 +187,9 @@ class Txn(HashedModel):
 
         # reject large coins
         for coin in [*self.inputs, *self.outputs]:
-            try:
-                coin.details = coin.details
-            except ValueError:
+            if not coin.check_size():
                 print(
-                    f'ValueError raised from large coin.details ({debug})'
+                    f'excessively large coin.details rejected ({debug})'
                 ) if debug else ''
                 return False
 

@@ -13,7 +13,7 @@ class Output(SqlModel):
     id: str
     net_id: str|None
     net_state: bytes|None
-    commitment: bytes|None
+    commitment: str|None
     wallet_id: str|None
     coin: RelatedModel
     trustnet: RelatedModel

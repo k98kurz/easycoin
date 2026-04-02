@@ -133,8 +133,8 @@ class AddOutputsContainer(Vertical):
                 lock=Address.parse(result['address']),
                 amount=result['amount'],
             )
-            coin.id = coin.generate_id(coin.data)
             coin.wallet_id = self.app.wallet.id
+            coin.id = coin.generate_id(coin.data)
             self.txn_data.txn.output_ids = [
                 coin.id,
                 *self.txn_data.txn.output_ids,
@@ -178,8 +178,8 @@ class AddOutputsContainer(Vertical):
                 prev_id = coin.id
                 coin.lock = Address.parse(result['address'])
                 coin.amount = result['amount']
-                coin.id = coin.generate_id(coin.data)
                 coin.wallet_id = self.app.wallet.id
+                coin.id = coin.generate_id(coin.data)
                 self.txn_data.txn.output_ids = [
                     coin.id,
                     *[oid for oid in self.txn_data.txn.output_ids if oid != prev_id],

@@ -187,19 +187,19 @@ class TestTxn(unittest.TestCase):
         t.witness = {c1.id_bytes: b''}
         # case 1: txn size too large, but each individual coin is acceptable size
         t.set_timestamp()
-        assert t.validate(debug='line 182', reload=False)
+        assert t.validate(debug='line 190', reload=False)
         outputs = [c2]
         for i in range(1, 32):
             c = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 100, str(i) + big_n).save()
             outputs.append(c)
         t.outputs = outputs
         t.set_timestamp()
-        assert not t.validate(debug='line 189', reload=False)
+        assert not t.validate(debug='line 197', reload=False)
         # case 2: txn size is okay, but the output coin is too large
         t.outputs = [c2]
-        assert t.validate(debug='line 192', reload=False)
+        assert t.validate(debug='line 200', reload=False)
         c2.data['details'] = packify.pack({'n': big_n * 12})
-        assert not t.validate(debug='line 209', reload=False)
+        assert not t.validate(debug='line 202', reload=False)
 
     def test_validate_rejects_mint_txn_that_fails_difficulty_threshold(self):
         c = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 999999999999999)

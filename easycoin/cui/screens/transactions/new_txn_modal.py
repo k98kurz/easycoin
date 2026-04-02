@@ -213,13 +213,27 @@ class NewTransactionModal(ModalScreen):
 
         # persist new coins to database
         for coin in self.txn_data.new_output_coins:
+            cid = coin.id
+            coin_data1 = f"{coin.data}"
             coin.save()
+            if cid != coin.id:
+                coin_data2 = f"{coin.data}"
+                self.app.notify("coin ID changed on save", severity="error")
+                self.app.log_event("coin ID changed on save", "ERROR")
+                self.app.log_event(f"{coin_data1=}", "ERROR")
+                self.app.log_event(f"{coin_data2=}", "ERROR")
+                # roll back
+                coin.delete()
+                Coin.query().is_in(
+                    'id', [c.id for c in txn.inputs]
+                ).update({'spent': False})
+                return
 
         # persist txn and changes to UTXOSet
         txn.save()
         coins = {c.id: c for c in self.txn_data.new_output_coins}
-        for c in self.txn_data.selected_inputs:
-            coins[c.id] = c.coin
+        for c in self.txn_data.txn.inputs:
+            coins[c.id] = c
         utxoset.apply(self.txn_data.txn, coins)
 
         self.app.notify(
