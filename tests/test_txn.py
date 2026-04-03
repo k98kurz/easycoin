@@ -336,6 +336,33 @@ class TestTxn(unittest.TestCase):
             t2.output_ids = [s2.id]
         assert t2.validate(), 'simple transfer w/ proper fee burn should work'
 
+        # splitting should work
+        amt = (s2.amount - 2400) // 2
+        s3_1 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, amt, 300, series_details
+        ).save()
+        s3_2 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, amt, 700, series_details
+        ).save()
+        t3 = models.Txn({'input_ids': s2.id})
+        t3.output_ids = [s3_1.id, s3_2.id]
+        t3.witness = {s2.id_bytes: b''}
+        t3.set_timestamp()
+        t3.save()
+        assert t3.validate(debug='line 352'), 'splitting w/ proper fee burn should work'
+
+        # joining should work
+        amt = (s3_1.amount + s3_2.amount) - 2400
+        s4 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, amt, 1000, series_details
+        )
+        t4 = models.Txn({'output_ids': s4.id})
+        t4.input_ids = [s3_1.id, s3_2.id]
+        t4.witness = {s3_1.id_bytes: b'', s3_2.id_bytes: b''}
+        t4.set_timestamp()
+        t4.save()
+        assert t4.validate(debug='line 363'), 'joining w/ proper fee burn should work'
+
 
 if __name__ == '__main__':
     unittest.main()

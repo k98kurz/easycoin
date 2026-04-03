@@ -213,6 +213,7 @@ stamps with the same dsh.
 #### The tapescript runtime cache will have the following serialized values:
 
 - `"i_len"`: int number of inputs
+- `"i_a"`: input amounts (in EC⁻¹)
 - `"si_len"`: int number of stamped inputs
 - `"si_det"`: `sha256(packify.pack(input_coin.details)).digest()` for every stamped `input_coin`
 - `"ii_det"`: `sha256(packify.pack(input_coin.details)).digest()` for current `input_coin`
@@ -221,6 +222,7 @@ stamps with the same dsh.
 - `"si_n"`: `input_coin.details['n']` for every stamped `input_coin`
 - `"ii_n"`: `input_coin.details['n']` for current `input_coin`
 - `"o_len"`: int number of outputs
+- `"o_a"`: output amounts (in EC⁻¹)
 - `"so_len"`: int number of stamped outputs
 - `"so_det"`: `sha256(packify.pack(output_coin.details)).digest()` for every stamped `output_coin`
 - `"so_dsh"`: sha256 of data and scripts `output_coin.details` for every stamped `output_coin`

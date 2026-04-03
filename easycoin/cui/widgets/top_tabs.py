@@ -11,6 +11,7 @@ class TopTabs(Tabs):
             Tab("Wallet", id="tab_wallet"),
             Tab("Coins", id="tab_coins"),
             Tab("Transactions", id="tab_transactions"),
+            Tab("Stamp Templates", id="tab_stamps"),
             **kwargs
         )
 
@@ -22,6 +23,7 @@ class TopTabs(Tabs):
             "tab_wallet": "wallet",
             "tab_coins": "coins",
             "tab_transactions": "transactions",
+            "tab_stamps": "stamp_templates",
         }
         screen_name = screen_map.get(tab_id)
         if screen_name:

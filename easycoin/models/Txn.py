@@ -17,7 +17,7 @@ from easycoin.constants import (
 )
 from hashlib import sha256
 from sqloquent import HashedModel, RelatedCollection, RelatedModel
-from tapescript import run_auth_scripts, Script
+from tapescript import run_auth_scripts, Script, int_to_bytes
 from time import time
 import packify
 
@@ -276,6 +276,11 @@ class Txn(HashedModel):
         si_len = len([1 for i in self.inputs if i.details])
         o_len = len(self.outputs)
         so_len = len([1 for o in self.outputs if o.details])
+
+        # amounts
+        i_a = [int_to_bytes(i.amount) for i in self.inputs]
+        o_a = [int_to_bytes(o.amount) for o in self.outputs]
+
         # stamp ids
         so_det = [
             sha256(packify.pack({
@@ -318,6 +323,7 @@ class Txn(HashedModel):
 
         cache = {
             "i_len": i_len,
+            "i_a": i_a,
             "si_len": si_len,
             "si_det": si_det,
             "ii_det": ii_det,
@@ -326,6 +332,7 @@ class Txn(HashedModel):
             "si_n": si_n,
             "ii_n": ii_n,
             "o_len": o_len,
+            "o_a": o_a,
             "so_len": so_len,
             "so_det": so_det,
             "so_dsh": so_dsh,

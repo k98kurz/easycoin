@@ -8,6 +8,7 @@ from easycoin.cui.screens.dashboard import DashboardScreen
 from easycoin.cui.screens.wallet.main_screen import WalletListScreen
 from easycoin.cui.screens.coins.coins_screen import CoinsScreen
 from easycoin.cui.screens.transactions.txn_screen import TransactionsScreen
+from easycoin.cui.screens.stamps.stamp_templates_screen import StampTemplatesScreen
 from easycoin.cui.screens.network.placeholder import NetworkScreen
 from easycoin.cui.screens.trustnet.placeholder import TrustNetScreen
 from easycoin.cui.screens.repl.repl_modal import ReplModal
@@ -28,6 +29,7 @@ class EasyCoinApp(App):
         "wallet": WalletListScreen,
         "coins": CoinsScreen,
         "transactions": TransactionsScreen,
+        "stamp_templates": StampTemplatesScreen,
         "network": NetworkScreen,
         "trustnet": TrustNetScreen,
         "repl": ReplModal,
@@ -41,6 +43,7 @@ class EasyCoinApp(App):
         ("2", "switch_to_wallet", "Identity/Wallet"),
         ("3", "switch_to_coins", "Coins"),
         ("4", "switch_to_transactions", "Transactions"),
+        ("5", "switch_to_stamp_templates", "Stamp Templates"),
         ("ctrl+e", "open_event_log", "Event Log"),
         ("ctrl+q", "quit", "Quit"),
         ("?", "open_welcome", "Welcome"),
@@ -123,6 +126,10 @@ class EasyCoinApp(App):
     def action_switch_to_transactions(self) -> None:
         """Switch to transactions screen."""
         self.switch_screen("transactions")
+
+    def action_switch_to_stamp_templates(self) -> None:
+        """Switch to stamp templates screen."""
+        self.switch_screen("stamp_templates")
 
     def action_open_repl(self) -> None:
         """Open REPL modal for Python code execution."""
