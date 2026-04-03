@@ -85,6 +85,16 @@ class Coin(HashedModel):
             f'serialized details exceed limit of {_max_stamp_size}')
         self.data['details'] = val
 
+    @property
+    def dsh(self) -> bytes:
+        """Derives the dsh (data-script-hash) used for comparing Stamps
+            to see if they are within a series.
+        """
+        return sha256(packify.pack({
+            k: v for k,v in self.details.items()
+            if k in ('d', 'L', '_', '$')
+        })).digest()
+
     def check_size(self) -> bool:
         """Returns True if the serialized details are not too large."""
         return len(packify.pack(self.details)) < _max_stamp_size
@@ -170,10 +180,6 @@ class Coin(HashedModel):
         details['id'] = sha256(packify.pack({
             k: v for k, v in details.items()
             if k not in ('id', 'dsh')
-        })).digest()
-        details['dsh'] = sha256(packify.pack({
-            k: v for k, v in details.items()
-            if k in ('d', 'L', '_', '$')
         })).digest()
         coin.details = details
         return coin

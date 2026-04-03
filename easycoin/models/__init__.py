@@ -9,6 +9,7 @@ from .TrustNetFeature import TrustNetFeature
 from .Attestation import Attestation
 from .Confirmation import Confirmation
 from .Snapshot import Snapshot
+from .StampTemplate import StampTemplate, StampType
 from .Chunk import Chunk, ChunkKind
 from sqloquent import contains, within, belongs_to, has_many, has_one, DeletedModel
 from typing import Callable
@@ -20,7 +21,7 @@ def set_connection_info(db_file_path: str):
         sqlite3 database file path.
     """
     models = [
-        Coin, Txn, Wallet, Address, Input, Output,
+        Coin, Txn, Wallet, Address, Input, Output, StampTemplate,
         TrustNet, Attestation, Confirmation, Snapshot, Chunk,
         DeletedModel,
     ]
@@ -30,7 +31,7 @@ def set_connection_info(db_file_path: str):
 def get_migrations() -> dict[str, str]:
     """Returns a dict mapping model names to migration file content strs."""
     models = [
-        Coin, Txn, Wallet, Address, Input, Output,
+        Coin, Txn, Wallet, Address, Input, Output, StampTemplate,
         TrustNet, Attestation, Confirmation, Snapshot, Chunk,
     ]
     migrations = {}

@@ -254,14 +254,12 @@ class Txn(HashedModel):
             if coin.details:
                 if 'L' not in coin.details:
                     continue
-                if coin.details['dsh'] in (
-                    c.details['dsh'] for c in self.inputs if c.details
-                ):
+                if coin.dsh in (c.dsh for c in self.inputs if c.details):
                     continue
                 if not run_auth_scripts(
-                    [self.witness.get(coin.id_bytes, b''), coin.details['L']],
-                    self.runtime_cache(coin)
-                ):
+                        [self.witness.get(coin.id_bytes, b''), coin.details['L']],
+                        self.runtime_cache(coin)
+                    ):
                     if debug:
                         print(f'stamp creation constraint failed validation ({debug})')
                     return False
@@ -307,25 +305,16 @@ class Txn(HashedModel):
 
         # stamp data-script-hashes
         so_dsh = [
-            sha256(packify.pack({
-                k: v for k,v in o.details.items()
-                if k in ('d', 'L', '_', '$')
-            })).digest()
+            o.dsh
             for o in self.outputs
             if o.details
         ]
         si_dsh = [
-            sha256(packify.pack({
-                k: v for k,v in i.details.items()
-                if k in ('d', 'L', '_', '$')
-            })).digest()
+            i.dsh
             for i in self.inputs
             if i.details
         ]
-        ii_dsh = sha256(packify.pack({
-            k: v for k, v in coin.details.items()
-            if k in ('d', 'L', '_', '$')
-        })).digest()
+        ii_dsh = coin.dsh
 
         cache = {
             "i_len": i_len,

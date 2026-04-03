@@ -110,6 +110,23 @@ class TestCoin(unittest.TestCase):
         assert 'n' in c.details
         assert c.details['n'] == "test"
 
+    def test_dsh_property_derives_consistent_hash(self):
+        c = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 999, "test")
+        dsh1 = c.dsh
+        assert c.dsh == dsh1, 'should not change between derivations'
+        s1 = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 999, "test")
+        s2 = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 888, "stet")
+        s3 = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 777, "with details", {
+            'd': {'t': 'txt', 'd': 'some test text'}
+        })
+        s4 = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 333, "with same details", {
+            'd': {'t': 'txt', 'd': 'some test text'}
+        })
+        assert s1.dsh == c.dsh
+        assert s1.dsh == s2.dsh
+        assert s3.dsh != s1.dsh
+        assert s3.dsh == s4.dsh
+
 
 if __name__ == '__main__':
     unittest.main()
