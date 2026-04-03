@@ -70,14 +70,11 @@ class ReadOnlyWitnessModal(ModalScreen):
         self._update_ui()
 
     def _update_ui(self) -> None:
-        truncated_id = truncate_text(
-            self.coin.id, prefix_len=8, suffix_len=4
-        )
         amount_str = format_balance(
             self.coin.amount, exact=True
         )
         self.query_one("#input_info").update(
-            f"ID: {truncated_id} | Amount: {amount_str}"
+            f"Amount: {amount_str} | ID: {self.coin.id}"
         )
 
         address = Address({"lock": self.coin.lock})
