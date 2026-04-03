@@ -115,10 +115,6 @@ cause validation to fail if the witness does not satisfy the lock or if the
 postfix raises a verification exception (e.g. calling `OP_VERIFY` on anything
 but a `True` value).
 
-NB: there is a bug in tapescript preventing prefix scripts from providing useful
-functions to be used in locks and witnesses. This dependency will be updated
-once it is fixed, and then prefix scripts will be potentially useful.
-
 #### By default, Stamps can only be transferred whole.
 
 In the basic case in which the '$' script is not present, each Stamp can be held

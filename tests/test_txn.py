@@ -275,7 +275,7 @@ class TestTxn(unittest.TestCase):
         second_series_details = {
             'd': {'type': 'token', 'name': 'fAuxUSD (test)'},
             'L': SINGLE_SIG_LOCK.bytes,
-            '$': models.Txn.std_series_covenant().bytes,
+            '$': models.Txn.std_series_covenant(False).bytes,
         }
 
         s1 = models.Coin.stamp(
@@ -339,10 +339,10 @@ class TestTxn(unittest.TestCase):
         # splitting should work
         amt = (s2.amount - 2400) // 2
         s3_1 = models.Coin.stamp(
-            ANYONE_CAN_SPEND_LOCK, amt, 300, series_details
+            ANYONE_CAN_SPEND_LOCK, amt, -300, series_details
         ).save()
         s3_2 = models.Coin.stamp(
-            ANYONE_CAN_SPEND_LOCK, amt, 700, series_details
+            ANYONE_CAN_SPEND_LOCK, amt, 1300, series_details
         ).save()
         t3 = models.Txn({'input_ids': s2.id})
         t3.output_ids = [s3_1.id, s3_2.id]
@@ -362,6 +362,89 @@ class TestTxn(unittest.TestCase):
         t4.set_timestamp()
         t4.save()
         assert t4.validate(debug='line 363'), 'joining w/ proper fee burn should work'
+
+        # negative values should be prevented in the second series
+        sX1 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, 100_000, 1000, second_series_details
+        ).save()
+        sX2_1 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, sX1.amount - 1200, 500, second_series_details
+        ).save()
+        sX2_2 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, sX1.amount - 1200, -500, second_series_details
+        ).save()
+        tx = models.Txn({'input_ids': sX1.id, 'output_ids': sX2_1.id})
+        tx.witness = {sX1.id_bytes: b''}
+        tx.set_timestamp()
+        assert tx.validate(debug='line 379')
+        tx.output_ids = [sX2_1.id, sX2_2.id]
+        assert not tx.validate(debug='line 381')
+
+    def test_requires_burn_mint_lock_e2e(self):
+        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 100_000).save()
+        series_details = {
+            'd': {'type': 'token', 'name': '$HIT Coin (test)'},
+            'L': models.Txn.std_requires_burn_mint_lock(1000).bytes,
+            '$': models.Txn.std_series_covenant(False).bytes,
+        }
+        # mint 2 by burning 2000
+        s1 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, c1.amount - 2000, 2, series_details
+        ).save()
+        tx = models.Txn({'input_ids': c1.id, 'output_ids': s1.id})
+        tx.witness = {c1.id_bytes: b''}
+        tx.set_timestamp()
+        assert tx.validate(debug='line 397'), 'mint 2 by burning 2000 should work'
+
+        # try to mint 10 by burning 2000
+        s2 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, c1.amount - 2000, 10, series_details
+        ).save()
+        tx.output_ids = [s2.id]
+        assert not tx.validate(), 'mint 10 by burning 2000 should not work'
+
+        # mint 10 by burning 10,000
+        s3 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, c1.amount - 10000, 10, series_details
+        ).save()
+        tx.output_ids = [s3.id]
+        assert tx.validate(debug='line 411'), 'mint 10 by burning 10k should work'
+
+    def test_must_balance_mint_lock_e2e(self):
+        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 100_000).save()
+        series_details = {
+            'd': {'type': 'token', 'name': '$HIT Coin (test)'},
+            'L': models.Txn.std_must_balance_mint_lock().bytes,
+            '$': models.Txn.std_series_covenant(True).bytes,
+        }
+        # mint 2 and -2
+        amt = (c1.amount - 2400) // 2
+        s1_1 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, amt, 2, series_details
+        ).save()
+        s1_2 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, amt, -2, series_details
+        ).save()
+        tx = models.Txn({'input_ids': c1.id})
+        tx.output_ids = [s1_1.id, s1_2.id]
+        tx.witness = {c1.id_bytes: b''}
+        tx.set_timestamp()
+        tx.timestamp += 2 # prevent timing issues
+        assert tx.validate(debug='line 432'), 'mint 2, -2 should work'
+
+        # try to mint 10, -2
+        s2 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, amt, 10, series_details
+        ).save()
+        tx.output_ids = [s2.id, s1_2.id]
+        assert not tx.validate(), 'mint 10, -2 should not work'
+
+        # mint 10 and -10
+        s3 = models.Coin.stamp(
+            ANYONE_CAN_SPEND_LOCK, amt, -10, series_details
+        ).save()
+        tx.output_ids = [s2.id, s3.id]
+        assert tx.validate(debug='line 446'), 'mint 10, -10 should work'
 
 
 if __name__ == '__main__':

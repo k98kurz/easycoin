@@ -364,14 +364,18 @@ class Txn(HashedModel):
         ''')
 
     @staticmethod
-    def std_series_covenant() -> Script:
+    def std_series_covenant(allow_negatives: bool = True) -> Script:
         """Returns the standard covenant ('$' script) for fungible stamps
             in a series. This requires that all stamped inputs and
             outputs share the same data-script-hash, and that the sum
             of output 'n' values is less than or equal to the sum of the
-            input 'n' values.
+            input 'n' values. If `allow_negatives` is set to False, then
+            an additional check to make sure all `n` values are positive
+            will be included. (Default setting allows negative `n`
+            values.)
         """
-        return Script.from_src('''
+        check = '' if allow_negatives else 'dup push d0 leq verify '
+        return Script.from_src(f'''
             # set some variables #
             get_value s"si_len" @= il 1
             get_value s"ii_dsh" @= s 1
@@ -379,37 +383,94 @@ class Txn(HashedModel):
 
             # ensure all stamped inputs are from the same series #
             get_value s"si_dsh"
-            @il loop {
+            @il loop {{
                 push d-1 add_ints d2 @= i 1
                 @s equal_verify
                 @i
-            } pop0
+            }} pop0
 
             # ensure all stamped outputs are from the same series #
             get_value s"so_dsh"
-            @ol loop {
+            @ol loop {{
                 push d-1 add_ints d2 @= i 1
                 @s equal_verify
                 @i
-            } pop0
+            }} pop0
 
             # calculate the sum of stamped inputs #
             get_value s"si_n" push d0
-            @il loop {
-                push d-1 add_ints d2 @= i 1
+            @il loop {{
+                {check}push d-1 add_ints d2 @= i 1
                 add_ints d2
                 @i
-            } pop0
+            }} pop0
 
             # calculate the sum of stamped outputs #
             get_value s"so_n" push d0
-            @ol loop {
-                push d-1 add_ints d2 @= i 1
+            @ol loop {{
+                {check}push d-1 add_ints d2 @= i 1
                 add_ints d2
                 @i
-            } pop0
+            }} pop0
 
             # ensure stamped output sum <= stamped input sum #
             leq verify
+        ''')
+
+    @staticmethod
+    def std_requires_burn_mint_lock(rate: int = 1000) -> Script:
+        """Returns a standard mint lock 'L' script that requires burning
+            EC⁻¹ at the specified `rate` to mint the 'n' value. Raises
+            `TypeError` or `ValueError` for invalid `rate`.
+        """
+        type_assert(type(rate) is int, 'rate must be int >0')
+        value_assert(rate > 0, 'rate must be int >0')
+        return Script.from_src(f'''
+            # sum output EC^-1 amounts #
+            get_value s"o_a" push d0
+            get_value s"o_len" loop {{
+                push d-1 add d2 @= i 1
+                add d2 @i
+            }} pop0
+
+            # sum input EC^-1 amounts #
+            get_value s"i_a" push d0
+            get_value s"i_len" loop {{
+                push d-1 add d2 @= i 1
+                add d2 @i
+            }} pop0
+
+            # calculate burn as sum(inputs)-sum(outputs) #
+            sub d2
+
+            # divide amount burned/{rate} #
+            push d{rate} swap2 div
+
+            # sum minted n values #
+            get_value s"so_n" push d0
+            get_value s"so_len" loop {{
+                push d-1 add d2 @= i 1
+                add d2 @i
+            }} pop0
+
+            # ensure minted n amount i <= burned/{rate} #
+            leq
+        ''')
+
+    @staticmethod
+    def std_must_balance_mint_lock():
+        """Returns a standard mint lock 'L' script that requires the sum
+            of all 'n' values to equal 0.
+        """
+        return Script.from_src('''
+            # sum all n values #
+            get_value s"so_n" push d0
+            get_value s"so_len" loop {
+                push d-1 add d2 @= i 1
+                add d2 @i
+            } pop0
+
+            # require the sum is equal to 0 #
+            push d0 eq
         ''')
 

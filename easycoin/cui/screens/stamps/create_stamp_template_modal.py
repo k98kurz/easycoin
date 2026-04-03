@@ -47,7 +47,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
                     yield RadioSet(
                         RadioButton("Single", id="type_single", value=True),
                         RadioButton("Series", id="type_series"),
-                        RadioButton("Unknown", id="type_unknown"),
+                        RadioButton("Custom", id="type_unknown"),
                         id="type_radio",
                     )
 
@@ -60,11 +60,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
                     )
                 with Vertical():
                     yield Static("Version:", classes="text-bold mb-1")
-                    yield Input(
-                        id="version_input",
-                        value="0.1.0",
-                        placeholder="e.g. 0.1.0"
-                    )
+                    yield Input(id="version_input", placeholder="e.g. 0.1.0")
 
             with Horizontal(classes="h-5 mt-1"):
                 with Vertical():
@@ -217,7 +213,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             stamp_type = StampType.UNKNOWN
 
         description = description_input.value.strip() or None
-        version = version_input.value.strip() or "1.0.0"
+        version = version_input.value.strip() or None
         author = author_input.value.strip() or None
         tags = tags_input.value.strip() or None
 
@@ -270,7 +266,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         description = self.template.description or ""
         self.query_one("#description_input").value = description
 
-        version = self.template.version or "1.0.0"
+        version = self.template.version or ""
         self.query_one("#version_input").value = version
 
         author = self.template.author or ""
@@ -314,7 +310,6 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
     def _initialize_new_template(self) -> None:
         """Initialize form for new template with defaults."""
-        self.query_one("#version_input").value = "1.0.0"
         self._prepopulate_covenant_script(StampType.SINGLE)
 
     def _show_error(self) -> None:
