@@ -135,13 +135,13 @@ class AddOutputsContainer(Vertical):
             )
             coin.wallet_id = self.app.wallet.id
             coin.id = coin.generate_id(coin.data)
-            self.txn_data.txn.output_ids = [
-                coin.id,
-                *self.txn_data.txn.output_ids,
-            ]
             self.txn_data.txn.outputs = [
                 coin,
                 *self.txn_data.txn.outputs,
+            ]
+            self.txn_data.txn.output_ids = [
+                coin.id,
+                *self.txn_data.txn.output_ids,
             ]
             self.txn_data.txn.set_timestamp()
             self.txn_data.new_output_coins.append(coin)
@@ -180,13 +180,13 @@ class AddOutputsContainer(Vertical):
                 coin.amount = result['amount']
                 coin.wallet_id = self.app.wallet.id
                 coin.id = coin.generate_id(coin.data)
-                self.txn_data.txn.output_ids = [
-                    coin.id,
-                    *[oid for oid in self.txn_data.txn.output_ids if oid != prev_id],
-                ]
                 self.txn_data.txn.outputs = [
                     coin,
                     *[c for c in self.txn_data.txn.outputs if c.id != prev_id],
+                ]
+                self.txn_data.txn.output_ids = [
+                    coin.id,
+                    *[oid for oid in self.txn_data.txn.output_ids if oid != prev_id],
                 ]
                 self.txn_data.txn.set_timestamp()
                 self.refresh_table()
@@ -217,6 +217,10 @@ class AddOutputsContainer(Vertical):
         table = self.query_one("#outputs_table")
         coin = self.txn_data.new_output_coins[table.cursor_row]
         txn = self.txn_data.txn
+        txn.outputs = [
+            o for o in txn.outputs
+            if o.id != coin.id
+        ]
         txn.output_ids = [
             oid for oid in txn.output_ids
             if oid != coin.id

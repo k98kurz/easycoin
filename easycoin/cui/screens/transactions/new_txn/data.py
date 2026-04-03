@@ -14,6 +14,8 @@ class Witness:
     def full(self) -> Script:
         if self.lock_type in ("P2GR", "P2GT", "P2PK", "P2PKH"):
             return self.generated
+        if self.lock_type == "P2TR" and not self.scriptspend:
+            return self.generated
         return self.custom + self.generated
 
 

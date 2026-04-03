@@ -107,7 +107,8 @@ def some_function_with_lots_of_params(
 - First conditional should be on same line as opening parenthesis, indented in once
 from the opening parenthesis
 - Each additional condition should be on its own line, indented in twice, with the
-condition combining word at the beginning of the condition
+combining word ("and"/"or") at the beginning of the condition
+- Closing "):" should be indented once, level with the body of the block
 
 Example:
 ```python
@@ -230,6 +231,9 @@ the selected row
 - Content should be contained within a Vertical or VerticalScroll with
 `classes="modal-container"`
 - Modals should have a Footer at the bottom, outside of the container
+- If the purpose of a modal is to provide details about some database object, do
+not truncate text; only truncate text for something that has its own dedicated
+UI in which the full text is viewable
 
 ## Database (Models, etc)
 

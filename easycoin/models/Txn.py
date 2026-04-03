@@ -61,7 +61,7 @@ class Txn(HashedModel):
             return
         type_assert(all([type(s) is str for s in val]),
             'input_ids must be list[str]')
-        self.data['input_ids'] = ','.join(val)
+        self.data['input_ids'] = ','.join(sorted(list(set(val))))
 
     @property
     def output_ids(self) -> list[str]:
@@ -80,7 +80,7 @@ class Txn(HashedModel):
             return
         type_assert(all([type(s) is str for s in val]),
             'output_ids must be list[str]|None')
-        self.data['output_ids'] = ','.join(sorted(val))
+        self.data['output_ids'] = ','.join(sorted(list(set(val))))
 
     @property
     def details(self) -> dict:
@@ -345,12 +345,12 @@ class Txn(HashedModel):
             "sigfield2": coin.id_bytes,
             "sigfield3": sha256(
                 b''.join(sorted([
-                    i.id_bytes for i in self.inputs
+                    bytes.fromhex(i) for i in self.input_ids
                 ]))
             ).digest(),
             "sigfield4": sha256(
                 b''.join(sorted([
-                    o.id_bytes for o in self.outputs
+                    bytes.fromhex(o) for o in self.output_ids
                 ]))
             ).digest(),
         }

@@ -190,7 +190,7 @@ class NewTransactionModal(ModalScreen):
         if not txn.validate(reload=False):
             buf = StringIO()
             with redirect_stdout(buf):
-                txn.validate("New Txn Modal")
+                txn.validate(debug="New Txn Modal", reload=False)
             debug_output = buf.getvalue().strip()
             self.app.log_event(
                 f"Txn failed validation:\n{debug_output}",

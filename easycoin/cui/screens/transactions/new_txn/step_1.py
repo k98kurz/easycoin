@@ -121,23 +121,23 @@ class SelectInputsContainer(Vertical):
                 if output in self.txn_data.selected_inputs:
                     self.txn_data.selected_inputs.remove(output)
                     if output.id in txn.input_ids:
+                        txn.inputs = [
+                            i for i in txn.inputs if i.id != output.id
+                        ]
                         txn.input_ids = [
                             oid for oid in txn.input_ids
                             if oid != output.id
-                        ]
-                        txn.inputs = [
-                            i for i in txn.inputs if i.id != output.id
                         ]
                     table.update_cell(event.row_key, "selected", " ")
                 else:
                     self.txn_data.selected_inputs.append(output)
                     if output.id not in txn.input_ids:
-                        txn.input_ids = [
-                            output.id, *txn.input_ids
-                        ]
                         txn.inputs = [
                             output.coin,
                             *txn.inputs
+                        ]
+                        txn.input_ids = [
+                            output.id, *txn.input_ids
                         ]
                     table.update_cell(event.row_key, "selected", "✓")
 
@@ -149,6 +149,4 @@ class SelectInputsContainer(Vertical):
                 except Exception:
                     pass
         except Exception as e:
-            parent = self.app.screen if hasattr(self.app, 'screen') else None
-            if parent:
-                parent.app.log_event(f"Error toggling selection: {e}", "ERROR")
+            self.app.log_event(f"Error toggling selection: {e}", "ERROR")

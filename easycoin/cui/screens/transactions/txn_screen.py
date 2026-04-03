@@ -162,6 +162,7 @@ class TransactionsScreen(BaseScreen):
         self.log_event("Refreshing transactions", "INFO")
         self._load_transactions()
 
+    @on(DataTable.RowSelected, "#transactions_table")
     @on(Button.Pressed, "#btn_view_txn")
     def action_view_transaction(self) -> None:
         """View details of selected transaction."""

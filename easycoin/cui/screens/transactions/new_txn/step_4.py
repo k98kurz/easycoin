@@ -60,6 +60,7 @@ class ReviewSubmitContainer(VerticalScroll):
         if len(outputs_table.columns) == 0:
             outputs_table.add_columns(
                 ("Amount", "amount"),
+                ("Data Size", "data_size"),
                 ("Address", "address"),
             )
         outputs_table.cursor_type = "none"
@@ -90,6 +91,7 @@ class ReviewSubmitContainer(VerticalScroll):
             total_out += coin.amount
             outputs_table.add_row(
                 format_balance(coin.amount, exact=True),
+                len(coin.data['details'] or b''),
                 Address({"lock": coin.lock}).hex,
             )
 

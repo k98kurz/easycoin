@@ -220,11 +220,14 @@ class TestTxn(unittest.TestCase):
     def test_validate_accepts_valid_mint_and_spend(self):
         # first mine a coin and save it
         c1 = models.Coin.mine(SINGLE_SIG_LOCK)
-        c1.save()
+        c1.id = c1.generate_id(c1.data)
         t = models.Txn({'output_ids': c1.id, 'input_ids': ''})
+        t.outputs = [c1]
         t.set_timestamp()
-        assert t.validate(debug='line 218')
+        assert t.validate(reload=False, debug='line 218')
         t.save()
+        c1.save()
+        assert t.validate(debug='line 230')
         # now spend it
         c2 = models.Coin.create(SINGLE_SIG_LOCK, c1.amount - 500)
         c2.save()
