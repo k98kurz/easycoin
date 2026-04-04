@@ -443,7 +443,7 @@ class Txn(HashedModel):
             # calculate burn as sum(inputs)-sum(outputs) #
             sub d2
 
-            # divide amount burned/{rate} #
+            # divide burned amount by {rate} #
             push d{rate} swap2 div
 
             # sum minted n values #
@@ -453,7 +453,7 @@ class Txn(HashedModel):
                 add d2 @i
             }} pop0
 
-            # ensure minted n amount i <= burned/{rate} #
+            # ensure minted n amount <= burned/{rate} #
             leq
         ''')
 

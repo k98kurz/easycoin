@@ -84,8 +84,11 @@ class MakeAddressModal(Screen):
                         classes="hidden"
                     )
 
-            with Vertical(id="custom_container", classes="hidden h-5 mt-1"):
-                yield Static("Custom Script:", classes="text-bold mb-1")
+            with Vertical(id="custom_container", classes="hidden h-8 mt-1"):
+                yield Static(
+                    "[bold]Custom Script:[/bold] (be careful not to create a "
+                    "broken lock/unspendable address)", classes="mb-1"
+                )
                 yield TextArea( "", id="custom_script")
 
             with Vertical(classes="mt-1 h-auto"):

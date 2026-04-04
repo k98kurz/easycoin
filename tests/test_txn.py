@@ -174,10 +174,9 @@ class TestTxn(unittest.TestCase):
         assert mf2 > mf1
 
     def test_validate_rejects_txn_over_max_size_or_with_excessive_stamp_details(self):
-        big_n = '0' * 1024
-        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 100000).save()
+        big_n = '0' * (499 * 1024)
+        c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1_000_000).save()
         c2 = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 100, '0' + big_n).save()
-        #print(f'{c1.amount=} {c2.amount=}')
         t = models.Txn({
             'input_ids': c1.id,
             'output_ids': c2.id,
@@ -189,7 +188,7 @@ class TestTxn(unittest.TestCase):
         t.set_timestamp()
         assert t.validate(debug='line 190', reload=False)
         outputs = [c2]
-        for i in range(1, 32):
+        for i in range(1, 11):
             c = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 100, str(i) + big_n).save()
             outputs.append(c)
         t.outputs = outputs
@@ -198,7 +197,7 @@ class TestTxn(unittest.TestCase):
         # case 2: txn size is okay, but the output coin is too large
         t.outputs = [c2]
         assert t.validate(debug='line 200', reload=False)
-        c2.data['details'] = packify.pack({'n': big_n * 12})
+        c2.data['details'] = packify.pack({'n': big_n * 2})
         assert not t.validate(debug='line 202', reload=False)
 
     def test_validate_rejects_mint_txn_that_fails_difficulty_threshold(self):

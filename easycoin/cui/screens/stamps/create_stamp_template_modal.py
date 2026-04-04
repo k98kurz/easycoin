@@ -14,6 +14,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
     """Modal for creating new StampTemplate objects or editing existing ones."""
 
     BINDINGS = [
+        Binding("0", "app.open_repl", "REPL"),
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+s", "save", "Save"),
@@ -138,7 +139,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         mint_lock_script = self.query_one("#mint_lock_script")
         if event.value:
             mint_lock_script.remove_class("hidden")
-            mint_lock_script.focus()
+            #mint_lock_script.focus()
         else:
             mint_lock_script.add_class("hidden")
         self.update_mintlock_prefix_container()
@@ -149,7 +150,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         prefix_script = self.query_one("#prefix_script")
         if event.value:
             prefix_script.remove_class("hidden")
-            prefix_script.focus()
+            #prefix_script.focus()
         else:
             prefix_script.add_class("hidden")
         self.update_mintlock_prefix_container()
