@@ -4,10 +4,16 @@ from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import (
-    Button, Static, Input, RadioSet, RadioButton, Checkbox, Footer
+    Button, Static, Input, RadioSet, RadioButton, Checkbox, Footer, OptionList
 )
+from textual.widgets.option_list import Option
+from easycoin.constants import _max_detail_icon_size
 from easycoin.models import StampTemplate, Txn, StampType
 from easycoin.cui.widgets import ECTextArea
+from easycoin.cui.widgets.file_picker_modal import FilePickerModal
+from easycoin.cui.helpers import get_image_type
+from pathlib import Path
+import base64
 
 
 class CreateStampTemplateModal(ModalScreen[bool|None]):
@@ -15,6 +21,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
     BINDINGS = [
         Binding("0", "app.open_repl", "REPL"),
+        Binding("ctrl+e", "app.open_event_log", "Event Log"),
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+s", "save", "Save"),
@@ -44,10 +51,10 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
                     yield Static("Name:", classes="text-bold my-1")
                     yield Input(id="name_input", placeholder="Template name")
                 with Vertical():
-                    yield Static("Type:", classes="text-bold my-1")
+                    yield Static("Covenant Type:", classes="text-bold my-1")
                     yield RadioSet(
                         RadioButton("Single", id="type_single", value=True),
-                        RadioButton("Series", id="type_series"),
+                        RadioButton("Fungible Series", id="type_series"),
                         RadioButton("Custom", id="type_unknown"),
                         id="type_radio",
                     )
@@ -82,13 +89,54 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
             with Horizontal(id="mintlock_prefix_container", classes="mt-1 h-6"):
                 with Vertical(classes="w-50p"):
-                    yield Checkbox("Enable Mint Lock (L)", id="enable_mint_lock")
-                    yield ECTextArea(id="mint_lock_script", classes="h-12 hidden mt-1")
+                    yield Checkbox("Enable Mint Lock ('L')", id="enable_mint_lock")
+                    yield ECTextArea(
+                        id="mint_lock_script", classes="h-12 hidden mt-1"
+                    )
                 with Vertical(classes="w-50p"):
-                    yield Checkbox("Enable Prefix (_)", id="enable_prefix")
+                    yield Checkbox("Enable Prefix Script ('_')", id="enable_prefix")
                     yield ECTextArea(id="prefix_script", classes="h-12 hidden mt-1")
 
             yield Static("", id="error_display", classes="text-bold mt-1 hidden")
+
+            yield Static(
+                "Stamp Details (optional; stamp 'd' value):",
+                classes="text-bold my-1"
+            )
+
+            with Horizontal(classes="h-8"):
+                with Vertical(classes="w-50p"):
+                    yield Static("Details Type:", classes="text-bold mb-1")
+                    yield OptionList(
+                        Option("N/A", id="na"),
+                        Option("Token", id="token"),
+                        Option("Image", id="image"),
+                        Option("Text", id="text"),
+                        id="details_type",
+                    )
+                with Vertical(classes="w-50p"):
+                    yield Static("Name:", classes="text-bold mb-1")
+                    yield Input(id="details_name", placeholder="Optional name")
+
+            with Horizontal(classes="h-7 mt-1"):
+                with Vertical():
+                    yield Static("Description:", classes="text-bold mb-1")
+                    yield Input(
+                        id="details_description", placeholder="Optional description"
+                    )
+                with Vertical():
+                    yield Static("Icon (b64):", classes="text-bold mb-1")
+                    with Horizontal():
+                        yield Button(
+                            "Import File", id="btn_import_icon", classes="m-0"
+                        )
+                        yield Input(
+                            id="details_icon",
+                            placeholder="Base64 encoded image (max "
+                            f"{_max_detail_icon_size:,} bytes)",
+                        )
+
+            yield Static("Data-script-hash: ...", id="dsh", classes="mt-1 text-bold")
 
             with Horizontal(id="modal_actions"):
                 yield Button("Save", id="btn_save", variant="primary")
@@ -118,6 +166,11 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             stamp_type = StampType.UNKNOWN
 
         self._prepopulate_covenant_script(stamp_type)
+
+    @on(OptionList.OptionHighlighted, "#details_type")
+    def _on_details_type_changed(self, event: OptionList.OptionHighlighted) -> None:
+        """Handle details type selection."""
+        pass
 
     def _prepopulate_covenant_script(self, stamp_type: StampType) -> None:
         """Set covenant script text area based on `stamp_type`."""
@@ -177,6 +230,63 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         """Cancel and dismiss modal."""
         self.dismiss(None)
 
+    @on(Button.Pressed, "#btn_import_icon")
+    def import_icon(self) -> None:
+        """Import icon file from filesystem."""
+        filter_func = (
+            lambda p: p.suffix.lower() in
+            ['.png', '.jpg', '.jpeg', '.gif', '.webp']
+        )
+
+        def on_file_selected(filepath: Path | None) -> None:
+            """Handle file selection callback."""
+            if not filepath:
+                return
+            try:
+                data = filepath.read_bytes()
+
+                if len(data) > _max_detail_icon_size:
+                    self.app.notify(
+                        f"Icon must be ≤{_max_detail_icon_size:,} bytes",
+                        severity="error"
+                    )
+                    self.app.log_event(
+                        "Import validation error: icon exceeds "
+                        f"{_max_detail_icon_size:,} bytes ({len(data):,} bytes)",
+                        "WARNING"
+                    )
+                    return
+
+                if get_image_type(data) is None:
+                    self.app.notify(
+                        "Unsupported icon format (supported: PNG, JPEG, GIF, WebP)",
+                        severity="error"
+                    )
+                    self.app.log_event(
+                        "Import validation error: unsupported image format for "
+                        f"{filepath.name}",
+                        "WARNING"
+                    )
+                    return
+
+                b64_data = base64.b64encode(data).decode()
+                self.query_one("#details_icon").value = b64_data
+                self.app.notify(
+                    f"Imported: {filepath.name}",
+                    severity="success"
+                )
+            except Exception as e:
+                self.app.notify(
+                    f"Failed to read file: {e}",
+                    severity="error"
+                )
+                self.app.log_event(f"Import file error: {e}", "ERROR")
+
+        self.app.push_screen(FilePickerModal(
+            title="Select Icon Image",
+            filter_callback=filter_func
+        ), on_file_selected)
+
     async def action_quit(self) -> None:
         """Quit the application."""
         await self.app.action_quit()
@@ -187,18 +297,17 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         """
         self.error_message = ""
 
-        name_input = self.query_one("#name_input")
-        description_input = self.query_one("#description_input")
-        version_input = self.query_one("#version_input")
-        author_input = self.query_one("#author_input")
-        tags_input = self.query_one("#tags_input")
+        name = self.query_one("#name_input").value.strip()
+        description = self.query_one("#description_input").value.strip() or None
+        version = self.query_one("#version_input").value.strip() or None
+        author = self.query_one("#author_input").value.strip() or None
+        tags = self.query_one("#tags_input").value.strip() or None
         covenant_script = self.query_one("#covenant_script")
         enable_mint_lock = self.query_one("#enable_mint_lock")
         mint_lock_script = self.query_one("#mint_lock_script")
         enable_prefix = self.query_one("#enable_prefix")
         prefix_script = self.query_one("#prefix_script")
 
-        name = name_input.value.strip()
         if not name:
             self.app.log_event("Name is required", "WARNING")
             self.app.notify("Name is required", severity="warning")
@@ -213,11 +322,6 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         else:
             stamp_type = StampType.UNKNOWN
 
-        description = description_input.value.strip() or None
-        version = version_input.value.strip() or None
-        author = author_input.value.strip() or None
-        tags = tags_input.value.strip() or None
-
         scripts: dict[str, str] = {'$': covenant_script.text}
 
         if enable_mint_lock.value and mint_lock_script.text.strip():
@@ -225,6 +329,46 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
         if enable_prefix.value and prefix_script.text.strip():
             scripts['_'] = prefix_script.text.strip()
+
+        details: dict[str, bytes|str|None] = {}
+        details_type = self.query_one("#details_type")
+        selected_option = details_type.highlighted_option
+        if selected_option and selected_option.id != "na":
+            selected_id = selected_option.id
+            if selected_id == "token":
+                details['type'] = 'token'
+            elif selected_id == "image":
+                details['type'] = 'image'
+            elif selected_id == "text":
+                details['type'] = 'text'
+
+        details_name = self.query_one("#details_name").value.strip()
+        if details_name:
+            details['name'] = details_name
+
+        details_description = self.query_one("#details_description").value.strip()
+        if details_description:
+            details['desc'] = details_description
+
+        details_icon = self.query_one("#details_icon").value.strip()
+
+        try:
+            if details_icon:
+                try:
+                    icon_bytes = base64.b64decode(details_icon, validate=True)
+                except Exception as e:
+                    raise ValueError(f"Invalid base64 icon: {e}")
+                if len(icon_bytes) > _max_detail_icon_size:
+                    raise ValueError(f"Icon must be ≤{_max_detail_icon_size:,} bytes")
+                if get_image_type(icon_bytes) is None:
+                    raise ValueError(
+                        "Unsupported icon format (supported: PNG, JPEG, GIF, WebP)"
+                    )
+                details['icon'] = icon_bytes
+        except ValueError as e:
+            self.app.log_event(f"Validation Error: {e}", "WARNING")
+            self.app.notify(f"Validation Error: {e}", severity="warning")
+            return False
 
         try:
             self.template.name = name
@@ -234,6 +378,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             self.template.author = author
             self.template.tags = tags
             self.template.scripts = scripts
+            self.template.details = details if details else None
             self.template.save()
             self.error_message = ""
             self._show_error()
@@ -309,8 +454,38 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             prefix_script.add_class("hidden")
             prefix_script.text = ""
 
+        details = self.template.details or {}
+        details_type = self.query_one("#details_type")
+        details_name = self.query_one("#details_name")
+        details_description = self.query_one("#details_description")
+        details_icon = self.query_one("#details_icon")
+
+        if 'type' in details:
+            type_id = details['type']
+            for i in range(details_type.option_count):
+                opt = details_type.get_option_at_index(i)
+                if opt.id == type_id:
+                    details_type.highlighted = i
+                    break
+        else:
+            details_type.highlighted = 0
+
+        details_name.value = details.get('name', '')
+        details_description.value = details.get('desc', '')
+        icon_bytes = details.get('icon')
+        if icon_bytes:
+            details_icon.value = base64.b64encode(icon_bytes).decode()
+        else:
+            details_icon.value = ""
+
+        self.query_one("#dsh").update(f"Data-script-hash: {self.template.dsh.hex()}")
+
     def _initialize_new_template(self) -> None:
         """Initialize form for new template with defaults."""
+        self.query_one("#details_type").highlighted = 0
+        self.query_one("#details_name").value = ""
+        self.query_one("#details_description").value = ""
+        self.query_one("#details_icon").text = ""
         self._prepopulate_covenant_script(StampType.SINGLE)
 
     def _show_error(self) -> None:

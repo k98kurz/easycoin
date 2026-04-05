@@ -87,10 +87,11 @@ class StampTemplatesScreen(BaseScreen):
         table.cursor_type = "row"
         table.add_columns(
             "Name",
-            "Type",
+            "Covenant Type",
             "Version",
             "Author",
-            "Tags"
+            "Tags",
+            "dsh",
         )
         self._load_templates()
 
@@ -201,7 +202,8 @@ class StampTemplatesScreen(BaseScreen):
                         template.type.value.capitalize(),
                         template.version or "N/A",
                         truncate_text(template.author or "", 20, 0),
-                        truncate_text(template.tags or "None", 20, 0)
+                        truncate_text(template.tags or "None", 20, 0),
+                        template.dsh.hex(),
                     )
                     self.template_id_map[row_key] = template.id
                 except Exception as e:

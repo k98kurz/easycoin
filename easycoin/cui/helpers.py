@@ -121,3 +121,22 @@ def sigflags_ints_to_hex(sigfield_indices: set[int]) -> str:
         sig_flag |= 1 << (idx - 1)
     return sig_flag.to_bytes(1, 'big').hex()
 
+
+def get_image_type(data: bytes) -> str|None:
+    """Detect image type from magic bytes. Returns 'png', 'jpeg', 'gif', 'webp',
+        or None if magic bytes are not detected.
+    """
+    if len(data) < 3:
+        return None
+
+    if data[:8] == b'\x89PNG\r\n\x1a\n':
+        return "png"
+    elif data[:3] == b'\xff\xd8\xff':
+        return "jpeg"
+    elif data[:6] in (b'GIF87a', b'GIF89a'):
+        return "gif"
+    elif data[:4] == b'RIFF' and len(data) >= 12 and data[8:12] == b'WEBP':
+        return "webp"
+    else:
+        return None
+

@@ -193,8 +193,9 @@ get_value s"so_n" push d0
 leq verify
 ```
 
-The node interface will automatically handle creation of unique stamps and stamp
-series.
+The CUI interface supports creation of unique stamps and fungible stamp series,
+and it allows experimentation with custom covenants, mint locks, and prefix
+scripts.
 
 NB: This covenant will become significantly more efficient after the tapescript
 0.8.0 update changes how `OP_ADD_INTS` functions (final 2 loops will be replaced
@@ -264,7 +265,7 @@ of that was rewritten before being published anyway.
 
 ## Testing
 
-This project contains 42 tests, most of them unit tests but some integration
+This project contains 81 tests, most of them unit tests but some integration
 tests.
 
 To set up, clone the repository and run the following:
@@ -281,11 +282,11 @@ Tests across LANs/the Internet are done manually.
 
 ## ISC License
 
-Copyleft (c) 2025 Jonathan Voss (k98kurz)
+Copyright (c) 2026 Jonathan Voss (k98kurz)
 
 Permission to use, copy, modify, and/or distribute this software
 for any purpose with or without fee is hereby granted, provided
-that the above copyleft notice and this permission notice appear in
+that the above copyright notice and this permission notice appear in
 all copies.
 
 THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL

@@ -1,10 +1,11 @@
 import packify
 
 
-# coin constants
+# coin/stamp constants
 _mint_difficulty = 200
 _min_coin_mint_size = 100000
 _max_stamp_size = 500 * 1024
+_max_detail_icon_size = 12 * 1024
 
 # txn constants
 _witfee_mult = 1
