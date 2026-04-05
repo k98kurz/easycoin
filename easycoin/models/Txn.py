@@ -261,7 +261,8 @@ class Txn(HashedModel):
                         self.runtime_cache(coin)
                     ):
                     if debug:
-                        print(f'stamp creation constraint failed validation ({debug})')
+                        print('stamp creation constraint failed validation '
+                            f'({debug})')
                     return False
         # all other stamp constraints must be embedded in the scripts
 
@@ -283,25 +284,16 @@ class Txn(HashedModel):
 
         # stamp ids
         so_det = [
-            sha256(packify.pack({
-                k: v for k,v in o.details.items()
-                if k not in ('id', 'dsh')
-            })).digest()
+            o.stamp_id
             for o in self.outputs
             if o.details
         ]
         si_det = [
-            sha256(packify.pack({
-                k: v for k,v in i.details.items()
-                if k not in ('id', 'dsh')
-            })).digest()
+            i.stamp_id
             for i in self.inputs
             if i.details
         ]
-        ii_det = sha256(packify.pack({
-            k: v for k,v in coin.details.items()
-            if k not in ('id', 'dsh')
-        })).digest()
+        ii_det = coin.stamp_id
 
         # stamp nonces/numbers/notes
         so_n = [o.details.get('n', b'') for o in self.outputs if o.details]

@@ -86,6 +86,14 @@ class Coin(HashedModel):
         self.data['details'] = val
 
     @property
+    def stamp_id(self) -> bytes:
+        """Derives the stamp ID from the stamp details."""
+        return sha256(packify.pack({
+            k: v for k,v in self.details.items()
+            if k not in ('id', 'dsh')
+        })).digest()
+
+    @property
     def dsh(self) -> bytes:
         """Derives the dsh (data-script-hash) used for comparing Stamps
             to see if they are within a series.
