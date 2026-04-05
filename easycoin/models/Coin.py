@@ -95,6 +95,11 @@ class Coin(HashedModel):
             if k in ('d', 'L', '_', '$')
         })).digest()
 
+    @property
+    def issue(self) -> bytes:
+        """Returns the sha256 of the 'L' mint lock script if one exists."""
+        return sha256(self.details.get('L', None) or b'').digest()
+
     def check_size(self) -> bool:
         """Returns True if the serialized details are not too large."""
         return len(packify.pack(self.details)) < _max_stamp_size

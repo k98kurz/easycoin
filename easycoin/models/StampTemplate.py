@@ -99,3 +99,9 @@ class StampTemplate(SqlModel):
         d = { 'd': self.details, **scripts }
         return sha256(packify.pack(d)).digest()
 
+    @property
+    def issue(self) -> bytes:
+        """Returns the sha256 of the 'L' mint lock script if one exists."""
+        L = Script.from_src(self.scripts.get('L', None) or '')
+        return sha256(L.bytes).digest()
+

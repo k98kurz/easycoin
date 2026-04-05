@@ -137,6 +137,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
                         )
 
             yield Static("Data-script-hash: ...", id="dsh", classes="mt-1 text-bold")
+            yield Static("Issue: ...", id="issue", classes="mt-1 text-bold")
 
             with Horizontal(id="modal_actions"):
                 yield Button("Save", id="btn_save", variant="primary")
@@ -479,6 +480,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             details_icon.value = ""
 
         self.query_one("#dsh").update(f"Data-script-hash: {self.template.dsh.hex()}")
+        self.query_one("#issue").update(f"Issue: {self.template.issue.hex()}")
 
     def _initialize_new_template(self) -> None:
         """Initialize form for new template with defaults."""

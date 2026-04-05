@@ -92,6 +92,7 @@ class StampTemplatesScreen(BaseScreen):
             "Author",
             "Tags",
             "dsh",
+            "issue",
         )
         self._load_templates()
 
@@ -204,6 +205,7 @@ class StampTemplatesScreen(BaseScreen):
                         truncate_text(template.author or "", 20, 0),
                         truncate_text(template.tags or "None", 20, 0),
                         template.dsh.hex(),
+                        template.issue.hex(),
                     )
                     self.template_id_map[row_key] = template.id
                 except Exception as e:
