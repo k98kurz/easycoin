@@ -8,11 +8,11 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Static, Footer
 from easycoin.models import Txn, Coin, Address
 from easycoin.UTXOSet import UTXOSet
-from easycoin.cui.screens.transactions.new_txn.data import TransactionData
-from easycoin.cui.screens.transactions.new_txn.step_1 import SelectInputsContainer
-from easycoin.cui.screens.transactions.new_txn.step_2 import AddOutputsContainer
-from easycoin.cui.screens.transactions.new_txn.step_3 import WitnessInputsContainer
-from easycoin.cui.screens.transactions.new_txn.step_4 import ReviewSubmitContainer
+from .data import TransactionData
+from .step_1 import SelectInputsContainer
+from .step_2 import AddOutputsContainer
+from .step_3 import WitnessInputsContainer
+from .step_4 import ReviewSubmitContainer
 
 
 class NewTransactionModal(ModalScreen):

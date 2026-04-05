@@ -6,10 +6,8 @@ from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
 from tapescript import Script
 from easycoin.cui.helpers import format_balance, truncate_text
-from easycoin.cui.screens.transactions.new_txn.data import TransactionData
-from easycoin.cui.screens.transactions.new_txn.edit_witness_modal import (
-    EditWitnessModal
-)
+from .data import TransactionData
+from .edit_witness_modal import EditWitnessModal
 from easycoin.models import Output, Wallet, Coin, Txn, Address
 import packify
 

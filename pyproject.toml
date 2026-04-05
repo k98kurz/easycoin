@@ -9,15 +9,15 @@ authors = [
   { name="k98kurz", email="k98kurz@gmail.com" },
 ]
 dependencies = [
-  "merkleasy >= 0.1.2",
-  "musig >= 0.0.1",
-  "packify >= 0.3.1",
-  "sqloquent >= 0.7.4",
-  "tapescript >= 0.7.3",
-  "tapehash >= 0.1.1",
-  "crossconfig >= 0.0.3",
-  "pyperclip >= 1.11.0",
-  "netaio >= 0.0.9",
+  "merkleasy == 0.1.2",
+  "musig == 0.0.1",
+  "packify == 0.3.1",
+  "sqloquent == 0.7.4",
+  "tapescript == 0.7.3",
+  "tapehash == 0.1.1",
+  "crossconfig == 0.0.3",
+  "pyperclip == 1.11.0",
+  "netaio == 0.0.9",
 ]
 description = "Proof-of-concept + proof-of-work - consensus = easycoin."
 readme = "readme.md"
@@ -37,7 +37,7 @@ classifiers = [
 
 [project.optional-dependencies]
 cui = [
-  "textual >= 8.1.1",
+  "textual == 8.1.1",
 ]
 
 [project.scripts]

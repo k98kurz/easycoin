@@ -5,7 +5,7 @@ from textual.containers import VerticalScroll, Vertical, Horizontal
 from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
 from easycoin.cui.helpers import format_balance
-from easycoin.cui.screens.transactions.edit_output_modal import EditOutputModal
+from .edit_output_modal import EditOutputModal
 from easycoin.cui.helpers import estimate_fee_for_witness, truncate_text
 from easycoin.models import Address, Coin, Txn, Wallet
 
