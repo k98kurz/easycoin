@@ -190,10 +190,6 @@ class Coin(HashedModel):
         details = {'n': n, **optional}
         if 'd' in details:
             type_assert(type(details['d']) is dict, 'd value must be dict')
-        details['id'] = sha256(packify.pack({
-            k: v for k, v in details.items()
-            if k not in ('id', 'dsh')
-        })).digest()
         coin.details = details
         return coin
 

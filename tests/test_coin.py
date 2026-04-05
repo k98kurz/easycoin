@@ -105,8 +105,7 @@ class TestCoin(unittest.TestCase):
     def test_stamp_method_returns_coin(self):
         c = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, 999, "test")
         assert isinstance(c, models.Coin)
-        assert 'id' in c.details
-        assert type(c.details['id']) is bytes
+        assert type(c.stamp_id) is bytes
         assert 'n' in c.details
         assert c.details['n'] == "test"
 
