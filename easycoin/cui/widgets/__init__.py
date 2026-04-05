@@ -12,6 +12,7 @@ __all__ = [
     "EventLog",
     "LogLevel",
     "FilePickerModal",
+    "InputModal",
     "RightSidebar",
     "SigflagsModal",
     "TopTabs",

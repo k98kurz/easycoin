@@ -3,8 +3,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Checkbox, DataTable, Input, Static
 from easycoin.models import Coin, TrustNet, Wallet
-from ..base import BaseScreen
-from easycoin.cui.helpers import format_balance, truncate_text
+from easycoin.cui.screens.base import BaseScreen
+from easycoin.cui.helpers import format_amount, format_balance, truncate_text
 from .mine_config import MiningConfigurationModal
 
 
@@ -18,6 +18,12 @@ class CoinsScreen(BaseScreen):
         ("m", "open_mining_config", "Configure Mining"),
     ]
 
+    def __init__(self):
+        """Initialize coins screen."""
+        super().__init__()
+        self._coins = []
+        self._coin_row_map = {}
+
     def compose(self) -> ComposeResult:
         """Compose coins screen layout."""
         yield from super().compose()
@@ -28,6 +34,7 @@ class CoinsScreen(BaseScreen):
             yield Static("Coins", classes="panel-title")
             with Horizontal(id="coins_header", classes="h-3 mt-1"):
                 yield Checkbox("Active Wallet Only", id="box_active_wallet")
+                yield Checkbox("Stamps Only", id="box_stamps_only")
                 yield Input(placeholder="Search coins...", id="search_input")
 
             yield DataTable(id="coins_table", classes="mt-1")
@@ -48,6 +55,7 @@ class CoinsScreen(BaseScreen):
         table.add_columns(
             "Coin ID",
             "Amount",
+            "Data Size",
             "Lock Type",
             "Status",
             "Network"
@@ -63,6 +71,10 @@ class CoinsScreen(BaseScreen):
 
     @on(Checkbox.Changed, "#box_active_wallet")
     def _checkbox_changed(self, event: Checkbox.Changed) -> None:
+        self._load_coins(search_query=self.query_one("#search_input").value)
+
+    @on(Checkbox.Changed, "#box_stamps_only")
+    def _stamps_only_changed(self, event: Checkbox.Changed) -> None:
         self._load_coins(search_query=self.query_one("#search_input").value)
 
     @on(Input.Changed, "#search_input")
@@ -97,8 +109,12 @@ class CoinsScreen(BaseScreen):
             self.app.notify(f"Error loading coins: {e}", severity="error")
             return
 
+        stamps_only = self.query_one("#box_stamps_only").value
+
         table = self.query_one("#coins_table")
         table.clear()
+        self._coins.clear()
+        self._coin_row_map.clear()
 
         sorted_coins = sorted(
             coins,
@@ -110,14 +126,23 @@ class CoinsScreen(BaseScreen):
             if search_query and search_query.lower() not in coin.id.lower():
                 continue
 
+            is_stamp = len(coin.details) > 0
+            if stamps_only and not is_stamp:
+                continue
+
+            self._coins.append(coin)
+
             try:
-                table.add_row(
+                data_size = len(coin.data.get('details', None) or b'')
+                row_key = table.add_row(
                     coin.id,
                     format_balance(coin.amount),
+                    f"{format_amount(data_size)}B",
                     Wallet.get_lock_type(coin.lock),
                     "Spent" if coin.spent else "Unspent",
                     self._get_network_name(coin.net_id)
                 )
+                self._coin_row_map[row_key] = coin
             except Exception as e:
                 self.log_event(f"Error adding coin row: {e}", "ERROR")
 
@@ -145,4 +170,13 @@ class CoinsScreen(BaseScreen):
             self.log_event(f"Error finding trustnet: {e}", "DEBUG")
 
         return truncate_text(net_id, suffix_len=0)
+
+    @on(DataTable.RowSelected, "#coins_table")
+    def _on_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Handle row selection to show coin details."""
+        from .coin_detail_modal import CoinDetailModal
+        row_key = event.row_key
+        coin = self._coin_row_map.get(row_key)
+        if coin:
+            self.app.push_screen(CoinDetailModal(coin))
 

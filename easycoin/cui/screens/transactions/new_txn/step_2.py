@@ -4,7 +4,7 @@ from textual.binding import Binding
 from textual.containers import VerticalScroll, Vertical, Horizontal
 from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
-from easycoin.cui.helpers import format_balance
+from easycoin.cui.helpers import format_balance, format_amount
 from .edit_output_modal import EditOutputModal
 from easycoin.cui.helpers import estimate_fee_for_witness, truncate_text
 from easycoin.models import Address, Coin, Txn, Wallet
@@ -129,10 +129,23 @@ class AddOutputsContainer(Vertical):
         def on_dismiss(result):
             if not result:
                 return
-            coin = Coin.create(
-                lock=Address.parse(result['address']),
-                amount=result['amount'],
-            )
+            
+            if result.get('is_stamp'):
+                stamp_details = result['stamp_details']
+                n = stamp_details['n']
+                optional = {k: v for k, v in stamp_details.items() if k != 'n'}
+                coin = Coin.stamp(
+                    lock=Address.parse(result['address']),
+                    amount=result['amount'],
+                    n=n,
+                    optional=optional,
+                )
+            else:
+                coin = Coin.create(
+                    lock=Address.parse(result['address']),
+                    amount=result['amount'],
+                )
+            
             coin.wallet_id = self.app.wallet.id
             coin.id = coin.generate_id(coin.data)
             self.txn_data.txn.outputs = [
@@ -158,7 +171,8 @@ class AddOutputsContainer(Vertical):
         self.app.push_screen(
             EditOutputModal(
                 address=None, amount=0, info=None,
-                max_amount=total_in - total_out - self.txn_data.fee
+                max_amount=total_in - total_out - self.txn_data.fee,
+                txn_data=self.txn_data
             ),
             on_dismiss
         )
@@ -176,8 +190,19 @@ class AddOutputsContainer(Vertical):
                     return
                 coin = self.txn_data.new_output_coins[result['info']]
                 prev_id = coin.id
-                coin.lock = Address.parse(result['address'])
-                coin.amount = result['amount']
+                
+                if result.get('is_stamp'):
+                    stamp_details = result['stamp_details']
+                    n = stamp_details['n']
+                    optional = {k: v for k, v in stamp_details.items() if k != 'n'}
+                    coin.lock = Address.parse(result['address'])
+                    coin.amount = result['amount']
+                    coin.details = {'n': n, **optional}
+                else:
+                    coin.lock = Address.parse(result['address'])
+                    coin.amount = result['amount']
+                    coin.details = None
+                
                 coin.wallet_id = self.app.wallet.id
                 coin.id = coin.generate_id(coin.data)
                 self.txn_data.txn.outputs = [
@@ -206,7 +231,8 @@ class AddOutputsContainer(Vertical):
                     address=Address({'lock': current.lock}).hex,
                     amount=current.amount,
                     info=output_index,
-                    max_amount=total_in - total_out - self.txn_data.fee
+                    max_amount=total_in - total_out - self.txn_data.fee,
+                    txn_data=self.txn_data
                 ),
                 on_dismiss
             )

@@ -18,6 +18,7 @@ class ConfirmationModal(ModalScreen):
             self, title: str, message: str, *,
             confirm_btn_variant="success", confirm_btn_classes="",
             cancel_btn_variant="default", cancel_btn_classes="",
+            confirm_btn_text="Confirm", cancel_btn_text="Cancel"
         ):
         """Initialize confirmation modal."""
         super().__init__()
@@ -27,6 +28,8 @@ class ConfirmationModal(ModalScreen):
         self.confirm_btn_classes = confirm_btn_classes
         self.cancel_btn_variant = cancel_btn_variant
         self.cancel_btn_classes = cancel_btn_classes
+        self.confirm_btn_text = confirm_btn_text
+        self.cancel_btn_text = cancel_btn_text
 
     def compose(self) -> ComposeResult:
         """Compose confirmation modal layout."""
@@ -36,11 +39,13 @@ class ConfirmationModal(ModalScreen):
             yield Static(self.message)
             with Horizontal(id="modal_actions"):
                 yield Button(
-                    "Confirm", id="btn_confirm", variant=self.confirm_btn_variant,
+                    self.confirm_btn_text, id="btn_confirm",
+                    variant=self.confirm_btn_variant,
                     classes=self.confirm_btn_classes,
                 )
                 yield Button(
-                    "Cancel", id="btn_cancel", variant=self.cancel_btn_variant,
+                    self.cancel_btn_text, id="btn_cancel",
+                    variant=self.cancel_btn_variant,
                     classes=self.cancel_btn_classes,
                 )
 
