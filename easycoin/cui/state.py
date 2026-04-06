@@ -1,12 +1,10 @@
 """
-StateManager: centralized reactive state with subscribe/publish
-pattern for cross-screen updates.
+StateManager: subscribe/publish + state bag for cross-screen updates.
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Callable
-
+from typing import Any, Callable
 from easycoin.cryptoworker import JobMessage
 from easycoin.models import Coin
 
@@ -19,149 +17,81 @@ class LogEntry:
     timestamp: datetime
 
 
-@dataclass
-class AppState:
-    """Application state data."""
-
-    wallet_info: dict = field(
-        default_factory=lambda: {"balance": 0, "coins": 0, "stamps": {}}
-    )
-    coins_count: int = 0
-    transactions_count: int = 0
-    mining_active: bool = False
-    mining_progress: int = 0
-    network_height: int = 0
-    peer_count: int = 0
-    log_entries: list[LogEntry] = field(default_factory=list)
-    log_entry_count: int = 0
-
-
 class StateManager:
-    """Centralized state management for EasyCoin CUI."""
+    """Pub/sub layer with some state sharing features."""
 
     def __init__(self, app):
         """Initialize StateManager with app reference."""
         self.app = app
-        self._state = AppState()
-        self._listeners = []
+        self.data = {}
+        self._subscriptions = {}
 
-    @property
-    def wallet_info(self) -> dict:
-        """Current wallet info dict with balance, coins, and stamps."""
-        return self._state.wallet_info
+    def subscribe(self, event_name: str, listener: Callable):
+        """Subscribe to a specific event."""
+        if event_name not in self._subscriptions:
+            self._subscriptions[event_name] = []
+        self._subscriptions[event_name].append(listener)
 
-    @property
-    def coins_count(self) -> int:
-        """Total number of coins owned."""
-        return self._state.coins_count
-
-    @property
-    def transactions_count(self) -> int:
-        """Total number of transactions."""
-        return self._state.transactions_count
-
-    @property
-    def mining_active(self) -> bool:
-        """Whether mining is currently active."""
-        return self._state.mining_active
-
-    @property
-    def mining_progress(self) -> int:
-        """Current mining progress percentage (0-100)."""
-        return self._state.mining_progress
-
-    @property
-    def network_height(self) -> int:
-        """Current network blockchain height."""
-        return self._state.network_height
-
-    @property
-    def peer_count(self) -> int:
-        """Number of connected peers."""
-        return self._state.peer_count
-
-    def subscribe(self, listener: Callable):
-        """Subscribe to state changes."""
-        self._listeners.append(listener)
-
-    def unsubscribe(self, listener: Callable):
-        """Unsubscribe from state changes. Silently ignores if not
+    def unsubscribe(self, event_name: str, listener: Callable):
+        """Unsubscribe from a specific event. Silently ignores if not
             subscribed.
         """
+        if event_name not in self._subscriptions:
+            return
         try:
-            self._listeners.remove(listener)
+            self._subscriptions[event_name].remove(listener)
         except ValueError:
-            self.app.logger.debug("Listener not found in _listeners")
+            self.app.logger.debug(
+                f"Listener not found in _subscriptions[{event_name}]"
+            )
 
-    def update_balance(self, balance: int) -> None:
-        """Update wallet balance in wallet_info dict."""
-        self._state.wallet_info["balance"] = balance
-        self._notify_listeners("wallet_info_changed", self._state.wallet_info)
+    def publish(self, event_name: str, data: Any = None):
+        """Publish an event to all subscriptions to that event."""
+        if event_name not in self._subscriptions:
+            return
+        for callback in self._subscriptions[event_name]:
+            try:
+                callback(data)
+            except Exception as e:
+                self.app.logger.warning(
+                    "subscription callback for event {event_name} failed: {e}"
+                )
 
-    def update_wallet_info(
-            self, *,
-            balance: int | None = None, coins: int | None = None,
-            stamps: dict[str, int] | None = None,
-        ) -> None:
-        """Update wallet info fields."""
-        if balance is not None:
-            self._state.wallet_info["balance"] = balance
-        if coins is not None:
-            self._state.wallet_info["coins"] = coins
-        if stamps is not None:
-            self._state.wallet_info["stamps"] = stamps
-        self._notify_listeners("wallet_info_changed", self._state.wallet_info)
+    def get(self, key: str) -> Any | None:
+        """Get some state."""
+        return self.data.get(key, None)
 
-    def update_mining_status(self, active: bool, progress: int = 0) -> None:
-        """Update mining status."""
-        self._state.mining_active = active
-        self._state.mining_progress = progress
-        self._notify_listeners("mining_status_changed", active, progress)
-
-    def update_network_status(self, height: int, peers: int) -> None:
-        """Update network status."""
-        self._state.network_height = height
-        self._state.peer_count = peers
-        self._notify_listeners("network_status_changed", height, peers)
-
-    def on_txn_validated(self, result: JobMessage) -> None:
-        """Handle transaction validation result. `result.result` can be
-            bool (valid) or Exception (error).
+    def set(self, key: str, data: Any):
+        """Set some state. Notify subscriptions for the `set_{key}`
+            event.
         """
-        self._notify_listeners("txn_validated", result)
+        self.data[key] = data
+        self.publish(f"set_{key}", data)
 
-    def on_coins_mined(self, coins: list[Coin | Exception]) -> None:
-        """Handle newly mined coins or mining errors. The list can
-            contain `Coin` objects or `Exception` objects. Screens
-            should handle both cases.
+    def unset(self, key: str):
+        """Unset some state. Notify subscriptions for the `unset_{key}`
+            event.
         """
-        coin_count = sum(1 for c in coins if not isinstance(c, Exception))
-        self._state.coins_count += coin_count
-        self._notify_listeners("coins_mined", coins)
+        self.publish(f"unset_{key}", self.data.pop(key, None))
+
+    def append(self, key: str, data: Any):
+        """Append to a list. If the list does not yet exist, create it.
+            Notify subscriptions for the `append_{key}` event. Raises
+            `TypeError` if the state with that key is set to a non-list.
+        """
+        if key not in self.data:
+            self.data[key] = []
+        if not isinstance(self.data[key], list):
+            raise TypeError(f"state item '{key}' is not a list; cannot append")
+        self.data[key].append(data)
+        self.publish(f"append_{key}", data)
 
     def add_log_entry(self, message: str, level: str) -> None:
-        """Add a log entry to state and notify listeners."""
-        from datetime import datetime
+        """Add a log entry to state and push to subscriptions."""
         entry = LogEntry(
             message=message,
             level=level,
             timestamp=datetime.now()
         )
-        self._state.log_entries.append(entry)
-        self._state.log_entry_count += 1
-        self._notify_listeners("log_entry_added", entry)
-
-    def _notify_listeners(self, event: str, *args) -> None:
-        """Notify all listeners of state change. Looks for `on_{event}`
-            method on each listener and calls it with `args`.
-        """
-        for listener in self._listeners:
-            callback = getattr(listener, f"on_{event}", None)
-            if callback:
-                try:
-                    callback(*args)
-                except Exception as e:
-                    self.app.logger.warning(
-                        f"Listener {listener} failed on {event}: {e}"
-                    )
+        self.append('log', entry)
 

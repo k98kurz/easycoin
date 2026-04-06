@@ -35,20 +35,18 @@ class EventLogDisplay(RichLog):
     def on_mount(self) -> None:
         """Subscribe to app state."""
         if hasattr(self.app, 'state'):
-            self.app.state.subscribe(self)
+            self.app.state.subscribe("append_log", self.on_log_entry_added)
         self._load_all_entries()
 
     def on_unmount(self) -> None:
         """Unsubscribe from app state."""
         if hasattr(self.app, 'state'):
-            self.app.state.unsubscribe(self)
+            self.app.state.unsubscribe("append_log", self.on_log_entry_added)
 
     def _load_all_entries(self) -> None:
         """Load all log entries from app state on mount."""
-        if  (   hasattr(self.app, 'state')
-                and hasattr(self.app.state._state, 'log_entries')
-            ):
-            for entry in self.app.state._state.log_entries:
+        if hasattr(self.app, 'state'):
+            for entry in self.app.state.get('log') or []:
                 try:
                     level = LogLevel[entry.level]
                     self._display_entry(entry.message, level, entry.timestamp)
@@ -164,16 +162,6 @@ class EventLog(Vertical):
             yield Button("Clear", id="clear_btn", variant="default")
             yield Button("Export", id="export_btn", variant="success")
 
-    def on_mount(self) -> None:
-        """Subscribe to app state when widget is mounted."""
-        if hasattr(self.app, 'state'):
-            self.app.state.subscribe(self)
-
-    def on_unmount(self) -> None:
-        """Unsubscribe from app state when widget is unmounted."""
-        if hasattr(self.app, 'state'):
-            self.app.state.unsubscribe(self)
-
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle search input changes."""
         if event.input.id == "log_search":
@@ -196,7 +184,6 @@ class EventLog(Vertical):
         level = level_mapping.get(event.option.id)
         if level is not None:
             log_widget.set_filter(level)
-
 
     @on(Button.Pressed, "#clear_btn")
     def action_clear_log(self, event = None) -> None:

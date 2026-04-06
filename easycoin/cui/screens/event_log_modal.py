@@ -32,16 +32,6 @@ class EventLogModal(ModalScreen):
             yield EventLog(id="event_log")
         yield Footer()
 
-    def on_mount(self) -> None:
-        """Subscribe to app state when modal is mounted."""
-        if hasattr(self.app, 'state'):
-            self.app.state.subscribe(self)
-
-    def on_unmount(self) -> None:
-        """Unsubscribe from app state when modal is unmounted."""
-        if hasattr(self.app, 'state'):
-            self.app.state.unsubscribe(self)
-
     def action_close(self) -> None:
         """Close event log modal."""
         self.dismiss()

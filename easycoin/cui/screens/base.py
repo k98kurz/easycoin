@@ -16,7 +16,7 @@ class BaseScreen(Screen):
     """
 
     BINDINGS = [
-        ("ctrl+r", "toggle_right_sidebar", "Toggle Sidebar"),
+        ("ctrl+r", "toggle_right_sidebar", "Sidebar"),
     ]
 
     # Subclasses should override this to specify their tab ID
@@ -51,9 +51,8 @@ class BaseScreen(Screen):
             yield
 
     def on_mount(self) -> None:
-        """Subscribe to state manager when screen is mounted."""
-        if hasattr(self.app, 'state'):
-            self.app.state.subscribe(self)
+        """Only here because every child class calls it."""
+        ...
 
     def on_screen_resume(self, event) -> None:
         """Handle screen resume event to update active tab and
@@ -62,11 +61,6 @@ class BaseScreen(Screen):
         self._update_active_tab()
         self._update_sidebar_visibility()
         event.stop()
-
-    def on_unmount(self) -> None:
-        """Unsubscribe from state manager when screen is unmounted."""
-        if hasattr(self.app, 'state'):
-            self.app.state.unsubscribe(self)
 
     def _update_active_tab(self) -> None:
         """Update `top tabs` to highlight the current screen."""
