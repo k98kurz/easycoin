@@ -174,7 +174,9 @@ class TestCryptoWorker(unittest.TestCase):
 
         total_target = 555555
         total_coins = 5
-        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, total_coins)
+        cryptoworker.submit_mine_job(
+            ANYONE_CAN_SPEND_LOCK.bytes, total_target, total_coins
+        )
         result = run(cryptoworker.work_mine_job())
         assert type(result) is tuple
         assert len(result) == 2
@@ -194,7 +196,9 @@ class TestCryptoWorker(unittest.TestCase):
 
         total_target = 555555
         total_coins = 5
-        cryptoworker.submit_mine_job(ANYONE_CAN_SPEND_LOCK.bytes, total_target, total_coins)
+        cryptoworker.submit_mine_job(
+            ANYONE_CAN_SPEND_LOCK.bytes, total_target, total_coins
+        )
 
         # wait for the jobs to complete
         await sleep(3)

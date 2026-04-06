@@ -1,11 +1,14 @@
-from textual import on
+from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Checkbox, DataTable, Input, Static
-from easycoin.models import Coin, TrustNet, Wallet
+from easycoin.UTXOSet import UTXOSet
+from easycoin.models import Address, Coin, Txn, TrustNet, Wallet
+from easycoin.cryptoworker import submit_mine_job, work_mine_job
 from easycoin.cui.screens.base import BaseScreen
 from easycoin.cui.helpers import format_amount, format_balance, truncate_text
 from .mine_config import MiningConfigurationModal
+from .mine_coin_modal import MineCoinModal
 
 
 class CoinsScreen(BaseScreen):
@@ -15,7 +18,8 @@ class CoinsScreen(BaseScreen):
 
     BINDINGS = [
         ("f5", "refresh_coins", "Refresh"),
-        ("m", "open_mining_config", "Configure Mining"),
+        ("m", "mine_coin", "Mine a Coin"),
+        ("c", "open_mining_config", "Configure Mining"),
     ]
 
     def __init__(self):
@@ -41,10 +45,11 @@ class CoinsScreen(BaseScreen):
 
             with Horizontal(id="coins_actions"):
                 yield Button("Refresh", id="btn_refresh", variant="default")
+                yield Button("Mine Coin", id="btn_mine_coin", variant="primary")
                 yield Button(
                     "Configure Mining",
                     id="btn_mine_config",
-                    variant="primary"
+                    variant="default"
                 )
 
     def on_mount(self) -> None:
@@ -93,6 +98,31 @@ class CoinsScreen(BaseScreen):
     def action_open_mining_config(self) -> None:
         """Open mining configuration modal."""
         self.app.push_screen(MiningConfigurationModal())
+
+    @on(Button.Pressed, "#btn_mine_coin")
+    async def action_mine_coin(self) -> None:
+        """Open mine coin modal."""
+        async def on_mine_params(result):
+            """Handle mining parameters returned from modal."""
+            if not result:
+                return
+
+            address = result.get("address")
+            amount = result.get("amount")
+
+            self.app.notify(
+                f"Mining coin of {amount} EC⁻¹ with address "
+                f"{truncate_text(address)}",
+                severity="info"
+            )
+            self.log_event(
+                f"Mine coin requested: amount={amount}, address={address}",
+                "INFO"
+            )
+
+            self._mine_coin(address, amount)
+
+        self.app.push_screen(MineCoinModal(), on_mine_params)
 
     def _load_coins(self, search_query: str = "") -> None:
         """Load coins from database and populate table."""
@@ -146,16 +176,67 @@ class CoinsScreen(BaseScreen):
             except Exception as e:
                 self.log_event(f"Error adding coin row: {e}", "ERROR")
 
+    @work(exclusive=True)
+    async def _mine_coin(self, address: str, amount: int) -> None:
+        lock = Address.parse(address)
+        submit_mine_job(lock, amount, 1)
+        result = await work_mine_job()
+        if result is None:
+            self.app.log_event("work_mine_job() returned None", "WARNING")
+            self.app.notify("Mining failed for unknown reason", "warning")
+            return
+
+        self.on_coins_mined(result[1])
+
     def on_coins_mined(self, coins: list[Coin | Exception]) -> None:
         """Handle newly mined coins."""
-        self.action_refresh_coins()
-
         new_coins = [c for c in coins if not isinstance(c, Exception)]
-        if new_coins:
-            self.app.notify(
-                f"Mined {len(new_coins)} new coin(s)",
-                severity="success"
+        errors = [c for c in coins if isinstance(c, Exception)]
+        for e in errors:
+            self.app.log_event(
+                f"Error mining coin: {e}", "ERROR"
             )
+
+        if errors:
+            self.app.notify("Errors encountered mining coins", severity="error")
+
+        if not new_coins:
+            return
+
+        self.app.notify(
+            f"Mined {len(new_coins)} new coin(s)",
+            severity="success"
+        )
+
+        utxos = UTXOSet()
+
+        # create a txn for each coin
+        for c in new_coins:
+            c.id = c.generate_id(c.data)
+            if self.app.wallet:
+                c.wallet_id = self.app.wallet.id
+            txn = Txn({'input_ids': '', 'output_ids': c.id})
+            txn.outputs = [c]
+
+            if not txn.validate(reload=False):
+                self.app.log_event("mint txn failed validation", "ERROR")
+                continue
+
+            if not utxos.can_apply(txn):
+                self.app.log_event(
+                    "mint txn could not be applied to UTXOSet", "ERROR"
+                )
+                continue
+
+            c.save()
+            txn.save()
+            utxos.apply(txn, {c.id: c})
+            self.app.log_event(
+                f"mint txn {txn.id} saved successfully",
+                "INFO"
+            )
+
+        self.action_refresh_coins()
 
     def _get_network_name(self, net_id: str) -> str:
         """Get network name from ID."""
