@@ -184,8 +184,12 @@ class TestCryptoWorker(unittest.TestCase):
         assert type(result[1]) is list
         assert len(result[1]) == total_coins, (len(result[1]), total_coins)
         jm, coins = result
+        ids = set()
         for c in coins:
+            c.id = c.generate_id(c.data)
             assert c.mint_value() >= c.amount, (c.mint_value(), c.amount)
+            assert c.id not in ids, 'same coin mined multiple times'
+            ids.add(c.id)
         total_actual = sum([c.amount for c in coins])
         assert total_actual >= total_target
 

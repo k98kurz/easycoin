@@ -34,125 +34,136 @@ class CoinDetailModal(ModalScreen):
         with VerticalScroll(classes="modal-container w-70p"):
             yield Static("Coin Details", classes="modal-title")
 
-            yield Static(f"Coin ID: {self.coin.id}", classes="mt-1")
+            yield Static(f"[b]Coin ID:[/b] {self.coin.id}", classes="mt-1")
             yield Static(
-                f"Address: {Address({'lock': self.coin.lock}).hex}",
+                f"[b]Address:[/b] {Address({'lock': self.coin.lock}).hex}",
                 classes="my-1"
             )
 
             with Horizontal(classes="h-6"):
                 with Vertical():
                     yield Static(
-                        f"Amount: {format_balance(self.coin.amount, exact=True)}",
+                        "[b]Amount:[/b] " +
+                        format_balance(self.coin.amount, exact=True),
                         classes="mb-1"
                     )
 
                     yield Static(
-                        f"Lock Type: {Wallet.get_lock_type(self.coin.lock)}",
+                        "[b]Lock Type:[/b] " +
+                        Wallet.get_lock_type(self.coin.lock),
                         classes="mb-1"
                     )
 
                     yield Static(
-                        "Status: " +
+                        "[b]Status:[/b] " +
                         ("Spent" if self.coin.spent else "Unspent"),
                         classes="mb-1"
                     )
 
                 with Vertical():
                     yield Static(
-                        f"Network: {self._get_network_name()}",
+                        f"[b]Network:[/b] {self._get_network_name()}",
                         classes="mb-1"
                     )
 
                     yield Static(
-                        f"Timestamp: {format_timestamp(self.coin.timestamp)}",
+                        f"[b]Timestamp:[/b] " +
+                        format_timestamp(self.coin.timestamp),
                         classes="mb-1"
                     )
 
-                    yield Static(f"Nonce: {self.coin.nonce}", classes="mb-1")
+                    yield Static(f"[b]Nonce:[/b] {self.coin.nonce}", classes="mb-1")
 
-            with VerticalScroll(
-                    classes="border-solid-primary h-30 px-1 my-1 " + (
-                        "hidden" if not self.coin.details else ""
-                    )
-                ):
+            hideclass = "hidden" if not self.coin.details else ""
+            yield Static(
+                f"[b]Stamp ID:[/b] {self.coin.stamp_id.hex()}",
+                classes=f"my-1 {hideclass}"
+            )
+
+            n_value = self.coin.details.get('n', 'N/A')
+            yield Static(
+                f"[b]Stamp Number/Note:[/b] {n_value}",
+                classes=f"mb-1 {hideclass}"
+            )
+
+            yield Static(
+                f"[b]Data-script-hash:[/b] {self.coin.dsh.hex()}",
+                classes=f"mb-1 {hideclass}"
+            )
+
+            yield Static(
+                f"[b]Issue:[/b] {self.coin.issue.hex()}",
+                classes=f"mb-1 {hideclass}"
+            )
+
+            if self.coin.details.get('d', None):
+                data_size = len(self.coin.data.get('details', None) or b'')
                 yield Static(
-                    f"Stamp ID: {self.coin.stamp_id.hex()}",
-                    classes="mb-1"
+                    f"[b]Stamp Size:[/b] {format_amount(data_size)}B",
+                    classes="my-1"
                 )
-
-                n_value = self.coin.details.get('n', 'N/A')
-                yield Static(
-                    f"Stamp Number/Note: {n_value}",
-                    classes="mb-1"
-                )
-
-                yield Static(
-                    f"Data-script-hash: {self.coin.dsh.hex()}",
-                    classes="mb-1"
-                )
-
-                yield Static(
-                    f"Issue: {self.coin.issue.hex()}",
-                    classes="mb-1"
-                )
-
-                if self.coin.details.get('d', None):
-                    yield Static("Stamp Data:", classes="text-muted my-1")
-                    try:
-                        stamp_data = self.coin.details['d']
-                        if isinstance(stamp_data, dict):
-                            if stamp_data.get('type', None) == 'file':
-                                stamp_data_str = json.dumps(
-                                    {
-                                        'file': '...',
-                                        **{
-                                            k:v for k,v in stamp_data.items()
-                                            if k != 'file'
-                                        }
-                                    }, indent=2
-                                )
-                            else:
-                                stamp_data_str = json.dumps(
-                                    stamp_data, indent=2, default=str
-                                )
+                yield Static("Stamp Data:", classes="mb-1 text-bold")
+                try:
+                    stamp_data = self.coin.details['d']
+                    if isinstance(stamp_data, dict):
+                        if stamp_data.get('type', None) == 'file':
+                            stamp_data_str = json.dumps(
+                                {
+                                    'file': '...',
+                                    **{
+                                        k:v for k,v in stamp_data.items()
+                                        if k != 'file'
+                                    }
+                                }, indent=2
+                            )
                         else:
-                            stamp_data_str = str(stamp_data)
-                        data_size = len(self.coin.data.get('details', None) or b'')
-                        yield Static(
-                            f"{stamp_data_str}\n\nData Size: "
-                            f"{format_amount(data_size)}B",
-                            classes="text-italic"
-                        )
-                    except Exception as e:
-                        yield Static(
-                            f"Error displaying stamp data: {e}",
-                            classes="text-error"
-                        )
-
-                if '_' in self.coin.details:
-                    yield Static("Prefix Script (_):", classes="text-bold my-1")
-                    yield ECTextArea(
-                        Script.from_bytes(self.coin.details['_']).src,
-                        read_only=True,
-                        classes="h-12 mb-1"
+                            stamp_data_str = json.dumps(
+                                stamp_data, indent=2, default=str
+                            )
+                    else:
+                        stamp_data_str = str(stamp_data)
+                    yield Static(f"{stamp_data_str}", classes="text-italic")
+                except Exception as e:
+                    yield Static(
+                        f"Error displaying stamp data: {e}",
+                        classes="text-error"
                     )
 
-                if 'L' in self.coin.details:
-                    yield Static("Mint Lock Script (L):", classes="text-bold my-1")
-                    yield ECTextArea(
-                        Script.from_bytes(self.coin.details['L']).src,
-                        read_only=True,
-                        classes="h-12 mb-1"
-                    )
+            if '_' in self.coin.details:
+                yield Static(
+                    "Prefix Script (_):", classes="text-bold my-1"
+                )
+                yield ECTextArea(
+                    Script.from_bytes(self.coin.details['_']).src,
+                    read_only=True,
+                    classes="h-12 mb-1"
+                )
 
-                if '$' in self.coin.details:
-                    yield Static("Covenant Script ($):", classes="text-bold my-1")
-                    yield ECTextArea(
-                        Script.from_bytes(self.coin.details['$']).src,
-                        read_only=True,
-                        classes="h-12 mb-1"
-                    )
+
+            has_scripts = 'L' in self.coin.details or '$' in self.coin.details
+            if has_scripts:
+                with Horizontal(classes="h-14"):
+                    if 'L' in self.coin.details:
+                        with Container(classes="h-14"):
+                            yield Static(
+                                "Mint Lock Script (L):", classes="text-bold my-1"
+                            )
+                            yield ECTextArea(
+                                Script.from_bytes(self.coin.details['L']).src,
+                                read_only=True,
+                                classes="h-12 mb-1"
+                            )
+
+                    if '$' in self.coin.details:
+                        with Container(classes="h-14"):
+                            yield Static(
+                                "Covenant Script ($):", classes="text-bold my-1"
+                            )
+                            yield ECTextArea(
+                                Script.from_bytes(self.coin.details['$']).src,
+                                read_only=True,
+                                classes="h-12 mb-1"
+                            )
 
             with Horizontal(id="modal_actions"):
                 yield Button("Close", id="btn_close", variant="default")
