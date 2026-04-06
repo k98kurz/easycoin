@@ -62,7 +62,6 @@ class WalletListScreen(BaseScreen):
 
     def on_mount(self) -> None:
         """Populate wallets table on mount and auto-navigate if appropriate."""
-        super().on_mount()
         table = self.query_one("#wallets_table", DataTable)
         table.add_columns("Name", "Wallet ID", "Status", "Balance", "Active", "Tags")
         table.cursor_type = "row"

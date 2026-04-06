@@ -92,7 +92,6 @@ class TransactionsScreen(BaseScreen):
 
     def on_mount(self) -> None:
         """Initialize table and load data on mount."""
-        super().on_mount()
         table = self.query_one("#transactions_table")
         table.cursor_type = "row"
         table.add_columns(

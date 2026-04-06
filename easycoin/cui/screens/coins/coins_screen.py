@@ -54,7 +54,6 @@ class CoinsScreen(BaseScreen):
 
     def on_mount(self) -> None:
         """Initialize coins table on mount."""
-        super().on_mount()
         table = self.query_one("#coins_table")
         table.cursor_type = "row"
         table.add_columns(

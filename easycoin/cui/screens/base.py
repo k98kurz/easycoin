@@ -50,10 +50,6 @@ class BaseScreen(Screen):
         if False:
             yield
 
-    def on_mount(self) -> None:
-        """Only here because every child class calls it."""
-        ...
-
     def on_screen_resume(self, event) -> None:
         """Handle screen resume event to update active tab and
             sidebar.

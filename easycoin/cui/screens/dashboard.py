@@ -40,7 +40,3 @@ class DashboardScreen(BaseScreen):
                 yield Static("Network Status", classes="panel-title")
                 yield Static("Mining Status", classes="panel-title")
 
-    def on_mount(self) -> None:
-        """Update top tabs to highlight Dashboard and set button states."""
-        super().on_mount()
-
