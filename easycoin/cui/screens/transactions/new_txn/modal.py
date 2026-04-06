@@ -203,6 +203,11 @@ class NewTransactionModal(ModalScreen):
             }
             self.app.log_event(f"{txn_witness=}", "DEBUG")
             self.app.log_event(f"{self.txn_data=}", "DEBUG")
+            if len(debug_output.split("\n")) > 7:
+                return self.app.notify(
+                    f"Txn failed validation: see event log for full details",
+                    severity="error"
+                )
             return self.app.notify(
                 f"Txn failed validation:\n{debug_output}",
                 severity="error"

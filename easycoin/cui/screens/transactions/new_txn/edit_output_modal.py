@@ -28,7 +28,7 @@ class EditOutputModal(ModalScreen[dict|None]):
 
     def __init__(
             self, address: str | None = None, amount: int = 0, info=None,
-            max_amount: int | None = None, txn_data=None
+            max_amount: int | None = None, txn_data=None, coin: Coin | None = None
         ):
         """Initialize edit output modal. The `info` parameter is passed
             through to the callback, e.g. an index/key for tracking the
@@ -41,7 +41,8 @@ class EditOutputModal(ModalScreen[dict|None]):
         self.max_amount = max_amount
         self.remaining_amount = max_amount or 0
         self.txn_data = txn_data
-        
+        self.coin = coin
+
         self.stamp_enabled = False
         self.stamp_source = ""
         self.selected_input_id = None
@@ -58,6 +59,7 @@ class EditOutputModal(ModalScreen[dict|None]):
         self._load_stamp_templates()
         self._load_stamp_inputs()
         self._setup_custom_details_table()
+        self._populate_stamp_from_coin()
 
     def compose(self) -> ComposeResult:
         """Compose edit output modal layout."""
@@ -190,6 +192,86 @@ class EditOutputModal(ModalScreen[dict|None]):
         table = self.query_one("#custom_details_table")
         table.add_columns("Field Name", "Field Value", "Parse Value as Hex")
         table.cursor_type = "row"
+
+    def _populate_stamp_from_coin(self) -> None:
+        """Populate stamp UI fields from existing coin details."""
+        if not self.coin or not self.coin.details:
+            return
+
+        self.stamp_enabled = True
+        self.copied_details = {**self.coin.details}
+
+        stamp_checkbox = self.query_one("#is_stamp_checkbox")
+        stamp_checkbox.value = True
+
+        n_value = self.copied_details.get('n', '')
+        n_input = self.query_one("#stamp_n_input")
+        n_input.value = str(n_value) if n_value is not None else ''
+
+        self._populate_custom_details_from_coin()
+        self._select_matching_stamp_source()
+        self._update_stamp_ui_visibility()
+
+    def _populate_custom_details_from_coin(self) -> None:
+        """Populate custom details table from coin's 'd' field."""
+        d_data = self.copied_details.get('d', {})
+        if not isinstance(d_data, dict):
+            return
+
+        for field_name, field_value in d_data.items():
+            is_hex = isinstance(field_value, bytes)
+            self._add_custom_field_row(field_name, field_value, is_hex)
+            self.custom_details[field_name] = (field_value, is_hex)
+
+    def _select_matching_stamp_source(self) -> None:
+        """Try to select matching template or input based on coin details."""
+        if not self.copied_details:
+            return
+
+        for tid, template, _ in self._stamp_template_options:
+            if template is None:
+                continue
+            template_details = {
+                k: Script.from_src(v).bytes for k,v in template.scripts.items()
+            }
+            template_details['d'] = template.details
+            if self._details_match_template(template_details):
+                self.stamp_source = "new_stamp"
+                self.selected_template_id = tid
+                template_list = self.query_one("#stamp_template_list")
+                for i, option in enumerate(template_list.options):
+                    if option.id == f"template_{tid}":
+                        template_list.highlighted = i
+                        break
+                return
+
+        for output in self._stamp_input_options:
+            if output.coin.details == self.copied_details:
+                self.stamp_source = "from_input"
+                self.selected_input_id = output.id
+                input_list = self.query_one("#stamp_input_list")
+                for i, option in enumerate(input_list.options):
+                    if option.id == f"input_{output.id}":
+                        input_list.highlighted = i
+                        break
+                return
+
+        self.stamp_source = "new_stamp"
+        if len(self._stamp_template_options) > 1:
+            tid, _, _ = self._stamp_template_options[1]
+            self.selected_template_id = tid
+            template_list = self.query_one("#stamp_template_list")
+            if len(template_list.options) > 1:
+                template_list.highlighted = 1
+
+    def _details_match_template(self, template_details: dict) -> bool:
+        """Check if coin details match template details (excluding 'n')."""
+        for k, v in self.copied_details.items():
+            if k == 'n':
+                continue
+            if k not in template_details or template_details[k] != v:
+                return False
+        return True
 
     def _update_stamp_ui_visibility(self) -> None:
         """Update visibility of stamp UI elements based on current state."""

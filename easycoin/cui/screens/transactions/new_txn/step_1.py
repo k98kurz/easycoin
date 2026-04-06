@@ -1,15 +1,21 @@
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll, Vertical
-from textual.widgets import Static, DataTable
+from textual.binding import Binding
+from textual.containers import VerticalScroll, Vertical, Horizontal
+from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
-from easycoin.cui.helpers import format_balance, truncate_text
+from easycoin.cui.helpers import format_balance, format_amount, truncate_text
+from easycoin.cui.widgets import CoinDetailModal
 from easycoin.models import Address, Output, Wallet
 import packify
 
 
 class SelectInputsContainer(Vertical):
     """Step 1: Select inputs for transaction."""
+
+    BINDINGS = [
+        Binding("v", "view_coin", "View Coin"),
+    ]
 
     def __init__(self, txn_data, **kwargs):
         super().__init__(**kwargs)
@@ -29,7 +35,9 @@ class SelectInputsContainer(Vertical):
                 id="input_summary",
                 classes="mb-1"
             )
-            yield DataTable(id="inputs_table", classes="h-min-20")
+            yield DataTable(id="inputs_table", classes="h-min-10")
+        with Horizontal(classes="h-5"):
+            yield Button("View Details", id="btn_view_details", variant="default")
 
     def on_show(self) -> None:
         """Load available outputs when step becomes visible."""
@@ -59,6 +67,7 @@ class SelectInputsContainer(Vertical):
             table.add_columns(
                 ("Coin ID", "coin_id"),
                 ("Amount", "amount"),
+                ("Stamp Size", "stamp_size"),
                 ("Lock Type", "lock_type"),
                 ("Selected", "selected"),
             )
@@ -74,9 +83,12 @@ class SelectInputsContainer(Vertical):
                 self.app.wallet.decrypt(addr.secrets)
             ) if addr else None
             try:
+                stamp_size = len(output.coin.data.get('details', None) or b'')
+                stamp_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else "-"
                 row_key = table.add_row(
                     truncate_text(output.id, prefix_len=8, suffix_len=4),
                     format_balance(output.coin.amount, exact=True),
+                    stamp_display,
                     Wallet.get_lock_type(output.coin.lock, secrets),
                     ("✓" if output.id in [
                         o.id for o in self.txn_data.selected_inputs
@@ -150,3 +162,39 @@ class SelectInputsContainer(Vertical):
                     pass
         except Exception as e:
             self.app.log_event(f"Error toggling selection: {e}", "ERROR")
+
+    @on(DataTable.RowHighlighted, "#inputs_table")
+    def _on_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        """Update button visibility when row is highlighted."""
+        self.update_button_visibility()
+
+    def update_button_visibility(self) -> None:
+        """Update button visibility based on table state."""
+        btn_view = self.query_one("#btn_view_details")
+        has_selection = False
+        if self.txn_data.available_inputs:
+            table = self.query_one("#inputs_table")
+            has_selection = (
+                table.cursor_row is not None
+                and table.cursor_row < len(self.row_keys)
+            )
+        btn_view.display = "block" if has_selection else "none"
+
+    def action_view_coin(self) -> None:
+        """Open coin detail modal for highlighted row."""
+        table = self.query_one("#inputs_table")
+        if table.cursor_row is None:
+            return
+
+        output_id = self.row_keys[table.cursor_row]
+        output = next(
+            (o for o in self.txn_data.available_inputs if o.id == output_id),
+            None
+        )
+        if output:
+            self.app.push_screen(CoinDetailModal(output.coin))
+
+    @on(Button.Pressed, "#btn_view_details")
+    def _on_view_details_pressed(self) -> None:
+        """Handle View Details button press."""
+        self.action_view_coin()

@@ -1,3 +1,4 @@
+from .coin_detail_modal import CoinDetailModal
 from .confirmation_modal import ConfirmationModal
 from .event_log import EventLog, LogLevel
 from .file_picker_modal import FilePickerModal
@@ -8,6 +9,7 @@ from .textarea import ECTextArea
 from .top_tabs import TopTabs
 
 __all__ = [
+    "CoinDetailModal",
     "ConfirmationModal",
     "EventLog",
     "LogLevel",

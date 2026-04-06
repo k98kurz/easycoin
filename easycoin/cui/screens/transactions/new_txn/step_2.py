@@ -232,7 +232,8 @@ class AddOutputsContainer(Vertical):
                     amount=current.amount,
                     info=output_index,
                     max_amount=total_in - total_out - self.txn_data.fee,
-                    txn_data=self.txn_data
+                    txn_data=self.txn_data,
+                    coin=current,
                 ),
                 on_dismiss
             )

@@ -8,7 +8,7 @@ from textual.widgets import Static, Button, Footer
 from easycoin.cui.helpers import (
     format_balance, format_timestamp, format_amount, truncate_text
 )
-from easycoin.cui.widgets import ECTextArea
+from easycoin.cui.widgets.textarea import ECTextArea
 from easycoin.models import Address, Coin, Wallet
 import json
 
@@ -175,8 +175,8 @@ class CoinDetailModal(ModalScreen):
         if not self.coin.net_id:
             return "None"
 
-        if coin.trustnet:
-             return coin.trustnet.name or "Unknown"
+        if self.coin.trustnet:
+             return self.coin.trustnet.name or "Unknown"
 
         return truncate_text(self.coin.net_id, suffix_len=0)
 
