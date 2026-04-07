@@ -257,7 +257,11 @@ class Txn(HashedModel):
                 if coin.dsh in (c.dsh for c in self.inputs if c.details):
                     continue
                 if not run_auth_scripts(
-                        [self.witness.get(coin.id_bytes, b''), coin.details['L']],
+                        [
+                            coin.details.get('_', b''),
+                            self.witness.get(coin.id_bytes, b''),
+                            coin.details['L']
+                        ],
                         self.runtime_cache(coin)
                     ):
                     if debug:
@@ -356,17 +360,48 @@ class Txn(HashedModel):
         ''')
 
     @staticmethod
-    def std_series_covenant(allow_negatives: bool = True) -> Script:
-        """Returns the standard covenant ('$' script) for fungible stamps
-            in a series. This requires that all stamped inputs and
-            outputs share the same data-script-hash, and that the sum
-            of output 'n' values is less than or equal to the sum of the
-            input 'n' values. If `allow_negatives` is set to False, then
-            an additional check to make sure all `n` values are positive
-            will be included. (Default setting allows negative `n`
-            values.)
+    def std_stamp_token_series_prefix(allow_negatives: bool = True) -> Script:
+        """Returns the standard prefix ('_' script) for use with token
+            series covenants and mint locks. Defines two functions: 0
+            compares values in a loop; 1 sums all integers in a loop.
+            Takes up 48-53 bytes; saves 14 (16-2) or 15-20
+            ((17 or 22)-2) bytes with each invocation of function 0 or
+            1, respectively. In total, changes the stamp script size
+            from 174 or 184 to 175 or 180 (depending upon whether or not
+            `allow_negatives` is `False`), including serialization
+            overhead, but excluding any mint lock.
         """
         check = '' if allow_negatives else 'dup push d0 leq verify '
+        return Script.from_src(f'''
+            # function to compare all values on the stack #
+            # params are [...vals, count, compare] #
+            def 0 {{
+                @= c 1
+                loop {{
+                    push d-1 add_ints d2 @= i 1
+                    @c eqv @i
+                }} pop0
+            }}
+
+            # function to sum integers #
+            # params are [...vals, count] #
+            def 1 {{
+                loop {{
+                    {check}push d-1 add_ints d2 @= i 1
+                    add_ints d2 @i
+                }} pop0
+            }}
+        ''')
+
+    @staticmethod
+    def std_stamp_token_series_covenant() -> Script:
+        """Returns the standard covenant ('$' script) for fungible
+            stamps in a token series. This requires that all stamped
+            inputs and outputs share the same data-script-hash, and that
+            the sum of output 'n' values is less than or equal to the
+            sum of the input 'n' values. Requires the standard token
+            series prefix script to function.
+        """
         return Script.from_src(f'''
             # set some variables #
             get_value s"si_len" @= il 1
@@ -375,35 +410,19 @@ class Txn(HashedModel):
 
             # ensure all stamped inputs are from the same series #
             get_value s"si_dsh"
-            @il loop {{
-                push d-1 add_ints d2 @= i 1
-                @s equal_verify
-                @i
-            }} pop0
+            @il @s call d0
 
             # ensure all stamped outputs are from the same series #
             get_value s"so_dsh"
-            @ol loop {{
-                push d-1 add_ints d2 @= i 1
-                @s equal_verify
-                @i
-            }} pop0
+            @ol @s call d0
 
             # calculate the sum of stamped inputs #
             get_value s"si_n" push d0
-            @il loop {{
-                {check}push d-1 add_ints d2 @= i 1
-                add_ints d2
-                @i
-            }} pop0
+            @il call d1
 
             # calculate the sum of stamped outputs #
             get_value s"so_n" push d0
-            @ol loop {{
-                {check}push d-1 add_ints d2 @= i 1
-                add_ints d2
-                @i
-            }} pop0
+            @ol call d1
 
             # ensure stamped output sum <= stamped input sum #
             leq verify
@@ -413,24 +432,19 @@ class Txn(HashedModel):
     def std_requires_burn_mint_lock(rate: int = 1000) -> Script:
         """Returns a standard mint lock 'L' script that requires burning
             EC⁻¹ at the specified `rate` to mint the 'n' value. Raises
-            `TypeError` or `ValueError` for invalid `rate`.
+            `TypeError` or `ValueError` for invalid `rate`. Requires the
+            standard token series prefix script.
         """
         type_assert(type(rate) is int, 'rate must be int >0')
         value_assert(rate > 0, 'rate must be int >0')
         return Script.from_src(f'''
             # sum output EC^-1 amounts #
             get_value s"o_a" push d0
-            get_value s"o_len" loop {{
-                push d-1 add d2 @= i 1
-                add d2 @i
-            }} pop0
+            get_value s"o_len" call d1
 
             # sum input EC^-1 amounts #
             get_value s"i_a" push d0
-            get_value s"i_len" loop {{
-                push d-1 add d2 @= i 1
-                add d2 @i
-            }} pop0
+            get_value s"i_len" call d1
 
             # calculate burn as sum(inputs)-sum(outputs) #
             sub d2
@@ -440,10 +454,7 @@ class Txn(HashedModel):
 
             # sum minted n values #
             get_value s"so_n" push d0
-            get_value s"so_len" loop {{
-                push d-1 add d2 @= i 1
-                add d2 @i
-            }} pop0
+            get_value s"so_len" call d1
 
             # ensure minted n amount <= burned/{rate} #
             leq

@@ -258,8 +258,16 @@ class TestTxn(unittest.TestCase):
         #print(f'{s2.details=} hash={sha256(packify.pack(s2.details)).digest().hex()}')
         assert t.validate()
 
-    def test_std_series_covenant_compiles_without_error(self):
-        s = models.Txn.std_series_covenant()
+    def test_std_scripts_compile_without_error(self):
+        s = models.Txn.std_stamp_token_series_prefix()
+        assert type(s) is Script
+        s = models.Txn.std_stamp_token_series_covenant()
+        assert type(s) is Script
+        s = models.Txn.std_stamp_covenant()
+        assert type(s) is Script
+        s = models.Txn.std_requires_burn_mint_lock()
+        assert type(s) is Script
+        s = models.Txn.std_must_balance_mint_lock()
         assert type(s) is Script
 
     def test_stamp_series_with_mint_lock_and_std_series_covenant_e2e(self):
@@ -269,12 +277,14 @@ class TestTxn(unittest.TestCase):
         series_details = {
             'd': {'type': 'token', 'name': '$HIT Coin (test)'},
             'L': SINGLE_SIG_LOCK.bytes,
-            '$': models.Txn.std_series_covenant().bytes,
+            '_': models.Txn.std_stamp_token_series_prefix().bytes,
+            '$': models.Txn.std_stamp_token_series_covenant().bytes,
         }
         second_series_details = {
             'd': {'type': 'token', 'name': 'fAuxUSD (test)'},
             'L': SINGLE_SIG_LOCK.bytes,
-            '$': models.Txn.std_series_covenant(False).bytes,
+            '_': models.Txn.std_stamp_token_series_prefix(False).bytes,
+            '$': models.Txn.std_stamp_token_series_covenant().bytes,
         }
 
         s1 = models.Coin.stamp(
@@ -384,7 +394,8 @@ class TestTxn(unittest.TestCase):
         series_details = {
             'd': {'type': 'token', 'name': '$HIT Coin (test)'},
             'L': models.Txn.std_requires_burn_mint_lock(1000).bytes,
-            '$': models.Txn.std_series_covenant(False).bytes,
+            '_': models.Txn.std_stamp_token_series_prefix(False).bytes,
+            '$': models.Txn.std_stamp_token_series_covenant().bytes,
         }
         # mint 2 by burning 2000
         s1 = models.Coin.stamp(
@@ -414,7 +425,8 @@ class TestTxn(unittest.TestCase):
         series_details = {
             'd': {'type': 'token', 'name': '$HIT Coin (test)'},
             'L': models.Txn.std_must_balance_mint_lock().bytes,
-            '$': models.Txn.std_series_covenant(True).bytes,
+            '_': models.Txn.std_stamp_token_series_prefix(True).bytes,
+            '$': models.Txn.std_stamp_token_series_covenant().bytes,
         }
         # mint 2 and -2
         amt = (c1.amount - 2400) // 2
