@@ -11,8 +11,9 @@ from textual.widgets.option_list import Option
 from textual.widgets.data_table import RowKey
 from secrets import token_hex
 from easycoin.models import Address, Coin, StampTemplate
+from easycoin.constants import _max_stamp_size
 from easycoin.cui.helpers import format_balance, format_amount, truncate_text
-from easycoin.cui.widgets import InputModal, ConfirmationModal
+from easycoin.cui.widgets import InputModal, ConfirmationModal, FilePickerModal
 
 
 class EditOutputModal(ModalScreen[dict|None]):
@@ -24,6 +25,7 @@ class EditOutputModal(ModalScreen[dict|None]):
         Binding("ctrl+s", "save", "Save"),
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+q", "quit", "Quit"),
+        Binding("delete", "delete_field", "Delete Field"),
     ]
 
     def __init__(
@@ -51,7 +53,7 @@ class EditOutputModal(ModalScreen[dict|None]):
         self.custom_details = {}
         self._stamp_input_options = []
         self._stamp_template_options = []
-        self._custom_details_rows = []
+        self._custom_details_rows: tuple[RowKey, str, [str|bytes, bool]] = []
 
     def on_mount(self) -> None:
         """Focus address input on mount."""
@@ -98,17 +100,17 @@ class EditOutputModal(ModalScreen[dict|None]):
                     ):
                     yield Static("Stamp Source:", classes="text-bold mb-1")
                     yield OptionList(
-                        Option("From Input", id="source_from_input"),
                         Option("New Stamp", id="source_new_stamp"),
+                        Option("From Input", id="source_from_input"),
                         id="stamp_source", classes="h-5"
                     )
-    
+
                 with Container(
                         id="stamp_input_container", classes="hidden my-1 h-7"
                     ):
                     yield Static("Select Stamped Input:", classes="text-bold mb-1")
                     yield OptionList(id="stamp_input_list", classes="h-5")
-    
+
                 with Container(
                         id="stamp_template_container", classes="hidden my-1 h-7"
                     ):
@@ -126,11 +128,15 @@ class EditOutputModal(ModalScreen[dict|None]):
             with Container(id="custom_details_container", classes="hidden my-1 h-11"):
                 yield Static("Custom Details:", classes="text-bold mb-1")
                 yield DataTable(id="custom_details_table", classes="h-5")
-                yield Button(
-                    "Add Custom Field",
-                    id="btn_add_custom_field",
-                    classes="my-1"
-                )
+                with Horizontal():
+                    yield Button(
+                        "Add Custom Field",
+                        id="btn_add_custom_field",
+                    )
+                    yield Button(
+                        "Delete Field",
+                        id="btn_delete_field",
+                    )
 
             with Horizontal(id="modal_actions"):
                 yield Button("Save", id="btn_save", variant="primary")
@@ -191,7 +197,11 @@ class EditOutputModal(ModalScreen[dict|None]):
     def _setup_custom_details_table(self) -> None:
         """Setup custom details DataTable."""
         table = self.query_one("#custom_details_table")
-        table.add_columns("Field Name", "Field Value", "Parse Value as Hex")
+        table.add_columns(
+            ("Field Name", "field_name"),
+            ("Field Value", "field_value"),
+            ("Parse Value as Hex", "parse_as_hex")
+        )
         table.cursor_type = "row"
 
     def _populate_stamp_from_coin(self) -> None:
@@ -258,12 +268,6 @@ class EditOutputModal(ModalScreen[dict|None]):
                 return
 
         self.stamp_source = "new_stamp"
-        if len(self._stamp_template_options) > 1:
-            tid, _, _ = self._stamp_template_options[1]
-            self.selected_template_id = tid
-            template_list = self.query_one("#stamp_template_list")
-            if len(template_list.options) > 1:
-                template_list.highlighted = 1
 
     def _details_match_template(self, template_details: dict) -> bool:
         """Check if coin details match template details (excluding 'n')."""
@@ -285,7 +289,7 @@ class EditOutputModal(ModalScreen[dict|None]):
 
         if stamp_checkbox.value:
             source_container.remove_class("hidden")
-            
+
             if self.stamp_source == "from_input":
                 input_container.remove_class("hidden")
                 template_container.add_class("hidden")
@@ -350,7 +354,7 @@ class EditOutputModal(ModalScreen[dict|None]):
                 if output.id == output_id:
                     self.selected_input_id = output_id
                     self.copied_details = {**output.coin.details}
-                    
+
                     n_input = self.query_one("#stamp_n_input")
                     n_value = self.copied_details.get('n', '')
                     n_input.value = str(n_value) if n_value is not None else ''
@@ -387,7 +391,7 @@ class EditOutputModal(ModalScreen[dict|None]):
         """Handle custom field row selection for editing."""
         row_key = event.row_key
         field_index = None
-        for i, (rk, _) in enumerate(self._custom_details_rows):
+        for i, (rk, _, _) in enumerate(self._custom_details_rows):
             if rk == row_key:
                 field_index = i
                 break
@@ -399,15 +403,14 @@ class EditOutputModal(ModalScreen[dict|None]):
         def on_name_dismissed(name: str | None) -> None:
             if not name or not name.strip():
                 return
-            
+
             def on_value_dismissed(value: str | None) -> None:
                 if value is None:
                     return
-                
+
                 def on_hex_confirmed(parse_as_hex: bool) -> None:
                     if parse_as_hex is None:
                         return
-                    
                     parsed_value = value
                     if parse_as_hex:
                         try:
@@ -415,7 +418,7 @@ class EditOutputModal(ModalScreen[dict|None]):
                         except ValueError:
                             self.app.notify("Invalid hex value", severity="warning")
                             return
-                    
+
                     if field_index is None:
                         row_key = self._add_custom_field_row(
                             name.strip(), parsed_value, parse_as_hex
@@ -425,7 +428,7 @@ class EditOutputModal(ModalScreen[dict|None]):
                         self._update_custom_field_row(
                             row_key, name.strip(), parsed_value, parse_as_hex
                         )
-                
+
                 modal = ConfirmationModal(
                     title="Parse Value as Hex",
                     message="Should this value be parsed as hex?",
@@ -434,34 +437,106 @@ class EditOutputModal(ModalScreen[dict|None]):
                     cancel_btn_text="Nope",
                 )
                 self.app.push_screen(modal, on_hex_confirmed)
-            
-            modal = InputModal(
-                title="Field Value",
-                description="Enter the value for this field:",
-                btn_text="Next"
-            )
-            self.app.push_screen(modal, on_value_dismissed)
-        
+
+            def on_file_dismissed(value):
+                if not value:
+                    return
+
+                with open(value, 'rb') as f:
+                    data = f.read()
+
+                # check file size with serialization overhead
+                if len(data) > _max_stamp_size - 20:
+                    self.notify(
+                        f"File too large ({format_amount(len(data), exact=True)}"
+                        f" > {format_amount(_max_stamp_size-20, exact=True)}",
+                        severity="warning"
+                    )
+                    return
+
+                # create or update file field
+                if field_index is None:
+                    row_key = self._add_custom_field_row(
+                        "file", data, True
+                    )
+                else:
+                    row_key, _, _ = self._custom_details_rows[field_index]
+                    self._update_custom_field_row(
+                        row_key, name.strip(), data, True
+                    )
+
+                # update or create name field
+                found = False
+                for i, row in enumerate(self._custom_details_rows):
+                    if row[1] == "name":
+                        self._update_custom_field_row(
+                            row[0], "name", value.parts[-1], False
+                        )
+                        found = True
+                        break
+                if not found:
+                    self._add_custom_field_row(
+                        "name", value.parts[-1], False
+                    )
+
+                # update or create type field
+                found = False
+                for i, row in enumerate(self._custom_details_rows):
+                    if row[1] == "type":
+                        self._update_custom_field_row(
+                            row[0], "type", "image", False
+                        )
+                        found = True
+                        break
+                if not found:
+                    self._add_custom_field_row(
+                        "type", "image", False
+                    )
+
+            if name == 'file':
+                modal = FilePickerModal(
+                    filter_callback=lambda p: p.suffix.lower() in (
+                        '.jpeg', '.jpg', '.png', '.gif', '.webp'
+                    )
+                )
+                self.app.push_screen(modal, on_file_dismissed)
+            else:
+                modal = InputModal(
+                    title="Field Value",
+                    description="Enter the value for this field:",
+                    btn_text="Next",
+                    value=current_val,
+                )
+                self.app.push_screen(modal, on_value_dismissed)
+
         if field_index is not None:
-            _, current_name, _ = self._custom_details_rows[field_index]
+            _, current_name, (current_val, _) = self._custom_details_rows[
+                field_index
+            ]
             title = "Edit Field Name"
             placeholder = current_name
         else:
+            current_name, current_val = None, None
             title = "New Field Name"
             placeholder = token_hex(4)
-        
+
         modal = InputModal(
             title=title,
-            description=f"Enter the field name:",
-            btn_text="Next"
+            description=f"Enter the field name. (Enter 'file' to attach an image.)",
+            btn_text="Next",
+            value=current_name,
         )
         self.app.push_screen(modal, on_name_dismissed)
 
-    def _add_custom_field_row(self, name: str, value: str | bytes, is_hex: bool) -> RowKey:
+    def _add_custom_field_row(
+            self, name: str, value: str | bytes, is_hex: bool
+        ) -> RowKey:
         """Add a row to the custom details table."""
         table = self.query_one("#custom_details_table")
         value_display = value.hex() if isinstance(value, bytes) else str(value)
-        row_key = table.add_row(name, value_display, "Yes" if is_hex else "No")
+        row_key = table.add_row(
+            name, truncate_text(value_display), "Yes" if is_hex else "No"
+        )
         self._custom_details_rows.append((row_key, name, (value, is_hex)))
         self.custom_details[name] = (value, is_hex)
         return row_key
@@ -472,16 +547,28 @@ class EditOutputModal(ModalScreen[dict|None]):
         """Update a row in the custom details table."""
         table = self.query_one("#custom_details_table")
         value_display = value.hex() if isinstance(value, bytes) else str(value)
-        table.update_cell(row_key, "Field Name", name)
-        table.update_cell(row_key, "Field Value", value_display)
-        table.update_cell(row_key, "Parse Value as Hex", "Yes" if is_hex else "No")
-        
+        table.update_cell(row_key, "field_name", name)
+        table.update_cell(row_key, "field_value", truncate_text(value_display))
+        table.update_cell(row_key, "parse_as_hex", "Yes" if is_hex else "No")
+
         for i, (rk, _, _) in enumerate(self._custom_details_rows):
             if rk == row_key:
                 self._custom_details_rows[i] = (row_key, name, (value, is_hex))
                 break
-        
+
         self.custom_details[name] = (value, is_hex)
+
+    @on(Button.Pressed, "#btn_delete_field")
+    def action_delete_field(self) -> None:
+        """Delete currently highlighted custom field."""
+        table = self.query_one("#custom_details_table")
+        if table.cursor_row is None or table.cursor_row >= len(self._custom_details_rows):
+            return
+
+        row_key, field_name, _ = self._custom_details_rows[table.cursor_row]
+        table.remove_row(row_key)
+        del self._custom_details_rows[table.cursor_row]
+        del self.custom_details[field_name]
 
     @on(Input.Changed, "#amount_input")
     def _on_input_changed(self, event: Input.Changed) -> None:
@@ -541,7 +628,7 @@ class EditOutputModal(ModalScreen[dict|None]):
 
             if stamp_checkbox.value:
                 n = self.query_one("#stamp_n_input").value.strip()
-                
+
                 if not n:
                     self.app.log_event("Stamp number/note is required", "WARNING")
                     self.app.notify(
@@ -551,9 +638,9 @@ class EditOutputModal(ModalScreen[dict|None]):
                     return
 
                 stamp_details = {'n': n, **self.copied_details}
-                
+
                 d_data = self.copied_details.get('d', {})
-                
+
                 if d_data and d_data.get('type') == 'token':
                     try:
                         stamp_details['n'] = int(n)
@@ -563,7 +650,7 @@ class EditOutputModal(ModalScreen[dict|None]):
                             severity="warning"
                         )
                         return
-                
+
                 if self.custom_details:
                     d_copy = {**d_data} if isinstance(d_data, dict) else {}
                     for field_name, (field_value, _) in self.custom_details.items():

@@ -39,6 +39,7 @@ class CoinsScreen(BaseScreen):
             with Horizontal(id="coins_header", classes="h-3 mt-1"):
                 yield Checkbox("Active Wallet Only", id="box_active_wallet")
                 yield Checkbox("Stamps Only", id="box_stamps_only")
+                yield Checkbox("Unspent Only", id="box_unspent_only", value=True)
                 yield Input(placeholder="Search coins...", id="search_input")
 
             yield DataTable(id="coins_table", classes="mt-1")
@@ -84,17 +85,22 @@ class CoinsScreen(BaseScreen):
     def _stamps_only_changed(self, event: Checkbox.Changed) -> None:
         self._load_coins(search_query=self.query_one("#search_input").value)
 
+    @on(Checkbox.Changed, "#box_unspent_only")
+    def _unspent_only_changed(self, event: Checkbox.Changed) -> None:
+        self._load_coins(search_query=self.query_one("#search_input").value)
+
     @on(Input.Changed, "#search_input")
     def _input_changed(self, event: Input.Changed) -> None:
         """Handle search input changes."""
+        if event.value and not event.value.strip():
+            return
         self._load_coins(search_query=event.value)
 
     @on(Button.Pressed, "#btn_refresh")
     def action_refresh_coins(self) -> None:
         """Refresh coins data."""
         self.log_event("Refreshing coins", "INFO")
-        search_input = self.query_one("#search_input")
-        self._load_coins(search_query=search_input.value)
+        self._load_coins(search_query=self.query_one("#search_input").value)
 
     @on(Button.Pressed, "#btn_mine_config")
     def action_open_mining_config(self) -> None:
@@ -128,40 +134,40 @@ class CoinsScreen(BaseScreen):
 
     def _load_coins(self, search_query: str = "") -> None:
         """Load coins from database and populate table."""
+        search_query = search_query.strip()
+        stamps_only = self.query_one("#box_stamps_only").value
+        unspent_only = self.query_one("#box_unspent_only").value
         coins = []
         try:
             if self.app.wallet and self.query_one("#box_active_wallet").value:
-                self.app.wallet.coins().reload()
-                coins = self.app.wallet.coins
+                sqb = self.app.wallet.coins().query()
             else:
-                for chunk in Coin.query().chunk(500):
-                    coins.extend(chunk)
+                sqb = Coin.query()
+
+            if stamps_only:
+                sqb.not_null('details')
+
+            if unspent_only:
+                sqb.equal('spent', False)
+
+            if search_query:
+                sqb.contains('id', search_query.lower())
+
+            sqb.order_by('timestamp', 'desc')
+
+            for chunk in sqb.chunk(500):
+                coins.extend(chunk)
         except Exception as e:
             self.log_event(f"Error loading coins: {e}", "ERROR")
             self.app.notify(f"Error loading coins: {e}", severity="error")
             return
-
-        stamps_only = self.query_one("#box_stamps_only").value
 
         table = self.query_one("#coins_table")
         table.clear()
         self._coins.clear()
         self._coin_row_map.clear()
 
-        sorted_coins = sorted(
-            coins,
-            key=lambda c: c.timestamp if hasattr(c, 'timestamp') else 0,
-            reverse=True
-        )
-
-        for coin in sorted_coins:
-            if search_query and search_query.lower() not in coin.id.lower():
-                continue
-
-            is_stamp = len(coin.details) > 0
-            if stamps_only and not is_stamp:
-                continue
-
+        for coin in coins:
             self._coins.append(coin)
 
             try:

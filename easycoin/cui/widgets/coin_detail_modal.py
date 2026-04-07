@@ -106,7 +106,7 @@ class CoinDetailModal(ModalScreen):
                 try:
                     stamp_data = self.coin.details['d']
                     if isinstance(stamp_data, dict):
-                        if stamp_data.get('type', None) == 'file':
+                        if 'file' in stamp_data:
                             stamp_data_str = json.dumps(
                                 {
                                     'file': '...',

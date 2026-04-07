@@ -215,6 +215,10 @@ no other UI updates indicate what happened.
 - Default cursor highlights individual cells, "row" highlights the whole row
 - `table.get_row_at(table.cursor_row)` returns the tuple of column values for
 the selected row
+- When adding columns with `add_columns()`, use tuples `(display_name, column_key)`
+  for use with `update_cell()`: e.g. `("Field Name", "field_name")`
+- When calling `update_cell()`, use the column key (second element), NOT the
+  display name: e.g. `table.update_cell(row_key, "field_name", value)`
 
 ### Element Styling
 

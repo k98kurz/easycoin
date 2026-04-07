@@ -129,9 +129,10 @@ class ReviewSubmitContainer(VerticalScroll):
 
         # set fee text
         txn = self.txn_data.txn
-        actual_burn = total_in - total_out
+        min_fee = format_balance(txn.minimum_fee(txn), exact=True)
+        actual_burn = format_balance(total_in - total_out, exact=True)
         fee_static.update(
-            f"Minimum Fee: {txn.minimum_fee(txn)} | Actual Fee Burn: {actual_burn}"
+            f"Minimum Fee: {min_fee} | Actual Fee Burn: {actual_burn}"
         )
 
     def _check_txn(self) -> tuple[bool, str]:

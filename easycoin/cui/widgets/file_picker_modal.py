@@ -7,6 +7,18 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DirectoryTree, Footer, Static
 
 
+class ECDirectoryTree(DirectoryTree):
+    def __init__(self, filter_callback, *args, **kwargs):
+        self.filter_callback = filter_callback
+        super().__init__(*args, **kwargs)
+
+    def filter_paths(self, paths: list[Path]) -> list[Path]:
+        """Filter displayed paths if a filter callback is provided."""
+        if self.filter_callback is None:
+            return paths
+        return [p for p in paths if p.is_dir() or self.filter_callback(p)]
+
+
 class FilePickerModal(ModalScreen[Path|None]):
     """Modal for selecting files from the filesystem."""
 
@@ -33,9 +45,8 @@ class FilePickerModal(ModalScreen[Path|None]):
         """Compose file picker layout."""
         with Vertical(classes="modal-container w-70p h-40"):
             yield Static(self.title, classes="modal-title")
-            yield DirectoryTree(
-                self.starting_path,
-                id="file_tree"
+            yield ECDirectoryTree(
+                self.filter_callback, self.starting_path, id="file_tree",
             )
 
             with Horizontal(id="modal_actions"):
@@ -57,12 +68,6 @@ class FilePickerModal(ModalScreen[Path|None]):
     def action_cancel(self) -> None:
         """Dismiss without selection."""
         self.dismiss(None)
-
-    def filter_paths(self, paths: list[Path]) -> list[Path]:
-        """Filter displayed paths if a filter callback is provided."""
-        if self.filter_callback is None:
-            return paths
-        return [p for p in paths if p.is_dir() or self.filter_callback(p)]
 
     async def action_quit(self) -> None:
         await self.app.action_quit()
