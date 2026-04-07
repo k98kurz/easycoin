@@ -9,9 +9,9 @@ from textual.widgets import Button, Static, Footer, DataTable
 from textual.widgets.data_table import RowKey
 from easycoin.cui.helpers import (
     format_balance, format_timestamp, format_timestamp_relative,
-    truncate_text
+    format_amount, truncate_text
 )
-from easycoin.cui.widgets import ECTextArea
+from easycoin.cui.widgets import ECTextArea, CoinDetailModal
 from easycoin.cui.clipboard import universal_copy
 from easycoin.models import Txn, Address, Coin, Wallet
 from .readonly_witness_modal import ReadOnlyWitnessModal
@@ -113,7 +113,10 @@ class TransactionDetailModal(ModalScreen):
             ("Coin ID", "coin_id"),
             ("Amount", "amount"),
             ("Lock Type", "lock_type"),
-            ("Data Size", "data_size"),
+            ("Stamp Size", "stamp_size"),
+            ("Stamp Type", "stamp_type"),
+            ("Stamp Name", "stamp_name"),
+            ("Stamp 'n'", "stamp_n"),
             ("Witness Size", "witness_size"),
             ("Address", "address"),
         )
@@ -124,7 +127,10 @@ class TransactionDetailModal(ModalScreen):
             ("Coin ID", "coin_id"),
             ("Amount", "amount"),
             ("Lock Type", "lock_type"),
-            ("Data Size", "data_size"),
+            ("Stamp Size", "stamp_size"),
+            ("Stamp Type", "stamp_type"),
+            ("Stamp Name", "stamp_name"),
+            ("Stamp 'n'", "stamp_n"),
             ("Spent", "spent"),
             ("Address", "address"),
         )
@@ -211,7 +217,14 @@ class TransactionDetailModal(ModalScreen):
             address = Address({"lock": coin.lock})
             lock_type = Wallet.get_lock_type(coin.lock)
             witness_size = 0
-            data_size = len(coin.data.get('details', None) or b'')
+
+            # Extract and format stamp data
+            stamp_size = len(coin.data.get('details', None) or b'')
+            stamp_size_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+            stamp_data = coin.details.get('d', None) or {}
+            stamp_type = stamp_data.get('type', '')
+            stamp_name = stamp_data.get('name', '')
+            stamp_n = str(coin.details.get('n', '')) if coin.details else ''
 
             witness_bytes = self.txn.witness.get(coin.id_bytes, b'')
             witness_size = len(witness_bytes)
@@ -220,7 +233,10 @@ class TransactionDetailModal(ModalScreen):
                 truncated_id,
                 format_balance(coin.amount, exact=True),
                 lock_type,
-                str(data_size),
+                stamp_size_display,
+                stamp_type,
+                stamp_name,
+                stamp_n,
                 str(witness_size),
                 address.hex,
             )
@@ -235,14 +251,24 @@ class TransactionDetailModal(ModalScreen):
             truncated_id = truncate_text(coin.id, prefix_len=8, suffix_len=4)
             address = Address({"lock": coin.lock})
             lock_type = Wallet.get_lock_type(coin.lock)
-            data_size = len(coin.data.get('details', None) or b'')
             spent_status = "Yes" if coin.spent else "No"
+
+            # Extract and format stamp data
+            stamp_size = len(coin.data.get('details', None) or b'')
+            stamp_size_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+            stamp_data = coin.details.get('d', None) or {}
+            stamp_type = stamp_data.get('type', '')
+            stamp_name = stamp_data.get('name', '')
+            stamp_n = str(coin.details.get('n', '')) if coin.details else ''
 
             row_key = outputs_table.add_row(
                 truncated_id,
                 format_balance(coin.amount, exact=True),
                 lock_type,
-                str(data_size),
+                stamp_size_display,
+                stamp_type,
+                stamp_name,
+                stamp_n,
                 spent_status,
                 address.hex,
             )
@@ -281,6 +307,7 @@ class TransactionDetailModal(ModalScreen):
             self.app.push_screen(modal)
         else:
             self.app.notify("No spending transaction found", severity="info")
+            self.app.push_screen(CoinDetailModal(coin))
 
     @on(Button.Pressed, "#btn_view_hex")
     def _toggle_hex(self) -> None:

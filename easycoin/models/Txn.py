@@ -371,9 +371,9 @@ class Txn(HashedModel):
             `allow_negatives` is `False`), including serialization
             overhead, but excluding any mint lock.
         """
-        check = '' if allow_negatives else 'dup push d0 leq verify '
+        check = '' if allow_negatives else ('dup push d0 leq verify\n' + ' ' * 20)
         return Script.from_src(f'''
-            # function to compare all values on the stack #
+            # func to compare all values on the stack #
             # params are [...vals, count, compare] #
             def 0 {{
                 @= c 1

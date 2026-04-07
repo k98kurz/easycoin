@@ -45,6 +45,64 @@ def format_timestamp_relative(ts: int) -> str:
         return format_timestamp(ts)
 
 
+def format_script_src(src: str) -> str:
+    """Formats tapescript source code to remove weird indentation."""
+    # parse into lines and strip indentation
+    lines = src.split('\n')
+    lines = [l.strip() for l in lines]
+
+    # remove leading and trailing empty lines
+    while len(lines) and len(lines[0]) == 0:
+        lines = lines[1:]
+    while len(lines) and len(lines[-1]) == 0:
+        lines = lines[:-1]
+
+    # re-indent in code blocks
+    code = []
+    indent_level = 0
+    empty_line = False
+    for i, l in enumerate(lines):
+        # preserve one empty internal line between blocks
+        if not l:
+            if not empty_line:
+                empty_line = True
+                code.append('')
+            continue
+        empty_line = False
+
+        # check for deindentation
+        if(   l[:6].lower() == 'end_if'
+                or l[:7].lower() == 'end_def'
+                or l[:4].lower() == 'else'
+                or l[:6].lower() == 'except'
+                or l[:10].lower() == 'end_except'
+                or l[:8].lower() == 'end_loop'
+                or l[:1] == '}'
+            ):
+            indent_level -= 1
+
+        # add line
+        code.append(('    ' * indent_level) + l)
+
+        # check for subsequent indentation/re-indentation
+        if  (   'op_if' in (l[:5].lower(), l[-5:].lower())
+                or 'if' in (l[:2].lower(), l[-2:].lower())
+                or 'else' in (l[:4].lower(), l[-4:].lower())
+                or '} else' == l[:6].lower()
+                or 'op_def' in (l[:6].lower(), l[-6:].lower())
+                or 'def' in (l[:3].lower(), l[-3:].lower())
+                or 'op_try' in (l[:6].lower(), l[-6:].lower())
+                or 'try' in (l[:3].lower(), l[-3:].lower())
+                or 'except' in (l[:6].lower(), l[-6:].lower())
+                or 'op_loop' in (l[:7].lower(), l[-7:].lower())
+                or 'loop' in (l[:4].lower(), l[-4:].lower())
+                or '{' == l[-1:]
+            ):
+            indent_level += 1
+
+    return '\n'.join(code)
+
+
 def truncate_text(text: str, prefix_len: int = 16, suffix_len: int = 8) -> str:
     """Truncate text to readable format with ellipsis."""
     value_assert(prefix_len >= 0, 'prefix_len must be >= 0')

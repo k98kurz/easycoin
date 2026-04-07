@@ -45,7 +45,7 @@ class StampTemplatesScreen(BaseScreen):
                     yield RadioSet(
                         RadioButton("All", id="type_all", value=True),
                         RadioButton("Single", id="type_single"),
-                        RadioButton("Series", id="type_series"),
+                        RadioButton("Token", id="type_token"),
                         RadioButton("Unknown", id="type_unknown"),
                         id="type_filter",
                         classes="h-7",
@@ -230,7 +230,7 @@ class StampTemplatesScreen(BaseScreen):
 
         if type_idx == 1 and template.type.value != "single":
             return False
-        elif type_idx == 2 and template.type.value != "series":
+        elif type_idx == 2 and template.type.value != "token":
             return False
         elif type_idx == 3 and template.type.value != "unknown":
             return False

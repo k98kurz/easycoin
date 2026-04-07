@@ -8,7 +8,7 @@ import packify
 
 class StampType(Enum):
     SINGLE = 'single'
-    SERIES = 'series'
+    TOKEN = 'token'
     UNKNOWN = 'unknown'
 
 
@@ -40,7 +40,7 @@ class StampTemplate(SqlModel):
     @type.setter
     def type(self, val: StampType|str):
         type_assert(type(val) in (StampType, str),
-            'type must be StampType or one of ["single", "series", "unknown"]')
+            'type must be StampType or one of ["single", "token", "unknown"]')
         if type(val) is StampType:
             self.data['type'] = val.value
             return

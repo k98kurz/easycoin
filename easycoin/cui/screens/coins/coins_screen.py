@@ -59,8 +59,11 @@ class CoinsScreen(BaseScreen):
         table.add_columns(
             "Coin ID",
             "Amount",
-            "Data Size",
             "Lock Type",
+            "Stamp Size",
+            "Stamp Type",
+            "Stamp Name",
+            "Stamp 'n'",
             "Status",
             "Network"
         )
@@ -162,12 +165,22 @@ class CoinsScreen(BaseScreen):
             self._coins.append(coin)
 
             try:
-                data_size = len(coin.data.get('details', None) or b'')
+                # Extract and format stamp data
+                stamp_size = len(coin.data.get('details', None) or b'')
+                stamp_size_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+                stamp_data = coin.details.get('d', None) or {}
+                stamp_type = stamp_data.get('type', '')
+                stamp_name = stamp_data.get('name', '')
+                stamp_n = str(coin.details.get('n', '')) if coin.details else ''
+
                 row_key = table.add_row(
                     coin.id,
                     format_balance(coin.amount),
-                    f"{format_amount(data_size)}B",
                     Wallet.get_lock_type(coin.lock),
+                    stamp_size_display,
+                    stamp_type,
+                    stamp_name,
+                    stamp_n,
                     "Spent" if coin.spent else "Unspent",
                     self._get_network_name(coin.net_id)
                 )

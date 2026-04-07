@@ -86,15 +86,15 @@ class TestStampTemplate(unittest.TestCase):
         # test valid models.StampType enum values
         t.type = models.StampType.SINGLE
         assert t.type == models.StampType.SINGLE
-        t.type = models.StampType.SERIES
-        assert t.type == models.StampType.SERIES
+        t.type = models.StampType.TOKEN
+        assert t.type == models.StampType.TOKEN
         t.type = models.StampType.UNKNOWN
         assert t.type == models.StampType.UNKNOWN
         # test valid str values
         t.type = 'single'
         assert t.type == models.StampType.SINGLE
-        t.type = 'series'
-        assert t.type == models.StampType.SERIES
+        t.type = 'token'
+        assert t.type == models.StampType.TOKEN
         t.type = 'unknown'
         assert t.type == models.StampType.UNKNOWN
         # test TypeError for invalid types

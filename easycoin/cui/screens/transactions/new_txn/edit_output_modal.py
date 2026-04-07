@@ -153,11 +153,12 @@ class EditOutputModal(ModalScreen[dict|None]):
                 self._stamp_template_options.append((
                     template.id,
                     template,
-                    f"{template.name} ({template.type.value})"
+                    f"{template.name} ({template.type.value}) ({template.version})"
                 ))
                 template_list.add_option(
                     Option(
-                        f"{template.name} ({template.type.value})",
+                        f"{template.name} ({template.type.value}) "
+                        f"({template.version})",
                         id=f"template_{template.id}"
                     )
                 )

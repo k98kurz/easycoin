@@ -1,3 +1,5 @@
+from pathlib import Path
+from tapescript import Script
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -11,8 +13,7 @@ from easycoin.constants import _max_detail_icon_size
 from easycoin.models import StampTemplate, Txn, StampType
 from easycoin.cui.widgets import ECTextArea
 from easycoin.cui.widgets.file_picker_modal import FilePickerModal
-from easycoin.cui.helpers import get_image_type
-from pathlib import Path
+from easycoin.cui.helpers import get_image_type, format_script_src
 import base64
 
 
@@ -53,11 +54,18 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
                 with Vertical():
                     yield Static("Covenant Type:", classes="text-bold my-1")
                     yield RadioSet(
-                        RadioButton("Single", id="type_single", value=True),
-                        RadioButton("Fungible Series", id="type_series"),
+                        RadioButton("Single", id="type_single"),
+                        RadioButton("Token", id="type_token"),
                         RadioButton("Custom", id="type_unknown"),
                         id="type_radio",
                     )
+
+            with Horizontal(classes="h-5"):
+                yield Checkbox(
+                    "Allow negative token values",
+                    id="allow_negatives",
+                    value=False
+                )
 
             with Horizontal(classes="h-5 mt-1"):
                 with Vertical():
@@ -162,27 +170,58 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         if pressed_index == 0:
             stamp_type = StampType.SINGLE
         elif pressed_index == 1:
-            stamp_type = StampType.SERIES
+            stamp_type = StampType.TOKEN
         else:
             stamp_type = StampType.UNKNOWN
 
-        self._prepopulate_covenant_script(stamp_type)
+        if self.template_id is None:
+            self._prepopulate_scripts(stamp_type)
+
+        if self.template_id is None:
+            allow_negatives = self.query_one("#allow_negatives")
+            if stamp_type == StampType.TOKEN:
+                allow_negatives.remove_class("hidden")
+            else:
+                allow_negatives.add_class("hidden")
 
     @on(OptionList.OptionHighlighted, "#details_type")
     def _on_details_type_changed(self, event: OptionList.OptionHighlighted) -> None:
         """Handle details type selection."""
         pass
 
-    def _prepopulate_covenant_script(self, stamp_type: StampType) -> None:
+    @on(Checkbox.Changed, "#allow_negatives")
+    def _on_allow_negatives_changed(self, event: Checkbox.Changed) -> None:
+        """Handle allow_negatives checkbox changes."""
+        if self.template_id is None:
+            type_radio = self.query_one("#type_radio")
+            pressed_index = type_radio.pressed_index
+            if pressed_index == 1:
+                stamp_type = StampType.TOKEN
+                prefix_script = self.query_one("#prefix_script")
+                prefix_script.text = format_script_src(Txn.std_stamp_token_series_prefix(
+                    event.value
+                ).src)
+
+    def _prepopulate_scripts(self, stamp_type: StampType) -> None:
         """Set covenant script text area based on `stamp_type`."""
         covenant_script = self.query_one("#covenant_script")
+        enable_prefix = self.query_one("#enable_prefix")
+        prefix_script = self.query_one("#prefix_script")
+        allow_negatives = self.query_one("#allow_negatives")
 
         if stamp_type == StampType.SINGLE:
-            covenant_script.text = Txn.std_stamp_covenant().src
-            covenant_script.read_only = True
-        elif stamp_type == StampType.SERIES:
-            covenant_script.text = Txn.std_series_covenant().src
-            covenant_script.read_only = True
+            covenant_script.text = format_script_src(Txn.std_stamp_covenant().src)
+            covenant_script.read_only = False
+        elif stamp_type == StampType.TOKEN:
+            covenant_script.text = format_script_src(Txn.std_stamp_token_series_covenant().src)
+            covenant_script.read_only = False
+            enable_prefix.value = True
+            prefix_script.remove_class("hidden")
+            prefix_script.text = format_script_src(Txn.std_stamp_token_series_prefix(
+                allow_negatives.value
+            ).src)
+            prefix_script.read_only = False
+            self.update_mintlock_prefix_container()
         else:
             covenant_script.text = ""
             covenant_script.read_only = False
@@ -319,28 +358,27 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         if type_index == 0:
             stamp_type = StampType.SINGLE
         elif type_index == 1:
-            stamp_type = StampType.SERIES
+            stamp_type = StampType.TOKEN
         else:
             stamp_type = StampType.UNKNOWN
 
-        scripts: dict[str, str] = {'$': covenant_script.text}
+        scripts: dict[str, str] = {'$': format_script_src(covenant_script.text)}
 
         if enable_mint_lock.value and mint_lock_script.text.strip():
-            scripts['L'] = mint_lock_script.text.strip()
+            scripts['L'] = format_script_src(mint_lock_script.text.strip())
 
         if enable_prefix.value and prefix_script.text.strip():
-            scripts['_'] = prefix_script.text.strip()
+            scripts['_'] = format_script_src(prefix_script.text.strip())
 
         details: dict[str, bytes|str|None] = {}
         details_type = self.query_one("#details_type")
         selected_option = details_type.highlighted_option
         if selected_option and selected_option.id != "na":
-            selected_id = selected_option.id
-            if selected_id == "token":
+            if selected_option.id == "token":
                 details['type'] = 'token'
-            elif selected_id == "image":
+            elif selected_option.id == "image":
                 details['type'] = 'image'
-            elif selected_id == "text":
+            elif selected_option.id == "text":
                 details['type'] = 'text'
 
         details_name = self.query_one("#details_name").value.strip()
@@ -425,20 +463,25 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         stamp_type = self.template.type
         if stamp_type == StampType.SINGLE:
             self.query_one("#type_single").value = True
-        elif stamp_type == StampType.SERIES:
-            self.query_one("#type_series").value = True
+        elif stamp_type == StampType.TOKEN:
+            self.query_one("#type_token").value = True
         else:
             self.query_one("#type_unknown").value = True
 
-        self._prepopulate_covenant_script(stamp_type)
+        allow_negatives = self.query_one("#allow_negatives")
+        allow_negatives.add_class("hidden")
 
         scripts = self.template.scripts
+        covenant_script = self.query_one("#covenant_script")
+        if '$' in scripts:
+            covenant_script.text = format_script_src(scripts['$'])
+
         enable_mint_lock = self.query_one("#enable_mint_lock")
         mint_lock_script = self.query_one("#mint_lock_script")
         if 'L' in scripts:
             enable_mint_lock.value = True
             mint_lock_script.remove_class("hidden")
-            mint_lock_script.text = scripts['L']
+            mint_lock_script.text = format_script_src(scripts['L'])
         else:
             enable_mint_lock.value = False
             mint_lock_script.add_class("hidden")
@@ -446,10 +489,11 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
         enable_prefix = self.query_one("#enable_prefix")
         prefix_script = self.query_one("#prefix_script")
+        allow_negatives = self.query_one("#allow_negatives")
         if '_' in scripts:
             enable_prefix.value = True
             prefix_script.remove_class("hidden")
-            prefix_script.text = scripts['_']
+            prefix_script.text = format_script_src(scripts['_'])
         else:
             enable_prefix.value = False
             prefix_script.add_class("hidden")
@@ -484,11 +528,13 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
     def _initialize_new_template(self) -> None:
         """Initialize form for new template with defaults."""
+        self.query_one("#type_single").value = True
         self.query_one("#details_type").highlighted = 0
         self.query_one("#details_name").value = ""
         self.query_one("#details_description").value = ""
         self.query_one("#details_icon").text = ""
-        self._prepopulate_covenant_script(StampType.SINGLE)
+        self.query_one("#allow_negatives").add_class("hidden")
+        self._prepopulate_scripts(StampType.SINGLE)
 
     def _show_error(self) -> None:
         """Display error message in error display widget."""
