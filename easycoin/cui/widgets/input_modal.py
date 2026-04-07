@@ -18,6 +18,7 @@ class InputModal(ModalScreen[str|None]):
     def __init__(
             self, title: str, description: str, *,
             is_password: bool = False, btn_text: str = "Submit",
+            value: str = ""
         ):
         """Initialize."""
         super().__init__()
@@ -25,6 +26,7 @@ class InputModal(ModalScreen[str|None]):
         self.description = description
         self.is_password = is_password
         self.btn_text = btn_text
+        self.value = value
 
     def compose(self) -> ComposeResult:
         """Compose unlock modal layout."""
@@ -36,7 +38,8 @@ class InputModal(ModalScreen[str|None]):
             yield Input(
                 placeholder="...",
                 password=self.is_password,
-                id="input"
+                id="input",
+                value=self.value,
             )
 
             with Horizontal(id="modal_actions"):

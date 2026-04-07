@@ -3,6 +3,7 @@ from .confirmation_modal import ConfirmationModal
 from .event_log import EventLog, LogLevel
 from .file_picker_modal import FilePickerModal
 from .input_modal import InputModal
+from .option_modal import OptionModal
 from .right_sidebar import RightSidebar
 from .sigflags_modal import SigflagsModal
 from .textarea import ECTextArea
@@ -15,6 +16,7 @@ __all__ = [
     "LogLevel",
     "FilePickerModal",
     "InputModal",
+    "OptionModal",
     "RightSidebar",
     "SigflagsModal",
     "TopTabs",

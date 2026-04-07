@@ -95,11 +95,6 @@ class StampTemplatesScreen(BaseScreen):
         )
         self._load_templates()
 
-    def on_screen_resume(self, event) -> None:
-        """Refresh data when returning from modal."""
-        super().on_screen_resume(event)
-        self._load_templates()
-
     @on(RadioSet.Changed, "#type_filter")
     def _on_type_filter_changed(self, event: RadioSet.Changed) -> None:
         """Handle type filter changes."""

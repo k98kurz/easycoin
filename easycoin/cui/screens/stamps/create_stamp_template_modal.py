@@ -11,7 +11,7 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 from easycoin.constants import _max_detail_icon_size
 from easycoin.models import StampTemplate, Txn, StampType
-from easycoin.cui.widgets import ECTextArea
+from easycoin.cui.widgets import ECTextArea, InputModal, OptionModal
 from easycoin.cui.widgets.file_picker_modal import FilePickerModal
 from easycoin.cui.helpers import get_image_type, format_script_src
 import base64
@@ -97,7 +97,13 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
             with Horizontal(id="mintlock_prefix_container", classes="mt-1 h-6"):
                 with Vertical(classes="w-50p"):
-                    yield Checkbox("Enable Mint Lock ('L')", id="enable_mint_lock")
+                    with Horizontal():
+                        yield Checkbox(
+                            "Enable Mint Lock ('L')", id="enable_mint_lock"
+                        )
+                        yield Button(
+                            "Use Std L", id="btn_use_std_L", classes="m-0 hidden"
+                        )
                     yield ECTextArea(
                         id="mint_lock_script", classes="h-12 hidden mt-1"
                     )
@@ -108,7 +114,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             yield Static("", id="error_display", classes="text-bold mt-1 hidden")
 
             yield Static(
-                "Stamp Details (optional; stamp 'd' value):",
+                "Stamp Details (stamp 'd' value):",
                 classes="text-bold my-1"
             )
 
@@ -159,7 +165,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             self._load_template_data()
         else:
             self.template = StampTemplate()
-            self._initialize_new_template()
+            self.query_one("#allow_negatives").add_class("hidden")
 
         self.query_one("#name_input").focus()
 
@@ -175,19 +181,26 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             stamp_type = StampType.UNKNOWN
 
         if self.template_id is None:
-            self._prepopulate_scripts(stamp_type)
-
-        if self.template_id is None:
             allow_negatives = self.query_one("#allow_negatives")
             if stamp_type == StampType.TOKEN:
                 allow_negatives.remove_class("hidden")
             else:
                 allow_negatives.add_class("hidden")
 
-    @on(OptionList.OptionHighlighted, "#details_type")
-    def _on_details_type_changed(self, event: OptionList.OptionHighlighted) -> None:
-        """Handle details type selection."""
-        pass
+            self._prepopulate_scripts(stamp_type)
+
+            details_type = self.query_one("#details_type")
+            if stamp_type == StampType.TOKEN:
+                self.query_one("#details_name").placeholder = (
+                    "Token name (necessary for full functionality)"
+                )
+                details_type.highlighted = 1
+                for i in [0, 2, 3]:
+                    details_type.disable_option_at_index(i)
+            else:
+                self.query_one("#details_name").placeholder = "Optional name"
+                for i in [0, 1, 2, 3]:
+                    details_type.enable_option_at_index(i)
 
     @on(Checkbox.Changed, "#allow_negatives")
     def _on_allow_negatives_changed(self, event: Checkbox.Changed) -> None:
@@ -211,30 +224,34 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
         if stamp_type == StampType.SINGLE:
             covenant_script.text = format_script_src(Txn.std_stamp_covenant().src)
-            covenant_script.read_only = False
+            prefix_script.text = ""
+            enable_prefix.value = False
         elif stamp_type == StampType.TOKEN:
-            covenant_script.text = format_script_src(Txn.std_stamp_token_series_covenant().src)
-            covenant_script.read_only = False
+            covenant_script.text = format_script_src(
+                Txn.std_stamp_token_series_covenant().src
+            )
             enable_prefix.value = True
             prefix_script.remove_class("hidden")
             prefix_script.text = format_script_src(Txn.std_stamp_token_series_prefix(
                 allow_negatives.value
             ).src)
-            prefix_script.read_only = False
             self.update_mintlock_prefix_container()
         else:
             covenant_script.text = ""
-            covenant_script.read_only = False
+            prefix_script.text = ""
+            enable_prefix.value = False
 
     @on(Checkbox.Changed, "#enable_mint_lock")
     def _toggle_mint_lock(self, event: Checkbox.Changed) -> None:
         """Handle checkbox changes for mint lock."""
         mint_lock_script = self.query_one("#mint_lock_script")
+        btn_std_L = self.query_one("#btn_use_std_L")
         if event.value:
             mint_lock_script.remove_class("hidden")
-            #mint_lock_script.focus()
+            btn_std_L.remove_class("hidden")
         else:
             mint_lock_script.add_class("hidden")
+            btn_std_L.add_class("hidden")
         self.update_mintlock_prefix_container()
 
     @on(Checkbox.Changed, "#enable_prefix")
@@ -243,10 +260,69 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         prefix_script = self.query_one("#prefix_script")
         if event.value:
             prefix_script.remove_class("hidden")
-            #prefix_script.focus()
         else:
             prefix_script.add_class("hidden")
         self.update_mintlock_prefix_container()
+
+    @on(Button.Pressed, "#btn_use_std_L")
+    def action_use_std_l(self) -> None:
+        """Open modal to select standard mint lock script."""
+        std_l_options = {
+            "Requires Burn": "requires_burn",
+            "Must Balance": "must_balance",
+        }
+
+        def on_std_l_selected(option_value: str | None) -> None:
+            if option_value is None:
+                return
+
+            if option_value == "must_balance":
+                self.query_one("#mint_lock_script").text = format_script_src(
+                    Txn.std_must_balance_mint_lock().src
+                )
+            elif option_value == "requires_burn":
+                def on_rate_entered(rate_str: str | None) -> None:
+                    if rate_str is None:
+                        return
+
+                    try:
+                        rate = int(rate_str)
+                        if rate <= 0:
+                            self.app.notify(
+                                "Rate must be a positive integer",
+                                severity="error"
+                            )
+                            return
+                        self.query_one("#mint_lock_script").text = format_script_src(
+                            Txn.std_requires_burn_mint_lock(rate).src
+                        )
+                    except ValueError:
+                        self.app.notify(
+                            "Rate must be a valid integer",
+                            severity="error"
+                        )
+                    except (TypeError, ValueError) as e:
+                        self.app.notify(
+                            f"Invalid rate: {e}",
+                            severity="error"
+                        )
+
+                self.app.push_screen(
+                    InputModal(
+                        title="Burn Rate",
+                        description="Enter the burn rate (integer > 0):",
+                        value="1000",
+                    ),
+                    on_rate_entered
+                )
+
+        self.app.push_screen(
+            OptionModal(
+                title="Standard Mint Lock",
+                options=std_l_options,
+            ),
+            on_std_l_selected
+        )
 
     def update_mintlock_prefix_container(self):
         container = self.query_one("#mintlock_prefix_container")
@@ -384,6 +460,9 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
         details_name = self.query_one("#details_name").value.strip()
         if details_name:
             details['name'] = details_name
+        elif details['type'] == "token":
+            self.app.notify("Details -> Name required for token template")
+            return False
 
         details_description = self.query_one("#details_description").value.strip()
         if details_description:
@@ -525,16 +604,6 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
 
         self.query_one("#dsh").update(f"Data-script-hash: {self.template.dsh.hex()}")
         self.query_one("#issue").update(f"Issue: {self.template.issue.hex()}")
-
-    def _initialize_new_template(self) -> None:
-        """Initialize form for new template with defaults."""
-        self.query_one("#type_single").value = True
-        self.query_one("#details_type").highlighted = 0
-        self.query_one("#details_name").value = ""
-        self.query_one("#details_description").value = ""
-        self.query_one("#details_icon").text = ""
-        self.query_one("#allow_negatives").add_class("hidden")
-        self._prepopulate_scripts(StampType.SINGLE)
 
     def _show_error(self) -> None:
         """Display error message in error display widget."""
