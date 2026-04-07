@@ -6,7 +6,8 @@ from textual.containers import Container, Vertical, VerticalScroll, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Static, Button, Footer
 from easycoin.cui.helpers import (
-    format_balance, format_timestamp, format_amount, truncate_text
+    format_balance, format_timestamp, format_amount, truncate_text, hexify,
+    create_temp_file, open_file_with_default_app
 )
 from easycoin.cui.widgets.textarea import ECTextArea
 from easycoin.models import Address, Coin, Wallet
@@ -107,22 +108,34 @@ class CoinDetailModal(ModalScreen):
                     stamp_data = self.coin.details['d']
                     if isinstance(stamp_data, dict):
                         if 'file' in stamp_data:
-                            stamp_data_str = json.dumps(
-                                {
-                                    'file': '...',
-                                    **{
-                                        k:v for k,v in stamp_data.items()
-                                        if k != 'file'
-                                    }
-                                }, indent=2
+                            filename = stamp_data.get('name', 'unknown')
+                            file_type = stamp_data.get('type', 'file')
+                            file_content = stamp_data['file']
+
+                            yield Static(f"📎 {filename}", classes="my-1 text-bold")
+                            display_size = format_amount(len(file_content)) + "B"
+                            yield Static(
+                                f"Type: {file_type} | Size: {display_size}",
+                                classes="mb-1"
                             )
+
+                            with Horizontal(classes="my-1 h-3"):
+                                yield Button(
+                                    "Open", id="btn_open_file",
+                                    variant="primary", classes="mx-1"
+                                )
+                                yield Button(
+                                    "Save to Disk", id="btn_save_file",
+                                    variant="default", classes="mx-1"
+                                )
                         else:
                             stamp_data_str = json.dumps(
-                                stamp_data, indent=2, default=str
+                                hexify(stamp_data), indent=2, default=str
                             )
+                            yield Static(stamp_data_str, classes="text-italic")
                     else:
                         stamp_data_str = str(stamp_data)
-                    yield Static(f"{stamp_data_str}", classes="text-italic")
+                        yield Static(stamp_data_str, classes="text-italic")
                 except Exception as e:
                     yield Static(
                         f"Error displaying stamp data: {e}",
@@ -184,6 +197,47 @@ class CoinDetailModal(ModalScreen):
     def action_close(self) -> None:
         """Close the modal."""
         self.dismiss()
+
+    @on(Button.Pressed, "#btn_open_file")
+    def _on_open_file(self) -> None:
+        """Open file attachment with system default app."""
+        try:
+            stamp_data = self.coin.details['d']
+            file_content = stamp_data['file']
+            filename = stamp_data.get('name', 'file.dat')
+
+            filepath = create_temp_file(file_content, filename)
+            open_file_with_default_app(filepath)
+        except Exception as e:
+            self.app.notify(f"Failed to open file: {e}", severity="error")
+
+    @on(Button.Pressed, "#btn_save_file")
+    def _on_save_file(self) -> None:
+        """Save file attachment to disk."""
+        import os
+
+        try:
+            stamp_data = self.coin.details['d']
+            file_content = stamp_data['file']
+            filename = stamp_data.get('name', 'file.dat')
+
+            filepath = filename
+            counter = 1
+            while os.path.exists(filepath):
+                name, ext = os.path.splitext(filename)
+                filepath = f"{name}_{counter}{ext}"
+                counter += 1
+
+            with open(filepath, 'wb') as f:
+                f.write(file_content)
+
+            abs_path = os.path.abspath(filepath)
+            self.app.notify(
+                f"File saved to: {abs_path}",
+                severity="success"
+            )
+        except Exception as e:
+            self.app.notify(f"Failed to save file: {e}", severity="error")
 
     async def action_quit(self) -> None:
         """Quit the application."""

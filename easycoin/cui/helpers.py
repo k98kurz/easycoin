@@ -1,5 +1,24 @@
 from datetime import datetime
 from easycoin.models.errors import type_assert, value_assert
+import atexit
+import os
+import packify
+import platform
+import subprocess
+import tempfile
+
+
+def hexify(thing, name=None, names_to_unpack=[]):
+    if type(thing) is dict:
+        return {
+            hexify(k, None, names_to_unpack): hexify(v, k, names_to_unpack)
+            for k,v in thing.items()
+        }
+    if type(thing) is bytes:
+        if name not in names_to_unpack:
+            return thing.hex()
+        return hexify(packify.unpack(thing), None, names_to_unpack)
+    return thing
 
 
 def format_balance(balance: int, exact: bool = False) -> str:
@@ -197,4 +216,51 @@ def get_image_type(data: bytes) -> str|None:
         return "webp"
     else:
         return None
+
+
+_temp_files: set[str] = set()
+
+def _cleanup_temp_files() -> None:
+    """Clean up temporary files created during the session."""
+    for filepath in _temp_files:
+        try:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+        except Exception:
+            pass
+
+atexit.register(_cleanup_temp_files)
+
+
+def create_temp_file(content: bytes, filename: str) -> str:
+    """Create temp file with content, track for cleanup. Returns the file path."""
+    temp_dir = tempfile.gettempdir()
+    filepath = os.path.join(temp_dir, f"easycoin_{filename}")
+    with open(filepath, 'wb') as f:
+        f.write(content)
+    _temp_files.add(filepath)
+    return filepath
+
+
+def open_file_with_default_app(filepath: str) -> None:
+    """Open file with system's default application. Works cross-platform."""
+    abs_path = os.path.abspath(filepath)
+    system = platform.system()
+
+    if system == "Linux":
+        subprocess.run(
+            ['xdg-open', abs_path],
+            check=False,
+            start_new_session=True
+        )
+    elif system == "Darwin":
+        subprocess.run(
+            ['open', abs_path],
+            check=False,
+            start_new_session=True
+        )
+    elif system == "Windows":
+        os.startfile(abs_path)
+    else:
+        raise RuntimeError(f"Unsupported platform: {system}")
 

@@ -9,14 +9,13 @@ from textual.widgets import Button, Static, Footer, DataTable
 from textual.widgets.data_table import RowKey
 from easycoin.cui.helpers import (
     format_balance, format_timestamp, format_timestamp_relative,
-    format_amount, truncate_text
+    format_amount, truncate_text, hexify
 )
 from easycoin.cui.widgets import ECTextArea, CoinDetailModal
 from easycoin.cui.clipboard import universal_copy
 from easycoin.models import Txn, Address, Coin, Wallet
 from .readonly_witness_modal import ReadOnlyWitnessModal
 import json
-import packify
 
 
 class TransactionDetailModal(ModalScreen):
@@ -156,19 +155,8 @@ class TransactionDetailModal(ModalScreen):
         self._populate_inputs_table()
         self._populate_outputs_table()
         self.query_one("#hex_textarea").text = self.txn.pack().hex()
-        def hexify(thing, name=None):
-            if type(thing) is dict:
-                return {
-                    hexify(k): hexify(v, k)
-                    for k,v in thing.items()
-                }
-            if type(thing) is bytes:
-                if name != 'witness':
-                    return thing.hex()
-                return hexify(packify.unpack(thing))
-            return thing
         self.query_one("#data_textarea").text = json.dumps(
-            hexify(self.txn.data), indent=2,
+            hexify(self.txn.data, None, ['witness']), indent=2,
         )
 
     def _update_header(self) -> None:
