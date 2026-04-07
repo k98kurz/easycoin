@@ -2,7 +2,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.widgets import Static, DataTable
-from easycoin.cui.helpers import format_balance, truncate_text
+from easycoin.cui.helpers import format_balance, format_amount, truncate_text
 from easycoin.models import Address
 
 
@@ -51,6 +51,10 @@ class ReviewSubmitContainer(VerticalScroll):
                 ("Coin ID", "coin_id"),
                 ("Amount", "amount"),
                 ("Lock Type", "lock_type"),
+                ("Stamp Size", "stamp_size"),
+                ("Stamp Type", "stamp_type"),
+                ("Stamp Name", "stamp_name"),
+                ("Stamp 'n'", "stamp_n"),
                 ("Witness Size", "witness_size"),
                 ("Address", "address"),
             )
@@ -60,7 +64,10 @@ class ReviewSubmitContainer(VerticalScroll):
         if len(outputs_table.columns) == 0:
             outputs_table.add_columns(
                 ("Amount", "amount"),
-                ("Data Size", "data_size"),
+                ("Stamp Size", "stamp_size"),
+                ("Stamp Type", "stamp_type"),
+                ("Stamp Name", "stamp_name"),
+                ("Stamp 'n'", "stamp_n"),
                 ("Address", "address"),
             )
         outputs_table.cursor_type = "none"
@@ -76,10 +83,23 @@ class ReviewSubmitContainer(VerticalScroll):
         inputs_table.clear()
         for output in self.txn_data.selected_inputs:
             total_in += output.coin.amount
+
+            # Extract stamp data
+            stamp_size = len(output.coin.data.get('details', None) or b'')
+            stamp_size_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+            stamp_data = output.coin.details.get('d', None) or {}
+            stamp_type = stamp_data.get('type', '')
+            stamp_name = stamp_data.get('name', '')
+            stamp_n = str(output.coin.details.get('n', '')) if output.coin.details else ''
+
             inputs_table.add_row(
                 truncate_text(output.coin.id),
                 format_balance(output.coin.amount, exact=True),
                 self.txn_data.witnesses[output.coin.id].lock_type,
+                stamp_size_display,
+                stamp_type,
+                stamp_name,
+                stamp_n,
                 len(self.txn_data.witnesses[output.coin.id].full().bytes),
                 Address({"lock": output.coin.lock}).hex,
             )
@@ -89,9 +109,21 @@ class ReviewSubmitContainer(VerticalScroll):
         outputs_table.clear()
         for coin in self.txn_data.new_output_coins:
             total_out += coin.amount
+
+            # Extract stamp data
+            stamp_size = len(coin.data.get('details', None) or b'')
+            stamp_size_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+            stamp_data = coin.details.get('d', None) or {}
+            stamp_type = stamp_data.get('type', '')
+            stamp_name = stamp_data.get('name', '')
+            stamp_n = str(coin.details.get('n', '')) if coin.details else ''
+
             outputs_table.add_row(
                 format_balance(coin.amount, exact=True),
-                len(coin.data['details'] or b''),
+                stamp_size_display,
+                stamp_type,
+                stamp_name,
+                stamp_n,
                 Address({"lock": coin.lock}).hex,
             )
 

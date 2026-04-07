@@ -69,16 +69,28 @@ class AddOutputsContainer(Vertical):
         if len(table.columns) == 0:
             table.add_columns(
                 ("Amount (EC⁻¹)", "amount"),
-                ("Data Size", "data_size"),
+                ("Stamp Size", "stamp_size"),
+                ("Stamp Type", "stamp_type"),
+                ("Stamp Name", "stamp_name"),
+                ("Stamp 'n'", "stamp_n"),
                 ("Address", "address"),
                 ("Output ID", "output_id"),
             )
         table.cursor_type = "row"
 
         for i, coin in enumerate(self.txn_data.new_output_coins):
+            stamp_size = len(coin.data.get('details', None) or b'')
+            stamp_size_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+            stamp_data = coin.details.get('d', None) or {}
+            stamp_type = stamp_data.get('type', '')
+            stamp_name = stamp_data.get('name', '')
+            stamp_n = str(coin.details.get('n', '')) if coin.details else ''
             table.add_row(
                 format_balance(coin.amount, exact=True),
-                len(coin.data.get('details', None) or b''),
+                stamp_size_display,
+                stamp_type,
+                stamp_name,
+                stamp_n,
                 Address({'lock': coin.lock}).hex,
                 truncate_text(coin.id),
                 key=i

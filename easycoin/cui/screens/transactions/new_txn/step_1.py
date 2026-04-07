@@ -66,9 +66,12 @@ class SelectInputsContainer(Vertical):
         if len(table.columns) == 0:
             table.add_columns(
                 ("Coin ID", "coin_id"),
+                ("Lock Type", "lock_type"),
                 ("Amount", "amount"),
                 ("Stamp Size", "stamp_size"),
-                ("Lock Type", "lock_type"),
+                ("Stamp Type", "stamp_type"),
+                ("Stamp Name", "stamp_name"),
+                ("Stamp 'n'", "stamp_n"),
                 ("Selected", "selected"),
             )
         table.cursor_type = "row"
@@ -84,12 +87,19 @@ class SelectInputsContainer(Vertical):
             ) if addr else None
             try:
                 stamp_size = len(output.coin.data.get('details', None) or b'')
-                stamp_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else "-"
+                stamp_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+                stamp_data = output.coin.details.get('d', None) or {}
+                stamp_type = stamp_data.get('type', '')
+                stamp_name = stamp_data.get('name', '')
+                stamp_n = str(output.coin.details.get('n', '')) if output.coin.details else ''
                 row_key = table.add_row(
                     truncate_text(output.id, prefix_len=8, suffix_len=4),
+                    Wallet.get_lock_type(output.coin.lock, secrets),
                     format_balance(output.coin.amount, exact=True),
                     stamp_display,
-                    Wallet.get_lock_type(output.coin.lock, secrets),
+                    stamp_type,
+                    stamp_name,
+                    stamp_n,
                     ("✓" if output.id in [
                         o.id for o in self.txn_data.selected_inputs
                     ] else " "),
