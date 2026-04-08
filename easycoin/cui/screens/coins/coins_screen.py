@@ -277,5 +277,9 @@ class CoinsScreen(BaseScreen):
         row_key = event.row_key
         coin = self._coin_row_map.get(row_key)
         if coin:
-            self.app.push_screen(CoinDetailModal(coin))
+            def on_disassociated():
+                if self.query_one("#box_active_wallet").value:
+                    self.action_refresh_coins()
+
+            self.app.push_screen(CoinDetailModal(coin, on_disassociated))
 

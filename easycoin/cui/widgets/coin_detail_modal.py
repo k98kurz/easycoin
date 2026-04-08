@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from tapescript import Script
 from textual import on
 from textual.app import ComposeResult
@@ -10,7 +11,8 @@ from easycoin.cui.helpers import (
     create_temp_file, open_file_with_default_app
 )
 from easycoin.cui.widgets.textarea import ECTextArea
-from easycoin.models import Address, Coin, Wallet
+from .confirmation_modal import ConfirmationModal
+from easycoin.models import Address, Coin, Wallet, Input, Output
 import json
 
 
@@ -24,11 +26,12 @@ class CoinDetailModal(ModalScreen):
         Binding("ctrl+q", "quit", "Quit"),
     ]
 
-    def __init__(self, coin: Coin):
+    def __init__(self, coin: Coin, on_disassociated: Callable[[], None] | None = None):
         """Initialize coin detail modal."""
         super().__init__()
         self.coin = coin
         self.is_stamp = len(coin.details) > 0
+        self.on_disassociated = on_disassociated
 
     def compose(self) -> ComposeResult:
         """Compose coin detail modal layout."""
@@ -179,9 +182,39 @@ class CoinDetailModal(ModalScreen):
                             )
 
             with Horizontal(id="modal_actions"):
+                yield Button(
+                    "Associate with Wallet", id="btn_associate",
+                    variant="success", classes="hidden"
+                )
+                yield Button(
+                    "Disassociate from Wallet", id="btn_disassociate",
+                    variant="error", classes="hidden"
+                )
                 yield Button("Close", id="btn_close", variant="default")
 
         yield Footer()
+
+    def on_mount(self) -> None:
+        """Initialize button visibility based on wallet and coin state."""
+        btn_associate = self.query_one("#btn_associate", Button)
+        btn_disassociate = self.query_one("#btn_disassociate", Button)
+
+        if not self.app.wallet or self.app.wallet.is_locked:
+            btn_associate.add_class("hidden")
+            btn_disassociate.add_class("hidden")
+            return
+
+        is_associated = (
+            self.coin.wallet_id is not None
+            and self.coin.wallet_id == self.app.wallet.id
+        )
+
+        if is_associated:
+            btn_associate.add_class("hidden")
+            btn_disassociate.remove_class("hidden")
+        else:
+            btn_associate.remove_class("hidden")
+            btn_disassociate.add_class("hidden")
 
     def _get_network_name(self) -> str:
         """Get network name from ID."""
@@ -238,6 +271,126 @@ class CoinDetailModal(ModalScreen):
             )
         except Exception as e:
             self.app.notify(f"Failed to save file: {e}", severity="error")
+
+    @on(Button.Pressed, "#btn_associate")
+    def _on_associate(self) -> None:
+        """Associate coin with active wallet."""
+        def on_confirmed(confirmed: bool) -> None:
+            if not confirmed:
+                return
+
+            try:
+                old_wallet_id = self.coin.wallet_id
+                new_wallet_id = self.app.wallet.id
+                coin_id = self.coin.id
+
+                if old_wallet_id is not None:
+                    old_wallet_short = old_wallet_id[:16]
+                    new_wallet_short = new_wallet_id[:16]
+                    self.app.notify(
+                        f"Coin was already associated with wallet {old_wallet_short}... "
+                        f"Re-associating with {new_wallet_short}...",
+                        severity="info"
+                    )
+
+                self.coin.wallet_id = new_wallet_id
+                self.coin.save()
+
+                self.app.log_event(
+                    f"Associated coin {coin_id[:16]}... with wallet {new_wallet_id[:16]}...",
+                    "INFO"
+                )
+
+                Input.query().equal('id', coin_id).update(
+                    {'wallet_id': new_wallet_id}
+                )
+                Output.query().equal('id', coin_id).update(
+                    {'wallet_id': new_wallet_id}
+                )
+
+                self.app.notify(
+                    f"Coin associated with wallet {new_wallet_id[:16]}...",
+                    severity="success"
+                )
+
+                self.dismiss()
+            except Exception as e:
+                self.app.notify(
+                    f"Failed to associate coin: {e}",
+                    severity="error"
+                )
+                self.app.log_event(f"Associate coin error: {e}", "ERROR")
+
+        if self.coin.wallet_id is not None:
+            message = (
+                f"This coin is already associated with wallet "
+                f"{self.coin.wallet_id[:16]}...\n\n"
+                f"Do you want to re-associate it with "
+                f"{self.app.wallet.id[:16]}...?"
+            )
+            modal = ConfirmationModal(
+                title="Re-associate with Wallet",
+                message=message,
+                confirm_btn_text="Re-associate",
+                confirm_btn_variant="success"
+            )
+        else:
+            modal = ConfirmationModal(
+                title="Associate with Wallet",
+                message=f"Associate this coin with {self.app.wallet.id[:16]}...?",
+                confirm_btn_text="Associate",
+                confirm_btn_variant="success"
+            )
+
+        self.app.push_screen(modal, on_confirmed)
+
+    @on(Button.Pressed, "#btn_disassociate")
+    def _on_disassociate(self) -> None:
+        """Disassociate coin from active wallet."""
+        def on_confirmed(confirmed: bool) -> None:
+            if not confirmed:
+                return
+
+            try:
+                wallet_id = self.coin.wallet_id
+                coin_id = self.coin.id
+                wallet_short = wallet_id[:16]
+
+                self.coin.wallet_id = None
+                self.coin.save()
+
+                self.app.log_event(
+                    f"Disassociated coin {coin_id[:16]}... from wallet {wallet_short}...",
+                    "INFO"
+                )
+
+                Input.query().equal('id', coin_id).update({'wallet_id': None})
+                Output.query().equal('id', coin_id).update({'wallet_id': None})
+
+                self.app.notify(
+                    f"Coin disassociated from wallet {wallet_short}...",
+                    severity="success"
+                )
+
+                if self.on_disassociated:
+                    self.on_disassociated()
+
+                self.dismiss()
+            except Exception as e:
+                self.app.notify(
+                    f"Failed to disassociate coin: {e}",
+                    severity="error"
+                )
+                self.app.log_event(f"Disassociate coin error: {e}", "ERROR")
+
+        modal = ConfirmationModal(
+            title="Disassociate from Wallet",
+            message=f"Remove this coin's association with {self.app.wallet.id[:16]}...?",
+            confirm_btn_text="Disassociate",
+            confirm_btn_variant="error"
+        )
+
+        self.app.push_screen(modal, on_confirmed)
 
     async def action_quit(self) -> None:
         """Quit the application."""
