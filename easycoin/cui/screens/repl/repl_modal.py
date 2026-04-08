@@ -118,18 +118,21 @@ class ReplModal(Screen):
         input_widget = self.query_one("#repl_input")
 
         if event.key == "up":
-            if self._history_index > 0:
+            if input_widget.cursor_at_first_line and self._history_index > 0:
                 self._history_index -= 1
                 input_widget.text = self._history[self._history_index]
-            event.stop()
+                input_widget.move_cursor((0, 0))
+                event.stop()
         elif event.key == "down":
-            if self._history_index < len(self._history) - 1:
-                self._history_index += 1
-                input_widget.text = self._history[self._history_index]
-            elif self._history_index == len(self._history) - 1:
-                self._history_index = len(self._history)
-                input_widget.text = ""
-            event.stop()
+            if input_widget.cursor_at_last_line:
+                if self._history_index < len(self._history) - 1:
+                    self._history_index += 1
+                    input_widget.text = self._history[self._history_index]
+                    input_widget.move_cursor(input_widget.document.end)
+                elif self._history_index == len(self._history) - 1:
+                    self._history_index = len(self._history)
+                    input_widget.text = ""
+                event.stop()
 
     @on(Button.Pressed, "#btn_clear")
     def action_clear(self) -> None:
