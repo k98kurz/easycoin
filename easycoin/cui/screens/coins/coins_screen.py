@@ -1,7 +1,9 @@
 from textual import on, work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Checkbox, DataTable, Input, Static
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widgets import (
+    Button, Checkbox, DataTable, Input, RadioSet, RadioButton, Static
+)
 from easycoin.UTXOSet import UTXOSet
 from easycoin.models import Address, Coin, Txn, TrustNet, Wallet
 from easycoin.cryptoworker import submit_mine_job, work_mine_job
@@ -27,6 +29,7 @@ class CoinsScreen(BaseScreen):
         super().__init__()
         self._coins = []
         self._coin_row_map = {}
+        self.coin_type_filter: str = "all"
 
     def compose(self) -> ComposeResult:
         """Compose coins screen layout."""
@@ -34,17 +37,31 @@ class CoinsScreen(BaseScreen):
 
     def _compose_content(self) -> ComposeResult:
         """Compose coins screen content area."""
-        with Vertical(id="coins_screen"):
+        with VerticalScroll(id="coins_screen"):
             yield Static("Coins", classes="panel-title")
-            with Horizontal(id="coins_header", classes="h-3 mt-1"):
-                yield Checkbox("Active Wallet Only", id="box_active_wallet")
-                yield Checkbox("Stamps Only", id="box_stamps_only")
-                yield Checkbox("Unspent Only", id="box_unspent_only", value=True)
-                yield Input(placeholder="Search coins...", id="search_input")
+            with Horizontal(id="coins_header", classes="h-7 mt-1"):
+                with Vertical(classes="w-30"):
+                    yield Checkbox(
+                        "Active Wallet Only", id="box_active_wallet",
+                        classes="mb-1"
+                    )
+                    yield Checkbox(
+                        "Unspent Only", id="box_unspent_only", value=True
+                    )
+                yield RadioSet(
+                    RadioButton("All", id="rbtn_all", value=True),
+                    RadioButton("Non-stamps", id="rbtn_non_stamps"),
+                    RadioButton("All Stamps", id="rbtn_all_stamps"),
+                    RadioButton("Images", id="rbtn_images"),
+                    RadioButton("Tokens", id="rbtn_tokens"),
+                    id="coin_type_filter",
+                    classes="h-7 w-30"
+                )
+                yield Input(placeholder="Search coins by ID...", id="search_input")
 
-            yield DataTable(id="coins_table", classes="mt-1")
+            yield DataTable(id="coins_table", classes="mt-1 h-20")
 
-            with Horizontal(id="coins_actions"):
+            with Horizontal(id="coins_actions", classes="h-6"):
                 yield Button("Refresh", id="btn_refresh", variant="default")
                 yield Button("Mine Coin", id="btn_mine_coin", variant="primary")
                 yield Button(
@@ -81,12 +98,16 @@ class CoinsScreen(BaseScreen):
     def _checkbox_changed(self, event: Checkbox.Changed) -> None:
         self._load_coins(search_query=self.query_one("#search_input").value)
 
-    @on(Checkbox.Changed, "#box_stamps_only")
-    def _stamps_only_changed(self, event: Checkbox.Changed) -> None:
-        self._load_coins(search_query=self.query_one("#search_input").value)
-
     @on(Checkbox.Changed, "#box_unspent_only")
     def _unspent_only_changed(self, event: Checkbox.Changed) -> None:
+        self._load_coins(search_query=self.query_one("#search_input").value)
+
+    @on(RadioSet.Changed, "#coin_type_filter")
+    def _update_filter(self):
+        radio_set = self.query_one("#coin_type_filter")
+        self.coin_type_filter = [
+            "all", "non_stamps", "all_stamps", "image", "token"
+        ][radio_set.pressed_index]
         self._load_coins(search_query=self.query_one("#search_input").value)
 
     @on(Input.Changed, "#search_input")
@@ -135,7 +156,6 @@ class CoinsScreen(BaseScreen):
     def _load_coins(self, search_query: str = "") -> None:
         """Load coins from database and populate table."""
         search_query = search_query.strip()
-        stamps_only = self.query_one("#box_stamps_only").value
         unspent_only = self.query_one("#box_unspent_only").value
         coins = []
         try:
@@ -144,7 +164,9 @@ class CoinsScreen(BaseScreen):
             else:
                 sqb = Coin.query()
 
-            if stamps_only:
+            if self.coin_type_filter == 'non_stamps':
+                sqb.is_null('details')
+            elif self.coin_type_filter != 'all':
                 sqb.not_null('details')
 
             if unspent_only:
@@ -157,6 +179,16 @@ class CoinsScreen(BaseScreen):
 
             for chunk in sqb.chunk(500):
                 coins.extend(chunk)
+
+            if self.coin_type_filter in ('image', 'token'):
+                target_type = self.coin_type_filter
+                filtered_coins = []
+                for coin in coins:
+                    if coin.details:
+                        stamp_data = coin.details.get('d', {})
+                        if stamp_data.get('type') == target_type:
+                            filtered_coins.append(coin)
+                coins = filtered_coins
         except Exception as e:
             self.log_event(f"Error loading coins: {e}", "ERROR")
             self.app.notify(f"Error loading coins: {e}", severity="error")
