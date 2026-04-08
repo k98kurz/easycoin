@@ -1,9 +1,10 @@
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll, Vertical, Horizontal
-from textual.widgets import Static, DataTable, Button
+from textual.containers import Container, VerticalScroll, Vertical, Horizontal
+from textual.widgets import Static, DataTable, Button, OptionList
 from textual.widgets.data_table import RowKey
+from textual.widgets.option_list import Option
 from easycoin.cui.helpers import format_balance, format_amount, truncate_text
 from easycoin.cui.widgets import CoinDetailModal
 from easycoin.models import Address, Output, Wallet
@@ -21,23 +22,36 @@ class SelectInputsContainer(Vertical):
         super().__init__(**kwargs)
         self.txn_data = txn_data
         self.row_keys: list[RowKey] = []
+        self.input_filter: str = "all"
 
     def compose(self) -> ComposeResult:
         """Compose Step 1: Select inputs."""
         with VerticalScroll():
-            yield Static(
-                "[bold]Step 1 of 4: Select Inputs[/bold]\n\n"
-                "Select coins to spend in this transaction.",
-                classes="mb-1"
-            )
-            yield Static(
-                "Selected: 0 coins | Total: 0 EC⁻¹",
-                id="input_summary",
-                classes="mb-1"
-            )
+            with Horizontal(classes="h-10"):
+                with Container(classes=""):
+                    yield Static(
+                        "[bold]Step 1 of 4: Select Inputs[/bold]\n\n"
+                        "Select coins to spend in this transaction.",
+                        classes="mb-1"
+                    )
+                    yield Static(
+                        "Selected: 0 coins | Total: 0 EC⁻¹",
+                        id="input_summary",
+                        classes="mb-1"
+                    )
+                with Container(classes=""):
+                    yield Static("Input Type Filter:", classes="text-bold mb-1")
+                    yield OptionList(
+                        Option("All", id="all"),
+                        Option("Non-stamped", id="non_stamped"),
+                        Option("All Stamps", id="all_stamps"),
+                        Option("Images", id="images"),
+                        Option("Tokens", id="tokens"),
+                        id="input_filter_selector",
+                    )
             yield DataTable(id="inputs_table", classes="h-min-10")
-        with Horizontal(classes="h-5"):
-            yield Button("View Details", id="btn_view_details", variant="default")
+            with Horizontal(classes="h-5"):
+                yield Button("View Details", id="btn_view_details", variant="default")
 
     def on_show(self) -> None:
         """Load available outputs when step becomes visible."""
@@ -46,6 +60,13 @@ class SelectInputsContainer(Vertical):
             self.query_one("#inputs_table").focus()
         except Exception:
             pass
+
+    def on_option_list_option_highlighted(
+            self, event: OptionList.OptionHighlighted
+        ) -> None:
+        """Handle input type filter selection."""
+        self.input_filter = event.option.id
+        self.load_outputs()
 
     def validate_step(self) -> tuple[bool, str]:
         """Validate that at least one output is selected."""
@@ -65,6 +86,7 @@ class SelectInputsContainer(Vertical):
 
         if len(table.columns) == 0:
             table.add_columns(
+                ("Selected", "selected"),
                 ("Coin ID", "coin_id"),
                 ("Lock Type", "lock_type"),
                 ("Amount", "amount"),
@@ -72,7 +94,6 @@ class SelectInputsContainer(Vertical):
                 ("Stamp Type", "stamp_type"),
                 ("Stamp Name", "stamp_name"),
                 ("Stamp 'n'", "stamp_n"),
-                ("Selected", "selected"),
             )
         table.cursor_type = "row"
 
@@ -80,7 +101,28 @@ class SelectInputsContainer(Vertical):
             'wallet_id', self.app.wallet.id
         ).get()
 
+        filtered_outputs = []
         for output in outputs:
+            coin_details = output.coin.details or {}
+
+            if self.input_filter == "all":
+                filtered_outputs.append(output)
+            elif self.input_filter == "non_stamped":
+                if not coin_details or len(coin_details) == 0:
+                    filtered_outputs.append(output)
+            elif self.input_filter == "all_stamps":
+                if coin_details and len(coin_details) > 0:
+                    filtered_outputs.append(output)
+            elif self.input_filter == "images":
+                stamp_data = coin_details.get('d', {})
+                if stamp_data.get('type') == 'image':
+                    filtered_outputs.append(output)
+            elif self.input_filter == "tokens":
+                stamp_data = coin_details.get('d', {})
+                if stamp_data.get('type') == 'token':
+                    filtered_outputs.append(output)
+
+        for output in filtered_outputs:
             addr = Address.query().equal('lock', output.coin.lock).first()
             secrets = packify.unpack(
                 self.app.wallet.decrypt(addr.secrets)
@@ -93,6 +135,9 @@ class SelectInputsContainer(Vertical):
                 stamp_name = stamp_data.get('name', '')
                 stamp_n = str(output.coin.details.get('n', '')) if output.coin.details else ''
                 row_key = table.add_row(
+                    ("✓" if output.id in [
+                        o.id for o in self.txn_data.selected_inputs
+                    ] else " "),
                     truncate_text(output.id, prefix_len=8, suffix_len=4),
                     Wallet.get_lock_type(output.coin.lock, secrets),
                     format_balance(output.coin.amount, exact=True),
@@ -100,9 +145,6 @@ class SelectInputsContainer(Vertical):
                     stamp_type,
                     stamp_name,
                     stamp_n,
-                    ("✓" if output.id in [
-                        o.id for o in self.txn_data.selected_inputs
-                    ] else " "),
                     key=output.id
                 )
                 self.row_keys.append(row_key)
