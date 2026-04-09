@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .errors import type_assert, value_assert
+from easycoin.errors import type_assert, value_assert
 from .Address import Address
 from hashlib import sha256, pbkdf2_hmac
 from nacl.bindings import crypto_core_ed25519_scalar_mul, crypto_scalarmult_ed25519

@@ -3,7 +3,7 @@ from hashlib import sha256
 from sqloquent import SqlModel, RelatedModel, SqlQueryBuilder, Default
 from tapescript import Script
 from easycoin.models import Coin
-from easycoin.models.errors import type_assert, value_assert
+from easycoin.errors import type_assert, value_assert
 import packify
 
 

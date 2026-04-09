@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .errors import type_assert, value_assert
+from easycoin.errors import type_assert, value_assert
 from hashlib import sha256
 from sqloquent import HashedModel, Default, RelatedCollection, RelatedModel
 from tapehash import tapehash3, work, calculate_difficulty

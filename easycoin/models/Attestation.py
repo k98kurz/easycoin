@@ -1,7 +1,7 @@
 from .Coin import Coin
 from .TrustNet import TrustNet
 from .TrustNetFeature import TrustNetFeature
-from .errors import type_assert, value_assert
+from easycoin.errors import type_assert, value_assert
 from sqloquent import HashedModel, RelatedModel, RelatedCollection
 import packify
 

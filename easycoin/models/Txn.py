@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .Coin import Coin
-from .errors import type_assert, value_assert
+from easycoin.errors import type_assert, value_assert
 from easycoin.constants import (
     _witfee_mult,
     _witfee_exp,

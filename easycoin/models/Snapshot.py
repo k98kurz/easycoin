@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .errors import type_assert
+from easycoin.errors import type_assert
 from .TrustNetFeature import TrustNetFeature
 from hashlib import sha256
 from sqloquent import HashedModel, RelatedCollection, RelatedModel

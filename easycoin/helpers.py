@@ -1,5 +1,5 @@
 from datetime import datetime
-from easycoin.models.errors import type_assert, value_assert
+from easycoin.errors import type_assert, value_assert
 import atexit
 import os
 import packify

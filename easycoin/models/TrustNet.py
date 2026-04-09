@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .errors import type_assert, value_assert
+from easycoin.errors import type_assert, value_assert
 from .TrustNetFeature import TrustNetFeature
 from merkleasy import Tree
 from sqloquent import HashedModel, RelatedCollection

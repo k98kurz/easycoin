@@ -1,4 +1,4 @@
-from .errors import type_assert, value_assert
+from easycoin.errors import type_assert, value_assert
 from enum import Enum
 from hashlib import sha256
 from sqloquent import SqlModel
