@@ -1,18 +1,93 @@
-from enum import Enum
 from crossconfig import get_config
 from easycoin.cryptoworker import set_mining_pool_size
 
 
-class MiningMode(Enum):
-    AUTO_TOPUP = "auto_topup"
-    CONTINUOUS = "continuous"
-    OFF = "off"
+_mining_modes = ["auto_topup", "continuous", "off"]
+_auto_topup_goals = [1_000_000, 10_000_000, 100_000_000, 1_000_000_000]
+_coin_sizes = [100_000, 500_000, 1_000_000]
+_app_modes = ["multiplayer", "singleplayer"]
 
 
-class AppMode(Enum):
-    MULTIPLAYER = "multiplayer"
-    SINGLEPLAYER = "singleplayer"
-
+_schema = {
+    "mining_mode": {
+        "validator": (
+            lambda v: None
+            if v in _mining_modes
+            else ValueError(
+                f"Invalid mining mode: {v}. Must be one of {_mining_modes}"
+            )
+        ),
+        "default": "auto_topup",
+    },
+    "mining_processes": {
+        "validator": (
+            lambda v: set_mining_pool_size(v)
+            if (v in [1, 2, 4, 8])
+            else ValueError(
+                f"Invalid mining processes: {v}. Must be one of [1, 2, 4, 8]"
+            )
+        ),
+        "default": 4,
+    },
+    "coin_size": {
+        "validator": (
+            lambda v: None
+            if v in _coin_sizes
+            else ValueError(
+                f"Invalid coin size: {v}. Must be one of {_coin_sizes}"
+            )
+        ),
+        "default": 500_000,
+    },
+    "auto_topup_goal": {
+        "validator": (
+            lambda v: None
+            if v in _auto_topup_goals
+            else ValueError(
+                f"Invalid auto top-up goal: {v}. Must be one of "
+                f"{_auto_topup_goals}"
+            )
+        ),
+        "default": 1_000_000,
+    },
+    "bootstrap_nodes": {
+        "get": lambda v: [n.strip() for n in v.split(',') if n.strip()],
+        "set": lambda v: ','.join([n.strip() for n in v if n.strip()]),
+        "default": "",
+    },
+    "network_port": {
+        "validator": (
+            lambda v: None
+            if 1 <= v <= 65535
+            else ValueError(
+                f"Invalid network port: {v}. Must be between 1 and 65535"
+            )
+        ),
+        "default": 9888,
+    },
+    "app_mode": {
+        "validator": (
+            lambda v: None
+            if v in _app_modes
+            else ValueError(
+                f"Invalid app mode: {v}. Must be one of {_app_modes}"
+            )
+        ),
+        "default": "multiplayer",
+    },
+    "current_wallet_id": {
+        "default": None,
+    },
+    "active_trustnet_id": {
+        "default": None,
+    },
+    "sidebar_visible": {
+        "default": False,
+    },
+    "welcome_shown": {
+        "default": False,
+    },
+}
 
 class ConfigManager:
     def __init__(self, app_name: str = "easycoin"):
@@ -28,129 +103,29 @@ class ConfigManager:
     def path(self, file_or_subdir: str | list[str] | None = None) -> str:
         return self.config.path(file_or_subdir)
 
+    def get(self, key: str, default = None) -> list|bool|str|int|float|None:
+        if default is None and key in _schema and 'default' in _schema[key]:
+            default = _schema[key]['default']
+        if key in _schema and 'get' in _schema[key]:
+            return _schema[key]['get'](
+                self.config.get(key, default)
+            )
+        return self.config.get(key, default)
+
+    def set(self, key: str, value: list|bool|str|int|float) -> ValueError|None:
+        if key in _schema and 'validator' in _schema[key]:
+            validation_error = _schema[key]['validator'](value)
+            if validation_error is not None:
+                return validation_error
+        if key in _schema and 'set' in _schema[key]:
+            value = _schema[key]['set'](value)
+        self.config.set(key, value)
+
+    def unset(self, key: str) -> None:
+        self.config.unset(key)
+
     def get_db_path(self) -> str:
         return self.config.path("easycoin.db")
 
     def get_log_path(self) -> str:
         return self.config.path("easycoin.log")
-
-    def get_mining_mode(self) -> MiningMode:
-        mode = self.config.get("mining_mode", MiningMode.AUTO_TOPUP.value)
-        return MiningMode(mode)
-
-    def set_mining_mode(self, mode: MiningMode) -> None:
-        self.config.set("mining_mode", mode.value)
-
-    def get_mining_processes(self) -> int:
-        value = self.config.get("mining_processes", 4)
-        if isinstance(value, (int, float)):
-            return int(value)
-        return 4
-
-    def set_mining_processes(self, count: int) -> None:
-        valid_counts = [1, 2, 4, 8]
-        if count not in valid_counts:
-            raise ValueError(
-                f"Invalid mining processes: {count}. Must be one of {valid_counts}"
-            )
-        self.config.set("mining_processes", count)
-        set_mining_pool_size(count)
-
-    def get_coin_size(self) -> int:
-        value = self.config.get("coin_size", 500_000)
-        if isinstance(value, (int, float)):
-            return int(value)
-        return 500_000
-
-    def set_coin_size(self, size: int) -> None:
-        valid_sizes = [100_000, 500_000, 1_000_000]
-        if size not in valid_sizes:
-            raise ValueError(
-                f"Invalid coin size: {size}. Must be one of {valid_sizes}"
-            )
-        self.config.set("coin_size", size)
-
-    def get_auto_topup_goal(self) -> int:
-        value = self.config.get("auto_topup_goal", 1_000_000)
-        if isinstance(value, (int, float)):
-            return int(value)
-        return 1_000_000
-
-    def set_auto_topup_goal(self, goal: int) -> None:
-        valid_goals = [1_000_000, 10_000_000, 100_000_000, 1_000_000_000]
-        if goal not in valid_goals:
-            raise ValueError(
-                f"Invalid auto top-up goal: {goal}. Must be one of {valid_goals}"
-            )
-        self.config.set("auto_topup_goal", goal)
-
-    def get_bootstrap_nodes(self) -> list[str]:
-        nodes = self.config.get("bootstrap_nodes", "")
-        if isinstance(nodes, str):
-            return [n.strip() for n in nodes.split(",") if n.strip()]
-        return []
-
-    def set_bootstrap_nodes(self, nodes: list[str]) -> None:
-        self.config.set("bootstrap_nodes", ",".join(nodes))
-
-    def get_network_port(self) -> int:
-        value = self.config.get("network_port", 9888)
-        if isinstance(value, (int, float)):
-            return int(value)
-        return 9888
-
-    def set_network_port(self, port: int) -> None:
-        if not isinstance(port, int) or port < 1 or port > 65535:
-            raise ValueError(
-                f"Invalid network port: {port}. Must be an integer between 1 "
-                "and 65535"
-            )
-        self.config.set("network_port", port)
-
-    def get_current_wallet_id(self) -> str | None:
-        value = self.config.get("current_wallet_id")
-        if isinstance(value, str):
-            return value
-        return None
-
-    def set_current_wallet_id(self, wallet_id: str) -> None:
-        self.config.set("current_wallet_id", wallet_id)
-
-    def get_active_trustnet_id(self) -> str | None:
-        value = self.config.get("active_trustnet_id")
-        if isinstance(value, str):
-            return value
-        return None
-
-    def set_active_trustnet_id(self, trustnet_id: str) -> None:
-        self.config.set("active_trustnet_id", trustnet_id)
-
-    def get_sidebar_visible(self) -> bool:
-        """Get sidebar visibility preference. Returns `True` if visible,
-            `False` if hidden.
-        """
-        value = self.config.get("sidebar_visible", False)
-        if isinstance(value, bool):
-            return value
-        return False
-
-    def set_sidebar_visible(self, visible: bool) -> None:
-        """Set sidebar visibility preference. Args:
-            visible: `True` for visible, `False` for hidden.
-        """
-        self.config.set("sidebar_visible", visible)
-
-    def get_welcome_shown(self) -> bool:
-        """Check if welcome screen has been shown. Returns `True` if shown,
-            `False` otherwise.
-        """
-        value = self.config.get("welcome_shown", False)
-        if isinstance(value, bool):
-            return value
-        return False
-
-    def set_welcome_shown(self, shown: bool) -> None:
-        """Set welcome screen shown status. Args:
-            shown: `True` if welcome has been shown, `False` otherwise.
-        """
-        self.config.set("welcome_shown", shown)

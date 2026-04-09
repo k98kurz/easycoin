@@ -4,7 +4,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, RadioButton, RadioSet, Static, Footer
-from easycoin.config import ConfigManager, MiningMode
+from easycoin.config import ConfigManager
 
 
 class MiningConfigurationModal(ModalScreen):
@@ -74,15 +74,15 @@ class MiningConfigurationModal(ModalScreen):
         """Load current configuration into form fields."""
         config = self.app.config
 
-        mode = config.get_mining_mode()
-        if mode == MiningMode.AUTO_TOPUP:
+        mode = config.get("mining_mode")
+        if mode == "auto_topup":
             self.query_one("#mode_auto_topup").value = True
-        elif mode == MiningMode.CONTINUOUS:
+        elif mode == "continuous":
             self.query_one("#mode_continuous").value = True
         else:
             self.query_one("#mode_off").value = True
 
-        goal = config.get_auto_topup_goal()
+        goal = config.get("auto_topup_goal")
         if goal == 1_000_000_000:
             self.query_one("#goal_1b").value = True
         elif goal == 100_000_000:
@@ -92,7 +92,7 @@ class MiningConfigurationModal(ModalScreen):
         else:
             self.query_one("#goal_1m").value = True
 
-        coin_size = config.get_coin_size()
+        coin_size = config.get("coin_size")
         if coin_size == 1_000_000:
             self.query_one("#size_1m").value = True
         elif coin_size == 500_000:
@@ -100,7 +100,7 @@ class MiningConfigurationModal(ModalScreen):
         else:
             self.query_one("#size_100k").value = True
 
-        processes = config.get_mining_processes()
+        processes = config.get("mining_processes")
         if processes == 1:
             self.query_one("#proc_1").value = True
         elif processes == 2:
@@ -137,11 +137,11 @@ class MiningConfigurationModal(ModalScreen):
 
         mode_radio = self.query_one("#mining_mode")
         if mode_radio.pressed_index == 0:
-            mode = MiningMode.AUTO_TOPUP
+            mode = "auto_topup"
         elif mode_radio.pressed_index == 1:
-            mode = MiningMode.CONTINUOUS
+            mode = "continuous"
         else:
-            mode = MiningMode.OFF
+            mode = "off"
 
         goal_radio = self.query_one("#auto_topup_goal")
         goal_map = {
@@ -169,14 +169,14 @@ class MiningConfigurationModal(ModalScreen):
         }
         processes = proc_map.get(proc_radio.pressed_index, 4)
 
-        config.set_mining_mode(mode)
-        config.set_auto_topup_goal(goal)
-        config.set_coin_size(size)
-        config.set_mining_processes(processes)
+        config.set("mining_mode", mode)
+        config.set("auto_topup_goal", goal)
+        config.set("coin_size", size)
+        config.set("mining_processes", processes)
         config.save()
 
         self.app.log_event(
-            f"Mining config: {mode.value}, processes={processes}, size={size}",
+            f"Mining config: {mode}, processes={processes}, size={size}",
             "INFO"
         )
 

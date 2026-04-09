@@ -5,7 +5,6 @@ from textual.widgets import (
     Button, Checkbox, Input, RadioSet, RadioButton, Static, TextArea
 )
 from ..base import BaseScreen
-from easycoin.config import AppMode
 
 
 class SettingsScreen(BaseScreen):
@@ -48,10 +47,10 @@ class SettingsScreen(BaseScreen):
         try:
             mode_radio = self.query_one("#app_mode", RadioSet)
             if mode_radio.pressed_index == 0:
-                mode = AppMode.MULTIPLAYER
+                mode = "multiplayer"
             else:
-                mode = AppMode.SINGLEPLAYER
-            self.app.config.config.set("app_mode", mode.value)
+                mode = "singleplayer"
+            self.app.config.set("app_mode", mode)
             self.app.config.save()
             self.app.notify("App Mode saved (dummy settings ignored)", severity="success")
         except Exception as e:
@@ -60,9 +59,8 @@ class SettingsScreen(BaseScreen):
     def on_mount(self) -> None:
         """Load current App Mode on mount."""
         try:
-            mode_value = self.app.config.config.get("app_mode", AppMode.MULTIPLAYER.value)
-            mode = AppMode(mode_value)
-            if mode == AppMode.MULTIPLAYER:
+            mode = self.app.config.get("app_mode")
+            if mode == "multiplayer":
                 self.query_one("#mode_multiplayer").value = True
             else:
                 self.query_one("#mode_singleplayer").value = True

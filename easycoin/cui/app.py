@@ -89,12 +89,12 @@ class EasyCoinApp(App):
         try:
             self.config.load()
 
-            self.active_trustnet_id = self.config.get_active_trustnet_id()
-            self.sidebar_visible = self.config.get_sidebar_visible()
+            self.active_trustnet_id = self.config.get("active_trustnet_id")
+            self.sidebar_visible = self.config.get("sidebar_visible")
 
             self.log_event("EasyCoin CUI started", "INFO")
 
-            if not self.config.get_welcome_shown():
+            if not self.config.get("welcome_shown"):
                 self.call_later(self.action_open_welcome)
 
             self.push_screen("dashboard")
@@ -111,7 +111,7 @@ class EasyCoinApp(App):
 
     def watch_sidebar_visible(self, old_value: bool, new_value: bool) -> None:
         """Watch `sidebar_visible` for changes and persist to config."""
-        self.config.set_sidebar_visible(new_value)
+        self.config.set("sidebar_visible", new_value)
         self.config.save()
 
     def action_switch_to_dashboard(self) -> None:
@@ -148,7 +148,7 @@ class EasyCoinApp(App):
 
     def action_open_welcome(self) -> None:
         """Open welcome screen."""
-        self.config.set_welcome_shown(True)
+        self.config.set("welcome_shown", True)
         self.config.save()
         self.push_screen("welcome")
 
