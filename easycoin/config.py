@@ -9,6 +9,11 @@ class MiningMode(Enum):
     OFF = "off"
 
 
+class AppMode(Enum):
+    MULTIPLAYER = "multiplayer"
+    SINGLEPLAYER = "singleplayer"
+
+
 class ConfigManager:
     def __init__(self, app_name: str = "easycoin"):
         self.app_name = app_name
