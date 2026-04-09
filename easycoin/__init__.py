@@ -1,4 +1,5 @@
 from .english import wordlist
+from .gameset import create_gameset, calculate_gameset_hash, apply_gameset
 from .misc import microbench, calc_microbench_offset
 from .models import (
     Coin, Txn, Input, Output, Address, Wallet, StampTemplate, StampType,

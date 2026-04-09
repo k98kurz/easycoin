@@ -7,3 +7,5 @@ build/
 temp/
 **/debug.py
 **.sw?
+tests/migrations
+tests/*.db
