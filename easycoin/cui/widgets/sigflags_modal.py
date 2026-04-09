@@ -4,7 +4,7 @@ from textual.binding import Binding
 from textual.containers import Vertical, Horizontal, ItemGrid
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Static, Footer
-from easycoin.cui.helpers import sigflags_hex_to_ints, sigflags_ints_to_hex
+from easycoin.helpers import sigflags_hex_to_ints, sigflags_ints_to_hex
 
 
 class SigflagsModal(ModalScreen[str|None]):

@@ -7,7 +7,7 @@ from textual.widgets import (
 from textual.widgets.data_table import RowKey
 from easycoin.models import StampTemplate
 from ..base import BaseScreen
-from easycoin.cui.helpers import truncate_text
+from easycoin.helpers import truncate_text
 from easycoin.cui.widgets import ConfirmationModal
 from .create_stamp_template_modal import CreateStampTemplateModal
 

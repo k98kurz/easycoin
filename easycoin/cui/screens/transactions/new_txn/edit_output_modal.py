@@ -12,7 +12,7 @@ from textual.widgets.data_table import RowKey
 from secrets import token_hex
 from easycoin.models import Address, Coin, StampTemplate
 from easycoin.constants import _max_stamp_size
-from easycoin.cui.helpers import format_balance, format_amount, truncate_text
+from easycoin.helpers import format_balance, format_amount, truncate_text
 from easycoin.cui.widgets import InputModal, ConfirmationModal, FilePickerModal
 
 

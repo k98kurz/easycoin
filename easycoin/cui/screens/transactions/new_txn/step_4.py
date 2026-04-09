@@ -2,7 +2,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.widgets import Static, DataTable
-from easycoin.cui.helpers import format_balance, format_amount, truncate_text
+from easycoin.helpers import format_balance, format_amount, truncate_text
 from easycoin.models import Address
 
 

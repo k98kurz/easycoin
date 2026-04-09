@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Callable
 from easycoin.models import Txn, Confirmation, Attestation
 from ..base import BaseScreen
-from easycoin.cui.helpers import format_balance, format_timestamp, truncate_text
+from easycoin.helpers import format_balance, format_timestamp, truncate_text
 from .new_txn.modal import NewTransactionModal
 from .txn_detail_modal import TransactionDetailModal
 

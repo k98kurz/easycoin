@@ -6,7 +6,7 @@ from textual.screen import Screen
 from textual.widgets import Button, DataTable, Static, Footer
 from textual.widgets.data_table import RowKey
 from easycoin.cui.clipboard import universal_copy
-from easycoin.cui.helpers import format_balance, truncate_text
+from easycoin.helpers import format_balance, truncate_text
 from easycoin.cui.widgets import ConfirmationModal, InputModal
 from easycoin.models import Wallet, Address, Coin
 from .export_address_modal import ExportAddressModal

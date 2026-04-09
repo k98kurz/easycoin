@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, Container
 from textual.css.query import NoMatches
 from textual.widgets import Button, Static
-from easycoin.cui.helpers import format_balance
+from easycoin.helpers import format_balance
 from .base import BaseScreen
 
 

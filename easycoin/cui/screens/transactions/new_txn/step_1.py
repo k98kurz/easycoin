@@ -5,7 +5,7 @@ from textual.containers import Container, VerticalScroll, Vertical, Horizontal
 from textual.widgets import Static, DataTable, Button, OptionList
 from textual.widgets.data_table import RowKey
 from textual.widgets.option_list import Option
-from easycoin.cui.helpers import format_balance, format_amount, truncate_text
+from easycoin.helpers import format_balance, format_amount, truncate_text
 from easycoin.cui.widgets import CoinDetailModal
 from easycoin.models import Address, Output, Wallet
 import packify

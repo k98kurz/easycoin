@@ -8,7 +8,7 @@ from easycoin.UTXOSet import UTXOSet
 from easycoin.models import Address, Coin, Txn, TrustNet, Wallet
 from easycoin.cryptoworker import submit_mine_job, work_mine_job
 from easycoin.cui.screens.base import BaseScreen
-from easycoin.cui.helpers import format_amount, format_balance, truncate_text
+from easycoin.helpers import format_amount, format_balance, truncate_text
 from .mine_config import MiningConfigurationModal
 from .mine_coin_modal import MineCoinModal
 

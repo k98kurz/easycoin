@@ -5,7 +5,7 @@ from textual.containers import VerticalScroll, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Input, OptionList, Static
 from textual.widgets.option_list import Option
-from easycoin.cui.helpers import truncate_text
+from easycoin.helpers import truncate_text
 from easycoin.models import Address, Wallet
 
 

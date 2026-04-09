@@ -13,7 +13,7 @@ from easycoin.constants import _max_detail_icon_size
 from easycoin.models import StampTemplate, Txn, StampType
 from easycoin.cui.widgets import ECTextArea, InputModal, OptionModal
 from easycoin.cui.widgets.file_picker_modal import FilePickerModal
-from easycoin.cui.helpers import get_image_type, format_script_src
+from easycoin.helpers import get_image_type, format_script_src
 import base64
 
 

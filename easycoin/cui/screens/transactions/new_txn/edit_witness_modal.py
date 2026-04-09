@@ -5,7 +5,7 @@ from textual.containers import Vertical, VerticalScroll, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Static, Footer, TextArea
 from tapescript import Script
-from easycoin.cui.helpers import format_balance, truncate_text
+from easycoin.helpers import format_balance, truncate_text
 from .data import TransactionData, Witness
 from easycoin.cui.widgets import ECTextArea, SigflagsModal
 from easycoin.models import Address, Output, Wallet

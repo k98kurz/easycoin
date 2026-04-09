@@ -5,7 +5,7 @@ from textual.containers import Vertical, VerticalScroll, Horizontal
 from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
 from tapescript import Script
-from easycoin.cui.helpers import format_balance, truncate_text
+from easycoin.helpers import format_balance, truncate_text
 from .data import TransactionData
 from .edit_witness_modal import EditWitnessModal
 from easycoin.models import Output, Wallet, Coin, Txn, Address

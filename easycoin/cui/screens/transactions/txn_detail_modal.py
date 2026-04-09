@@ -7,7 +7,7 @@ from textual.containers import VerticalScroll, Vertical, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static, Footer, DataTable
 from textual.widgets.data_table import RowKey
-from easycoin.cui.helpers import (
+from easycoin.helpers import (
     format_balance, format_timestamp, format_timestamp_relative,
     format_amount, truncate_text, hexify
 )

@@ -4,7 +4,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Static
 from easycoin.models import Wallet, Coin
 from ..base import BaseScreen
-from easycoin.cui.helpers import format_balance, truncate_text
+from easycoin.helpers import format_balance, truncate_text
 from easycoin.cui.widgets import ConfirmationModal, InputModal
 from .create_wallet_modal import CreateWalletModal
 from .restore_wallet_modal import RestoreWalletModal

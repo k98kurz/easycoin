@@ -6,7 +6,7 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical, VerticalScroll, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Static, Button, Footer
-from easycoin.cui.helpers import (
+from easycoin.helpers import (
     format_balance, format_timestamp, format_amount, truncate_text, hexify,
     create_temp_file, open_file_with_default_app
 )

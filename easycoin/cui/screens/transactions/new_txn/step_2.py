@@ -4,9 +4,10 @@ from textual.binding import Binding
 from textual.containers import VerticalScroll, Vertical, Horizontal
 from textual.widgets import Static, DataTable, Button
 from textual.widgets.data_table import RowKey
-from easycoin.cui.helpers import format_balance, format_amount
+from easycoin.helpers import (
+    format_balance, format_amount, estimate_fee_for_witness, truncate_text
+)
 from .edit_output_modal import EditOutputModal
-from easycoin.cui.helpers import estimate_fee_for_witness, truncate_text
 from easycoin.models import Address, Coin, Txn, Wallet
 
 
