@@ -23,3 +23,5 @@ _max_txn_size = _max_stamp_size * 10
 # serialization constants
 _empty = packify.pack({})
 
+# network
+_default_port = 9876

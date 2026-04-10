@@ -1,9 +1,10 @@
-from .cryptoworker import work, submit_txn_job
-from .models import Coin, Txn, Input, Output
 from collections import deque
 from netaio import UDPNode, Peer, Body, Message, MessageType
 from netaio.asymmetric import X25519CipherPlugin
 from netaio.node import get_ip
+from easycoin.constants import _default_port
+from easycoin.cryptoworker import work, submit_txn_job
+from easycoin.models import Coin, Txn, Input, Output
 import os
 
 
@@ -12,13 +13,13 @@ cipher_plugin = X25519CipherPlugin({
     'seed': seed,
 })
 local_peer = Peer(
-    addrs={(get_ip(), 9888)}, id=bytes(cipher_plugin.vkey),
+    addrs={(get_ip(), _default_port)}, id=bytes(cipher_plugin.vkey),
     data=DefaultPeerPlugin().encode_data({
         "pubkey": bytes(cipher_plugin.pubk),
         "vkey": bytes(cipher_plugin.vkey),
     })
 )
-udpnode = UDPNode(port=9888)
+udpnode = UDPNode(port=_default_port)
 
 
 @udpnode.on(MessageType.REQUEST_URI, b'nodes')

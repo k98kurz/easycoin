@@ -12,6 +12,7 @@ class TopTabs(Tabs):
             Tab("Coins", id="tab_coins"),
             Tab("Transactions", id="tab_transactions"),
             Tab("Stamp Templates", id="tab_stamps"),
+            Tab("Network", id="tab_network"),
             Tab("Settings", id="tab_settings"),
             **kwargs
         )
@@ -25,6 +26,7 @@ class TopTabs(Tabs):
             "tab_coins": "coins",
             "tab_transactions": "transactions",
             "tab_stamps": "stamp_templates",
+            "tab_network": "network",
             "tab_settings": "settings",
         }
         screen_name = screen_map.get(tab_id)

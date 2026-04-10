@@ -10,7 +10,7 @@ from easycoin.cui.screens.wallet.main_screen import WalletListScreen
 from easycoin.cui.screens.coins.coins_screen import CoinsScreen
 from easycoin.cui.screens.transactions.txn_screen import TransactionsScreen
 from easycoin.cui.screens.stamps.stamp_templates_screen import StampTemplatesScreen
-from easycoin.cui.screens.network.placeholder import NetworkScreen
+from easycoin.cui.screens.network.network_screen import NetworkScreen
 from easycoin.cui.screens.trustnet.placeholder import TrustNetScreen
 from easycoin.cui.screens.repl.repl_modal import ReplModal
 from easycoin.cui.screens.event_log_modal import EventLogModal
@@ -47,6 +47,7 @@ class EasyCoinApp(App):
         ("3", "switch_to_coins", "Coins"),
         ("4", "switch_to_transactions", "Transactions"),
         ("5", "switch_to_stamp_templates", "Stamp Templates"),
+        ("6", "switch_to_network", "Network"),
         ("9", "switch_to_settings", "Settings"),
         ("ctrl+e", "open_event_log", "Event Log"),
         ("ctrl+q", "quit", "Quit"),
@@ -134,6 +135,10 @@ class EasyCoinApp(App):
     def action_switch_to_stamp_templates(self) -> None:
         """Switch to stamp templates screen."""
         self.switch_screen("stamp_templates")
+
+    def action_switch_to_network(self) -> None:
+        """Switch to network screen."""
+        self.switch_screen("network")
 
     def action_switch_to_settings(self) -> None:
         """Switch to settings screen."""
