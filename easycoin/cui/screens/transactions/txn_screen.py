@@ -31,6 +31,9 @@ class TransactionsScreen(BaseScreen):
         self.selected_txn_id = None
         self.txn_id_map = {}
         self._is_initializing = True
+        self._page: int = 1
+        self._page_size: int = 50
+        self._total_count: int = 0
 
     def compose(self) -> ComposeResult:
         """Compose transactions screen layout."""
@@ -80,9 +83,14 @@ class TransactionsScreen(BaseScreen):
                         classes="form-input"
                     )
 
-            yield DataTable(id="transactions_table", classes="mt-1 h-min-10")
+            yield DataTable(id="transactions_table", classes="mt-1 h-16")
 
-            with Horizontal(id="txn_actions", classes="h-min-4"):
+            with Horizontal(id="txn_actions", classes="h-6"):
+                yield Button("← Previous", id="btn_prev_page", variant="default")
+                yield Static(
+                    "Page 1 of 1", id="page_info", classes="text-center w-12 mt-2"
+                )
+                yield Button("Next →", id="btn_next_page", variant="default")
                 yield Button("New Transaction", id="btn_new", variant="primary")
                 yield Button("Refresh", id="btn_refresh", variant="default")
                 yield Button(
@@ -133,21 +141,25 @@ class TransactionsScreen(BaseScreen):
         else:
             custom_section.add_class("hidden")
 
+        self._page = 1
         self._load_transactions()
 
     @on(Input.Changed, "#start_date")
     def on_start_date_changed(self, event: Input.Changed) -> None:
         """Handle start date input changes."""
+        self._page = 1
         self._load_transactions()
 
     @on(Input.Changed, "#end_date")
     def on_end_date_changed(self, event: Input.Changed) -> None:
         """Handle end date input changes."""
+        self._page = 1
         self._load_transactions()
 
     @on(Input.Changed, "#min_amount")
     def on_min_amount_changed(self, event: Input.Changed) -> None:
         """Handle minimum amount input changes."""
+        self._page = 1
         self._load_transactions()
 
     @on(Button.Pressed, "#btn_new")
@@ -159,7 +171,22 @@ class TransactionsScreen(BaseScreen):
     def action_refresh_transactions(self) -> None:
         """Refresh transactions data."""
         self.log_event("Refreshing transactions", "INFO")
+        self._page = 1
         self._load_transactions()
+
+    @on(Button.Pressed, "#btn_prev_page")
+    def _on_prev_page(self) -> None:
+        """Handle previous page button press."""
+        if self._page > 1:
+            self._page -= 1
+            self._load_transactions()
+
+    @on(Button.Pressed, "#btn_next_page")
+    def _on_next_page(self) -> None:
+        """Handle next page button press."""
+        if self._page * self._page_size < self._total_count:
+            self._page += 1
+            self._load_transactions()
 
     @on(DataTable.RowSelected, "#transactions_table")
     @on(Button.Pressed, "#btn_view_txn")
@@ -207,13 +234,15 @@ class TransactionsScreen(BaseScreen):
 
             query = query.order_by('timestamp', 'desc')
 
-            transactions = []
-            for chunk in query.chunk(500):
-                transactions.extend(chunk)
+            self._total_count = query.count()
+            transactions = query.skip(
+                (self._page - 1) * self._page_size
+            ).take(self._page_size)
 
             for txn in transactions:
                 self._add_txn_to_table(txn, min_amount_input.value)
 
+            self._update_pagination_controls()
             self.log_event(
                 f"Loaded {len(transactions)} transactions",
                 "INFO"
@@ -300,3 +329,17 @@ class TransactionsScreen(BaseScreen):
         except Exception as e:
             self.log_event(f"Error calculating amounts for {txn.id}: {e}", "DEBUG")
             return 0, 0, 0
+
+    def _update_pagination_controls(self) -> None:
+        """Update pagination info and button states."""
+        total_pages = (
+            (self._total_count + self._page_size - 1) // self._page_size
+            if self._total_count > 0 else 1
+        )
+        self.query_one("#page_info").update(
+            f"Page {self._page} of {total_pages}"
+        )
+        self.query_one("#btn_prev_page").disabled = self._page <= 1
+        self.query_one("#btn_next_page").disabled = (
+            self._page * self._page_size >= self._total_count
+        )
