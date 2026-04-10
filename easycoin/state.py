@@ -2,11 +2,10 @@
 StateManager: subscribe/publish + state bag for cross-screen updates.
 """
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable
-from easycoin.cryptoworker import JobMessage
-from easycoin.models import Coin
 
 
 @dataclass
@@ -20,9 +19,9 @@ class LogEntry:
 class StateManager:
     """Pub/sub layer with some state sharing features."""
 
-    def __init__(self, app):
-        """Initialize StateManager with app reference."""
-        self.app = app
+    def __init__(self, logger: logging.Logger):
+        """Initialize StateManager with logger."""
+        self.logger = logger
         self.data = {}
         self._subscriptions = {}
 
@@ -41,7 +40,7 @@ class StateManager:
         try:
             self._subscriptions[event_name].remove(listener)
         except ValueError:
-            self.app.logger.debug(
+            self.logger.debug(
                 f"Listener not found in _subscriptions[{event_name}]"
             )
 
@@ -53,8 +52,8 @@ class StateManager:
             try:
                 callback(data)
             except Exception as e:
-                self.app.logger.warning(
-                    "subscription callback for event {event_name} failed: {e}"
+                self.logger.warning(
+                    f"subscription callback for event {event_name} failed: {e}"
                 )
 
     def get(self, key: str) -> Any | None:
