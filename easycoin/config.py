@@ -1,3 +1,4 @@
+from typing import Any, Callable
 from crossconfig import get_config
 from easycoin.cryptoworker import set_mining_pool_size
 
@@ -93,6 +94,34 @@ class ConfigManager:
     def __init__(self, app_name: str = "easycoin"):
         self.app_name = app_name
         self.config = get_config(app_name)
+        self._subscriptions = {}
+
+    def subscribe(self, event_name: str, listener: Callable):
+        """Subscribe to a specific event."""
+        if event_name not in self._subscriptions:
+            self._subscriptions[event_name] = []
+        self._subscriptions[event_name].append(listener)
+
+    def unsubscribe(self, event_name: str, listener: Callable):
+        """Unsubscribe from a specific event. Silently ignores if not
+            subscribed.
+        """
+        if event_name not in self._subscriptions:
+            return
+        try:
+            self._subscriptions[event_name].remove(listener)
+        except ValueError:
+            pass
+
+    def publish(self, event_name: str, data: Any = None):
+        """Publish an event to all subscriptions to that event."""
+        if event_name not in self._subscriptions:
+            return
+        for callback in self._subscriptions[event_name]:
+            try:
+                callback(data)
+            except Exception:
+                pass
 
     def load(self) -> None:
         self.config.load()
@@ -120,9 +149,11 @@ class ConfigManager:
         if key in _schema and 'set' in _schema[key]:
             value = _schema[key]['set'](value)
         self.config.set(key, value)
+        self.publish(f"set_{key}", value)
 
     def unset(self, key: str) -> None:
         self.config.unset(key)
+        self.publish(f"unset_{key}", None)
 
     def get_db_path(self) -> str:
         return self.config.path("easycoin.db")
