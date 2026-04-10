@@ -54,6 +54,7 @@ class CoinsScreen(BaseScreen):
                     RadioButton("All Stamps", id="rbtn_all_stamps"),
                     RadioButton("Images", id="rbtn_images"),
                     RadioButton("Tokens", id="rbtn_tokens"),
+                    RadioButton("Files", id="rbtn_files"),
                     id="coin_type_filter",
                     classes="h-7 w-30"
                 )
@@ -106,7 +107,7 @@ class CoinsScreen(BaseScreen):
     def _update_filter(self):
         radio_set = self.query_one("#coin_type_filter")
         self.coin_type_filter = [
-            "all", "non_stamps", "all_stamps", "image", "token"
+            "all", "non_stamps", "all_stamps", "image", "token", "files"
         ][radio_set.pressed_index]
         self._load_coins(search_query=self.query_one("#search_input").value)
 
@@ -180,13 +181,17 @@ class CoinsScreen(BaseScreen):
             for chunk in sqb.chunk(500):
                 coins.extend(chunk)
 
-            if self.coin_type_filter in ('image', 'token'):
+            if self.coin_type_filter in ('image', 'token', 'files'):
                 target_type = self.coin_type_filter
                 filtered_coins = []
                 for coin in coins:
                     if coin.details:
                         stamp_data = coin.details.get('d', {})
-                        if stamp_data.get('type') == target_type:
+                        stamp_type = stamp_data.get('type', '')
+                        if target_type == 'files':
+                            if stamp_type and stamp_type not in ('image', 'token'):
+                                filtered_coins.append(coin)
+                        elif stamp_type == target_type:
                             filtered_coins.append(coin)
                 coins = filtered_coins
         except Exception as e:

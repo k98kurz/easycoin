@@ -480,23 +480,32 @@ class EditOutputModal(ModalScreen[dict|None]):
                     )
 
                 # update or create type field
+                # Check if file is an image type
+                image_extensions = {'.jpeg', '.jpg', '.png', '.gif', '.webp'}
+                file_ext = value.suffix.lower()
+                if file_ext in image_extensions:
+                    file_type = 'image'
+                else:
+                    # remove leading dot for non-images
+                    file_type = file_ext[1:]
                 found = False
                 for i, row in enumerate(self._custom_details_rows):
                     if row[1] == "type":
                         self._update_custom_field_row(
-                            row[0], "type", "image", False
+                            row[0], "type", file_type, False
                         )
                         found = True
                         break
                 if not found:
                     self._add_custom_field_row(
-                        "type", "image", False
+                        "type", file_type, False
                     )
 
             if name == 'file':
                 modal = FilePickerModal(
                     filter_callback=lambda p: p.suffix.lower() in (
-                        '.jpeg', '.jpg', '.png', '.gif', '.webp'
+                        '.jpeg', '.jpg', '.png', '.gif', '.webp',
+                        '.zip', '.html', '.pdf', '.mp3', '.mp4'
                     )
                 )
                 self.app.push_screen(modal, on_file_dismissed)
