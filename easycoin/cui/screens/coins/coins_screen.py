@@ -267,6 +267,8 @@ class CoinsScreen(BaseScreen):
 
         # create a txn for each coin
         for c in new_coins:
+            if type(c.net_state) is not bytes:
+                c.net_state = None
             c.id = c.generate_id(c.data)
             if self.app.wallet:
                 c.wallet_id = self.app.wallet.id

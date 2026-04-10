@@ -29,7 +29,7 @@ class TestGameSet(unittest.TestCase):
             if isfile(filepath):
                 remove(filepath)
 
-        backups = [f"tests/{f}" for f in os.listdir('tests/') if f[:6] == 'backup']
+        backups = [f"tests/{f}" for f in os.listdir('tests/') if f.endswith('.db-backup')]
         for filepath in [DB_FILEPATH, 'tests/test_gameset.zip', *backups]:
             if isfile(filepath):
                 remove(filepath)
@@ -76,11 +76,7 @@ class TestGameSet(unittest.TestCase):
             gameset.create_gameset(123)
         assert 'output_filename must be str' in str(e.exception)
 
-        with self.assertRaises(TypeError) as e:
-            gameset.create_gameset('test.zip', chunk_size=-1)
-        assert 'chunk_size must be positive int' in str(e.exception)
-
-    def test_calculate_gameset_hash(self):
+    def test_calculate_gameset_hash_and_validate_gameset_hash(self):
         coin1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 10**6).save()
 
         zip_path = gameset.create_gameset('tests/test_gameset.zip')
@@ -92,7 +88,14 @@ class TestGameSet(unittest.TestCase):
 
         assert hash1 == hash2
         assert hash1 != hash3
-        assert len(hash1) == 64
+        assert len(hash1) == 72
+        assert gameset.validate_gameset_hash(hash1)
+        assert gameset.validate_gameset_hash(hash3)
+        hg = (bytes.fromhex(hash3[:-2])[0] + 1) % 256
+        hg = bytes([hg]).hex()
+        assert len(hg) == 2, hg
+        assert not gameset.validate_gameset_hash(hash3[:70] + hg)
+        assert not gameset.validate_gameset_hash(hash3[:64])
         assert isfile(zip_path)
 
         remove(zip_path)
@@ -156,7 +159,7 @@ class TestGameSet(unittest.TestCase):
         zip_path = gameset.create_gameset('tests/test_gameset.zip')
         gameset.apply_gameset(zip_path, DB_FILEPATH, MIGRATIONS_PATH)
 
-        backup_files = [f for f in listdir('tests') if f.startswith('backup.')]
+        backup_files = [f for f in listdir('tests') if f.endswith('.db-backup')]
         assert len(backup_files) > 0
 
         imported_coins = {c.id: c for c in models.Coin.query().get()}
@@ -176,6 +179,7 @@ class TestGameSet(unittest.TestCase):
             assert original.timestamp == imported.timestamp
             assert original.lock == imported.lock
             assert original.amount == imported.amount
+            assert original.data == imported.data, "Coin data should match exactly"
 
         for txn_id in original_txns:
             assert txn_id in imported_txns, (
@@ -193,6 +197,19 @@ class TestGameSet(unittest.TestCase):
             assert original.input_ids == imported.input_ids, (original, imported)
             assert original.timestamp == imported.timestamp, (original, imported)
             assert original.witness == imported.witness, (original, imported)
+            assert original.data == imported.data, "Txn data should match exactly"
+
+        for input_id in original_inputs:
+            assert input_id in imported_inputs, f"Input ID {input_id} not found"
+            original = original_inputs[input_id]
+            imported = imported_inputs[input_id]
+            assert original.data == imported.data, "Input data should match exactly"
+
+        for output_id in original_outputs:
+            assert output_id in imported_outputs, f"Output ID {output_id} not found"
+            original = original_outputs[output_id]
+            imported = imported_outputs[output_id]
+            assert original.data == imported.data, "Output data should match exactly"
 
         remove(zip_path)
         for f in backup_files:

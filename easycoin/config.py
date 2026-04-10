@@ -88,6 +88,9 @@ _schema = {
     "welcome_shown": {
         "default": False,
     },
+    "active_game_set": {
+        "default": None,
+    },
 }
 
 class ConfigManager:

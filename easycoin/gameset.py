@@ -1,137 +1,122 @@
 """
 This module provides tools for creating and applying GameSets, which are
-zip files containing CSV exports of Txn, Coin, Input, and Output database
-tables.
+zip files containing packed exports of Txn, Coin, Input, and Output database
+tables. Each table is exported as a folder containing individual files
+where the filename is the object ID and the content is the packed bytes.
 """
 
-from csv import reader, writer
+from os import listdir, makedirs, path, remove, rmdir
 from hashlib import sha256
 from io import StringIO
 from os import listdir, makedirs, path, remove, rmdir
-from shutil import copy2
+from shutil import copy2, rmtree
 from tempfile import mkdtemp
 from time import time
-from typing import TYPE_CHECKING, get_args, get_origin
 from zipfile import ZIP_DEFLATED, ZipFile
 from genericpath import isfile, isdir
-from sqloquent import SqlModel, Default
+from sqloquent import SqlModel
 from easycoin.errors import type_assert, value_assert
-from easycoin.helpers import create_temp_file
 from easycoin.models import (
     Coin, Input, Output, Txn,
     publish_migrations, automigrate
 )
 
 
-def _prepare_value_for_csv(value: any) -> any:
-    """Prepare a value for CSV export. Converts bytes to hex,
-        handles None values.
-    """
-    if value is None:
-        return '~None~'
-    if isinstance(value, bytes):
-        return value.hex()
-    return value
-
-
-def _export_model_to_csv(
+def _export_model_to_folder(
         model_class: type[SqlModel],
-        csv_filename: str,
-        chunk_size: int = 500
-    ) -> str | None:
-    """Export a model's database table to CSV. Returns: path to
-        CSV file or None if table is empty.
+        folder_name: str,
+        base_dir: str
+    ) -> list[str]:
+    """Export a model's database table to a folder with individual files.
+        Each file is named after the object ID and contains the packed bytes.
+        Returns: list of created file paths (empty if table is empty).
     """
     records = model_class.query().get()
-    excluded_columns = ['wallet_id', 'key_index1', 'key_index2']
 
     if not records:
-        return None
+        return []
 
-    fieldnames = model_class.columns
-    fieldnames = [field for field in fieldnames if field not in excluded_columns]
+    folder_path = path.join(base_dir, folder_name)
+    makedirs(folder_path, exist_ok=True)
 
-    csv_buffer = StringIO()
-    csv_writer = writer(csv_buffer)
-    csv_writer.writerow(fieldnames)
-
+    file_paths: list[str] = []
     for record in records:
-        row_values = [
-            _prepare_value_for_csv(record.data.get(field))
-            for field in fieldnames
-        ]
-        csv_writer.writerow(row_values)
+        packed_data = record.pack()
+        file_path = path.join(folder_path, record.id)
+        with open(file_path, 'wb') as f:
+            f.write(packed_data)
+        file_paths.append(file_path)
 
-    csv_content = csv_buffer.getvalue().encode('utf-8')
-    csv_path = create_temp_file(csv_content, csv_filename)
-
-    return csv_path
+    return file_paths
 
 
-def _create_zip_from_files(file_paths: list[str], output_filename: str) -> str:
-    """Create a ZIP archive from multiple files and save to the
-        specified path. Returns: path to created ZIP file.
+def _import_model_from_folder(
+        folder_path: str,
+        model_class: type[SqlModel]
+    ) -> None:
+    """Import packed data from a folder to a database table.
+        Each file is unpacked and saved, preserving the original ID.
+        Raises `ValueError` for invalid data or corrupt files.
     """
-    type_assert(isinstance(output_filename, str),
-        'output_filename must be str')
-    value_assert(len(output_filename) > 0,
-        'output_filename must not be empty')
+    type_assert(isinstance(folder_path, str), 'folder_path must be str')
+    type_assert(isinstance(model_class, type), 'model_class must be type')
+    value_assert(isdir(folder_path),
+        f'folder_path must be valid directory: {folder_path}')
 
-    with ZipFile(output_filename, 'w', ZIP_DEFLATED) as zip_file:
-        for file_path in file_paths:
-            if path.exists(file_path):
-                basename = path.basename(file_path)
-                if basename.startswith('easycoin_'):
-                    basename = basename[9:]
-                zip_file.write(file_path, basename)
+    for file_name in listdir(folder_path):
+        file_path = path.join(folder_path, file_name)
+        if isfile(file_path):
+            with open(file_path, 'rb') as f:
+                packed_data = f.read()
 
-    return output_filename
+            try:
+                obj = model_class.unpack(packed_data)
+                obj.save()
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to import {model_class.__name__} from file "
+                    f"'{file_name}': {e}"
+                ) from e
 
 
-def create_gameset(output_filename: str, chunk_size: int = 500) -> str:
-    """Create a GameSet ZIP file containing CSV exports of Txn,
+def create_gameset(output_filename: str) -> str:
+    """Create a GameSet ZIP file containing packed exports of Txn,
         Coin, Input, and Output tables.
-
-        The CSV files are created as temporary files and then
-        bundled into a ZIP archive saved to specified path.
+        Each table is exported as a folder containing individual files
+        where the filename is the object ID and the content is the packed bytes.
         Empty tables are skipped entirely.
-
         Raises `TypeError` or `ValueError` for invalid parameters.
     """
     type_assert(isinstance(output_filename, str),
         'output_filename must be str')
-    type_assert(isinstance(chunk_size, int) and chunk_size > 0,
-        'chunk_size must be positive int')
     value_assert(len(output_filename) > 0,
         'output_filename must not be empty')
 
-    csv_paths: list[str] = []
+    temp_dir = mkdtemp()
+    try:
+        txn_files = _export_model_to_folder(Txn, 'txns', temp_dir)
+        coin_files = _export_model_to_folder(Coin, 'coins', temp_dir)
+        input_files = _export_model_to_folder(Input, 'inputs', temp_dir)
+        output_files = _export_model_to_folder(Output, 'outputs', temp_dir)
 
-    txn_csv_path = _export_model_to_csv(Txn, 'txns.csv', chunk_size)
-    if txn_csv_path:
-        csv_paths.append(txn_csv_path)
+        all_files = txn_files + coin_files + input_files + output_files
+        value_assert(len(all_files) > 0,
+            'all tables are empty, cannot create empty GameSet')
 
-    coin_csv_path = _export_model_to_csv(Coin, 'coins.csv', chunk_size)
-    if coin_csv_path:
-        csv_paths.append(coin_csv_path)
+        with ZipFile(output_filename, 'w', ZIP_DEFLATED) as zip_file:
+            for file_path in all_files:
+                arcname = path.relpath(file_path, temp_dir)
+                zip_file.write(file_path, arcname)
 
-    input_csv_path = _export_model_to_csv(Input, 'inputs.csv', chunk_size)
-    if input_csv_path:
-        csv_paths.append(input_csv_path)
-
-    output_csv_path = _export_model_to_csv(Output, 'outputs.csv', chunk_size)
-    if output_csv_path:
-        csv_paths.append(output_csv_path)
-
-    value_assert(len(csv_paths) > 0,
-        'all tables are empty, cannot create empty GameSet')
-
-    return _create_zip_from_files(csv_paths, output_filename)
+        return output_filename
+    finally:
+        rmtree(temp_dir, ignore_errors=True)
 
 
 def calculate_gameset_hash(gameset_path: str) -> str:
     """Calculate the SHA256 hash of a GameSet ZIP file for UI
-        verification. Returns: hex string of hash.
+        verification. Returns: hex string of hash with checksum (72
+        chars total: 64 for SHA256 + 8 for 4-byte checksum).
     """
     type_assert(isinstance(gameset_path, str), 'gameset_path must be str')
     value_assert(isfile(gameset_path),
@@ -141,77 +126,14 @@ def calculate_gameset_hash(gameset_path: str) -> str:
     with open(gameset_path, 'rb') as f:
         while chunk := f.read(8192):
             hash_obj.update(chunk)
-    return hash_obj.hexdigest()
-
-
-def get_column_types(model_class: type[SqlModel]) -> dict[str, str]:
-    """Get column type mappings from model class annotations. Returns
-        dict mapping column name to type str, with fallback to 'str' for
-        columns lacking annotations.
-    """
-    column_types: dict[str, str] = {}
-
-    if hasattr(model_class, '__annotations__'):
-        for column_name, annotation in model_class.__annotations__.items():
-            if column_name in model_class.columns:
-                origin = get_origin(annotation)
-
-                if origin is None:
-                    column_type = annotation
-                elif origin is type(None).__class__ or origin in (list, set):
-                    args = get_args(annotation)
-                    if args:
-                        column_type = args[0]
-                    else:
-                        column_type = str
-                else:
-                    args = get_args(annotation)
-                    if args and args[0] is not type(None):
-                        column_type = args[0]
-                    else:
-                        column_type = annotation
-
-                if column_type is Default:
-                    args = get_args(annotation)
-                    if args and args[0] is not type(None):
-                        column_type = args[0]
-                    else:
-                        column_type = str
-
-                if type(column_type) is not str:
-                    column_types[column_name] = str(column_type)
-                else:
-                    column_types[column_name] = column_type
-
-    for column_name in model_class.columns:
-        if column_name not in column_types:
-            column_types[column_name] = 'str'
-
-    return column_types
-
-
-def _parse_csv_value(value: str, column_type: type|str) -> any:
-    """Parse a CSV string value to the proper Python type for database
-        insertion. Returns: parsed value.
-    """
-    if value == '~None~':
-        return None
-
-    if column_type in (bytes, bytes | None) or (
-            type(column_type) is str and column_type[:5] == 'bytes'
-        ):
-        return bytes.fromhex(value)
-    elif column_type in (int, int | None, int | Default) or (
-            type(column_type) is str and column_type[:3] == 'int'
-        ):
-        return int(value)
-    else:
-        return value
+    hash_hex = hash_obj.hexdigest()
+    checksum = sha256(bytes.fromhex(hash_hex)).digest()[:4].hex()
+    return hash_hex + checksum
 
 
 def _backup_database(db_filepath: str, backup_path: str | None = None) -> str | None:
     """Backup existing database file. If backup_path is None, generates
-        'backup.{timestamp}.{db_filepath}'. Returns: path to backup file
+        '{timestamp}.easycoin.db-backup'. Returns: path to backup file
         or None if database doesn't exist.
     """
     type_assert(isinstance(db_filepath, str), 'db_filepath must be str')
@@ -223,81 +145,13 @@ def _backup_database(db_filepath: str, backup_path: str | None = None) -> str | 
 
     if backup_path is None:
         timestamp = str(int(time()))
-        filename = path.basename(db_filepath)
-        backup_path = f"backup.{timestamp}.{filename}"
+        backup_path = f"{timestamp}.easycoin.db-backup"
         backup_dir = path.dirname(db_filepath)
         if backup_dir:
             backup_path = path.join(backup_dir, backup_path)
 
     copy2(db_filepath, backup_path)
     return backup_path
-
-
-def _extract_csvs_from_zip(zip_path: str, extract_dir: str) -> list[str]:
-    """Extract CSV files from a ZIP archive to the specified directory.
-        Returns: list of extracted CSV file paths.
-    """
-    type_assert(isinstance(zip_path, str), 'zip_path must be str')
-    type_assert(isinstance(extract_dir, str), 'extract_dir must be str')
-    value_assert(isfile(zip_path), f'zip_path must be valid file: {zip_path}')
-
-    makedirs(extract_dir, exist_ok=True)
-    extracted_paths: list[str] = []
-
-    with ZipFile(zip_path, 'r') as zip_file:
-        for member in zip_file.namelist():
-            if member.endswith('.csv'):
-                zip_file.extract(member, extract_dir)
-                extracted_paths.append(path.join(extract_dir, member))
-
-    return extracted_paths
-
-
-def _import_csv_to_model(
-        csv_path: str,
-        model_class: type[SqlModel],
-        chunk_size: int = 500
-    ) -> None:
-    """Import CSV data to a database table using batch insertion.
-        Only imports columns that exist in both the CSV and the model.
-        Handles None values, hex-encoded bytes, and integer conversions.
-    """
-    type_assert(isinstance(csv_path, str), 'csv_path must be str')
-    type_assert(isinstance(model_class, type), 'model_class must be type')
-    type_assert(isinstance(chunk_size, int) and chunk_size > 0,
-        'chunk_size must be positive int')
-
-    column_types = get_column_types(model_class)
-
-    with open(csv_path, 'r', encoding='utf-8') as f:
-        csv_reader = reader(f)
-        header = next(csv_reader)
-
-        valid_columns = [
-            col for col in header if col in model_class.columns
-        ]
-
-        if not valid_columns:
-            return
-
-        records: list[dict] = []
-        for row in csv_reader:
-            row_dict: dict = {}
-
-            for col_name, value in zip(header, row):
-                if col_name in valid_columns:
-                    row_dict[col_name] = _parse_csv_value(
-                        value, column_types[col_name]
-                    )
-
-            records.append(row_dict)
-
-            if len(records) >= chunk_size:
-                model_class.insert_many(records)
-                records = []
-
-        if records:
-            model_class.insert_many(records)
 
 
 def apply_gameset(
@@ -307,13 +161,10 @@ def apply_gameset(
         backup_path: str | None = None,
     ) -> None:
     """Apply a GameSet ZIP file to restore a database. Backs up the
-        existing database if present, creates a fresh database via
-        migrations, then imports CSV data from the GameSet.
-
-        The workflow: validate → backup → delete old DB → migrate →
-        extract → import CSVs → cleanup. Empty CSVs are skipped.
-        Only columns present in both CSV and model are imported.
-
+        existing database if present, truncates the GameSet tables, then imports
+        packed data from the GameSet.
+        The workflow: validate → backup → truncate tables → extract →
+        import packed files → cleanup. Empty folders are skipped.
         Raises `TypeError` or `ValueError` for invalid parameters.
     """
     type_assert(isinstance(gameset_path, str), 'gameset_path must be str')
@@ -331,31 +182,51 @@ def apply_gameset(
 
     _backup_database(db_filepath, backup_path)
 
-    if isfile(db_filepath):
-        remove(db_filepath)
-
-    publish_migrations(migrations_path)
-    automigrate(migrations_path, db_filepath)
+    Input.query().execute_raw(f'delete from {Input.table}')
+    Output.query().execute_raw(f'delete from {Output.table}')
+    Coin.query().execute_raw(f'delete from {Coin.table}')
+    Txn.query().execute_raw(f'delete from {Txn.table}')
 
     temp_dir = mkdtemp()
     try:
-        csv_paths = _extract_csvs_from_zip(gameset_path, temp_dir)
+        with ZipFile(gameset_path, 'r') as zip_file:
+            zip_file.extractall(temp_dir)
 
-        csv_mapping = {
-            'txns.csv': Txn,
-            'coins.csv': Coin,
-            'inputs.csv': Input,
-            'outputs.csv': Output,
+        folder_mapping = {
+            'txns': Txn,
+            'coins': Coin,
+            'inputs': Input,
+            'outputs': Output,
         }
 
-        for csv_path in csv_paths:
-            csv_filename = path.basename(csv_path)
-            if csv_filename in csv_mapping:
-                model_class = csv_mapping[csv_filename]
-                _import_csv_to_model(csv_path, model_class)
+        for folder_name, model_class in folder_mapping.items():
+            folder_path = path.join(temp_dir, folder_name)
+            if isdir(folder_path):
+                try:
+                    _import_model_from_folder(folder_path, model_class)
+                except ValueError as e:
+                    raise ValueError(
+                        f"Failed to import from {folder_name} folder: {e}"
+                    ) from e
     finally:
-        for file_name in listdir(temp_dir):
-            file_path = path.join(temp_dir, file_name)
-            if isfile(file_path):
-                remove(file_path)
-        rmdir(temp_dir)
+        rmtree(temp_dir, ignore_errors=True)
+
+
+def validate_gameset_hash(gameset_hash: str) -> bool:
+    """Validate a Game Set hash with checksum. Similar pattern to
+        Address.validate(). The hash is SHA256 (64 hex chars) + 4 byte
+        checksum (8 hex chars) for a total of 72 hex characters.
+        Returns `False` if validation fails.
+    """
+    type_assert(type(gameset_hash) is str, 'gameset_hash must be str')
+
+    if len(gameset_hash) != 72:
+        return False
+
+    try:
+        hash_bytes = bytes.fromhex(gameset_hash[:64])
+        checksum_bytes = bytes.fromhex(gameset_hash[64:])
+    except ValueError:
+        return False
+
+    return sha256(hash_bytes).digest()[:4] == checksum_bytes

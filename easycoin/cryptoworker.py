@@ -83,7 +83,7 @@ def get_txn_job_result() -> JobMessage|None:
 
 def submit_mine_job(
         lock: bytes|Script, total_amount: int, number_of_coins: int,
-        net_id: int|None = None, net_state: bytes|None = None,
+        net_id: str|None = None, net_state: bytes|None = None,
         output_q: deque|None = None
     ):
     """Queues a mining job to mine `total_amount` of EC⁻¹ across

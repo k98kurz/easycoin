@@ -81,9 +81,10 @@ class Input(SqlModel):
         unpacked = packify.unpack(data, inject=inject)
         if len(unpacked) == 3:
             id_bytes, net_state, commitment = unpacked
+            net_id = None
         else:
             id_bytes, net_id_bytes, net_state, commitment = unpacked
-            net_id = net_id_bytes.hex()
+            net_id = net_id_bytes.hex() if net_id_bytes else None
         return cls({
             'id': id_bytes.hex(),
             'net_id': net_id,

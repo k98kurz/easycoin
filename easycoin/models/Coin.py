@@ -139,7 +139,7 @@ class Coin(HashedModel):
 
     @classmethod
     def create(
-            cls, lock: bytes|Script, amount: int, net_id: bytes|None = None,
+            cls, lock: bytes|Script, amount: int, net_id: str|None = None,
             net_state: bytes|None = None, nonce_offset: int = 0
         ) -> Coin:
         """Creates a new coin that must be funded or mined. Raises
@@ -160,7 +160,7 @@ class Coin(HashedModel):
     @classmethod
     def mine(
             cls, lock: bytes|Script, amount: int = _min_coin_mint_size,
-            net_id: bytes|None = None, net_state: bytes|None = None,
+            net_id: str|None = None, net_state: bytes|None = None,
             nonce_offset: int = 0
         ) -> Coin:
         """Mines a coin with the `amount` of value. Raises `TypeError`
@@ -168,7 +168,7 @@ class Coin(HashedModel):
         """
         type_assert(net_id is None or type(net_id) is str,
             'net_id must be str|None')
-        type_assert(type(net_state) in (str, type(None)),
+        type_assert(type(net_state) in (bytes, type(None)),
             'net_state must be bytes|None')
         value_assert(amount >= _min_coin_mint_size,
             f'amount must be >= {_min_coin_mint_size}')
@@ -183,7 +183,7 @@ class Coin(HashedModel):
     def stamp(
             cls, lock: bytes, amount: int, n: str|bytes|int,
             optional: dict[str, str|int|bool|bytes] = {},
-            net_id: bytes|None = None, net_state: bytes|None = None,
+            net_id: str|None = None, net_state: bytes|None = None,
         ) -> Coin:
         """Create a Stamp."""
         coin = cls.create(lock, amount, net_id, net_state)
