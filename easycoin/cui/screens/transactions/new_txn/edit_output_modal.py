@@ -449,7 +449,7 @@ class EditOutputModal(ModalScreen[dict|None]):
                 if len(data) > _max_stamp_size - 20:
                     self.notify(
                         f"File too large ({format_amount(len(data), exact=True)}"
-                        f" > {format_amount(_max_stamp_size-20, exact=True)}",
+                        f" > {format_amount(_max_stamp_size-20, exact=True)})",
                         severity="warning"
                     )
                     return

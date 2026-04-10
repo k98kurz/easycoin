@@ -68,6 +68,7 @@ class ReviewSubmitContainer(VerticalScroll):
                 ("Stamp Type", "stamp_type"),
                 ("Stamp Name", "stamp_name"),
                 ("Stamp 'n'", "stamp_n"),
+                ("Witness Size", "witness_size"),
                 ("Address", "address"),
             )
         outputs_table.cursor_type = "none"
@@ -124,6 +125,9 @@ class ReviewSubmitContainer(VerticalScroll):
                 stamp_type,
                 stamp_name,
                 stamp_n,
+                len(self.txn_data.witnesses[coin.id].full().bytes)
+                if coin.id in self.txn_data.witnesses
+                else 0,
                 Address({"lock": coin.lock}).hex,
             )
 

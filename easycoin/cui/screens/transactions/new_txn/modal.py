@@ -11,7 +11,7 @@ from easycoin.UTXOSet import UTXOSet
 from .data import TransactionData
 from .step_1 import SelectInputsContainer
 from .step_2 import AddOutputsContainer
-from .step_3 import WitnessInputsContainer
+from .step_3 import WitnessContainer
 from .step_4 import ReviewSubmitContainer
 
 
@@ -44,7 +44,7 @@ class NewTransactionModal(ModalScreen):
             self.step_2 = AddOutputsContainer(
                 self.txn_data, id="step_2_container"
             )
-            self.step_3 = WitnessInputsContainer(
+            self.step_3 = WitnessContainer(
                 self.txn_data, id="step_3_container"
             )
             self.step_4 = ReviewSubmitContainer(

@@ -8,7 +8,7 @@ from tapescript import Script
 from easycoin.helpers import format_balance, truncate_text
 from .data import TransactionData, Witness
 from easycoin.cui.widgets import ECTextArea, SigflagsModal
-from easycoin.models import Address, Output, Wallet
+from easycoin.models import Address, Coin, Output, Wallet
 import packify
 
 
@@ -23,15 +23,24 @@ class EditWitnessModal(ModalScreen[bool|None]):
         Binding("ctrl+q", "quit", "Quit"),
     ]
 
-    def __init__(self, output: Output, txn_data: TransactionData):
+    def __init__(
+            self,
+            output: Output | None = None,
+            txn_data: TransactionData = None,
+            coin: Coin | None = None,
+        ):
         super().__init__()
         self.output = output
+        self.coin = coin
         self.txn_data = txn_data
+        self.is_input = output is not None
         self.is_known = False
         self.requires_custom = True
         self.address = None
-        if output.coin.id in txn_data.witnesses:
-            witness = txn_data.witnesses[output.coin.id]
+
+        target_coin = output.coin if output else coin
+        if target_coin and target_coin.id in txn_data.witnesses:
+            witness = txn_data.witnesses[target_coin.id]
             self.witness = Witness(
                 witness.lock_type,
                 witness.generated,
@@ -48,7 +57,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
             yield Static("Edit Witness", classes="modal-title")
 
             with Vertical(classes="h-3 my-1"):
-                yield Static("Input Details:", classes="text-bold")
+                yield Static("Input Details:", id="details_label", classes="text-bold")
                 yield Static("...", id="input_info", classes="text-muted")
 
             with Vertical(classes="h-3 mb-1"):
@@ -131,10 +140,11 @@ class EditWitnessModal(ModalScreen[bool|None]):
             self.is_known = False
             return
 
-        self.witness.lock_type = Wallet.get_lock_type(self.output.coin.lock)
-        self.address = Address({"lock": self.output.coin.lock})
+        target_coin = self.output.coin if self.is_input else self.coin
+        self.witness.lock_type = Wallet.get_lock_type(target_coin.lock)
+        self.address = Address({"lock": target_coin.lock})
         for addr in self.app.wallet.addresses:
-            if addr.lock == self.output.coin.lock:
+            if addr.lock == target_coin.lock:
                 self.is_known = True
                 self.address = addr
                 secrets = packify.unpack(
@@ -151,19 +161,23 @@ class EditWitnessModal(ModalScreen[bool|None]):
                 return
 
     def _update_ui(self) -> None:
+        coin_type = "Input" if self.is_input else "Output"
+        self.query_one("#details_label").update(f"{coin_type} Details:")
+
         self.query_one("#address_hex").update(self.address.hex)
-        decompiled = Script.from_bytes(self.output.coin.lock).src
+        target_coin = self.output.coin if self.is_input else self.coin
+        decompiled = Script.from_bytes(target_coin.lock).src
         self.query_one("#decompiled_lock").text = decompiled
         scriptspend, generated, custom = False, '', ''
 
         truncated_id = truncate_text(
-            self.output.coin.id, prefix_len=8, suffix_len=4
+            target_coin.id, prefix_len=8, suffix_len=4
         )
         amount_str = format_balance(
-            self.output.coin.amount, exact=True
+            target_coin.amount, exact=True
         )
         self.query_one("#input_info").update(
-            f"ID: {truncated_id} | Amount: {amount_str} | "
+            f"{coin_type} ID: {truncated_id} | Amount: {amount_str} | "
             f"Lock Type: {self.witness.lock_type}",
         )
 
@@ -241,19 +255,20 @@ class EditWitnessModal(ModalScreen[bool|None]):
                     severity="warning"
                 )
 
+        target_coin = self.output.coin if self.is_input else self.coin
         self.app.log_event(
-            f"runtime cache: {self.txn_data.txn.runtime_cache(self.output.coin)}",
+            f"runtime cache: {self.txn_data.txn.runtime_cache(target_coin)}",
             "DEBUG"
         )
         if self.witness.lock_type == "P2PK":
             self.witness.generated = self.app.wallet.get_p2pk_witness(
-                self.address.nonce, self.txn_data.txn, self.output.coin,
+                self.address.nonce, self.txn_data.txn, target_coin,
                 child_nonce=self.address.child_nonce,
                 sigflags=self.witness.sigflags,
             )
         elif self.witness.lock_type == "P2PKH":
             self.witness.generated = self.app.wallet.get_p2pkh_witness(
-                self.address.nonce, self.txn_data.txn, self.output.coin,
+                self.address.nonce, self.txn_data.txn, target_coin,
                 child_nonce=self.address.child_nonce,
                 sigflags=self.witness.sigflags,
             )
@@ -271,7 +286,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                 )
             else:
                 self.witness.generated = self.app.wallet.get_p2tr_witness_keyspend(
-                    self.address.nonce, self.txn_data.txn, self.output.coin,
+                    self.address.nonce, self.txn_data.txn, target_coin,
                     child_nonce=self.address.child_nonce,
                     script=committed_script,
                     sigflags=self.witness.sigflags,
@@ -284,7 +299,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                 )
             else:
                 self.witness.generated = self.app.wallet.get_p2gr_witness_keyspend(
-                    self.address.nonce, self.txn_data.txn, self.output.coin,
+                    self.address.nonce, self.txn_data.txn, target_coin,
                     child_nonce=self.address.child_nonce,
                     sigflags=self.witness.sigflags,
                 )
@@ -296,7 +311,7 @@ class EditWitnessModal(ModalScreen[bool|None]):
                 )
             else:
                 self.witness.generated = self.app.wallet.get_p2gt_witness_keyspend(
-                    self.address.nonce, self.txn_data.txn, self.output.coin,
+                    self.address.nonce, self.txn_data.txn, target_coin,
                     child_nonce=self.address.child_nonce,
                     sigflags=self.witness.sigflags,
                 )
@@ -356,13 +371,14 @@ class EditWitnessModal(ModalScreen[bool|None]):
             )
             return
 
+        target_coin = self.output.coin if self.is_input else self.coin
         self.txn_data.witnesses[
-            self.output.coin.id
+            target_coin.id
         ] = self.witness
         txn = self.txn_data.txn
         txn.witness = {
             **txn.witness,
-            self.output.coin.id_bytes: self.witness.full().bytes
+            target_coin.id_bytes: self.witness.full().bytes
         }
         self.dismiss(True)
 

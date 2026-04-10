@@ -31,9 +31,11 @@ def format_balance(balance: int, exact: bool = False) -> str:
         return f"{format_amount(balance)} EC⁻¹"
 
 
-def format_amount(amount: int) -> str:
+def format_amount(amount: int, exact: bool = False) -> str:
     """Format amount with K/M/B suffix for large values."""
-    if amount >= 1_000_000_000:
+    if exact:
+        return f"{amount:,}"
+    elif amount >= 1_000_000_000:
         return f"{amount / 1_000_000_000:.2f}B"
     elif amount >= 1_000_000:
         return f"{amount / 1_000_000:.2f}M"
