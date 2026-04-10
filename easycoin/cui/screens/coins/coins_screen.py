@@ -30,6 +30,9 @@ class CoinsScreen(BaseScreen):
         self._coins = []
         self._coin_row_map = {}
         self.coin_type_filter: str = "all"
+        self._page: int = 1
+        self._page_size: int = 50
+        self._total_count: int = 0
 
     def compose(self) -> ComposeResult:
         """Compose coins screen layout."""
@@ -63,6 +66,11 @@ class CoinsScreen(BaseScreen):
             yield DataTable(id="coins_table", classes="mt-1 h-20")
 
             with Horizontal(id="coins_actions", classes="h-6"):
+                yield Button("← Previous", id="btn_prev_page", variant="default")
+                yield Static(
+                    "Page 1 of 1", id="page_info", classes="text-center w-12 mt-2"
+                )
+                yield Button("Next →", id="btn_next_page", variant="default")
                 yield Button("Refresh", id="btn_refresh", variant="default")
                 yield Button("Mine Coin", id="btn_mine_coin", variant="primary")
                 yield Button(
@@ -97,10 +105,12 @@ class CoinsScreen(BaseScreen):
 
     @on(Checkbox.Changed, "#box_active_wallet")
     def _checkbox_changed(self, event: Checkbox.Changed) -> None:
+        self._page = 1
         self._load_coins(search_query=self.query_one("#search_input").value)
 
     @on(Checkbox.Changed, "#box_unspent_only")
     def _unspent_only_changed(self, event: Checkbox.Changed) -> None:
+        self._page = 1
         self._load_coins(search_query=self.query_one("#search_input").value)
 
     @on(RadioSet.Changed, "#coin_type_filter")
@@ -109,6 +119,7 @@ class CoinsScreen(BaseScreen):
         self.coin_type_filter = [
             "all", "non_stamps", "all_stamps", "image", "token", "files"
         ][radio_set.pressed_index]
+        self._page = 1
         self._load_coins(search_query=self.query_one("#search_input").value)
 
     @on(Input.Changed, "#search_input")
@@ -116,12 +127,14 @@ class CoinsScreen(BaseScreen):
         """Handle search input changes."""
         if event.value and not event.value.strip():
             return
+        self._page = 1
         self._load_coins(search_query=event.value)
 
     @on(Button.Pressed, "#btn_refresh")
     def action_refresh_coins(self) -> None:
         """Refresh coins data."""
         self.log_event("Refreshing coins", "INFO")
+        self._page = 1
         self._load_coins(search_query=self.query_one("#search_input").value)
 
     @on(Button.Pressed, "#btn_mine_config")
@@ -154,6 +167,20 @@ class CoinsScreen(BaseScreen):
 
         self.app.push_screen(MineCoinModal(), on_mine_params)
 
+    @on(Button.Pressed, "#btn_prev_page")
+    def _on_prev_page(self) -> None:
+        """Handle previous page button press."""
+        if self._page > 1:
+            self._page -= 1
+            self._load_coins(search_query=self.query_one("#search_input").value)
+
+    @on(Button.Pressed, "#btn_next_page")
+    def _on_next_page(self) -> None:
+        """Handle next page button press."""
+        if self._page * self._page_size < self._total_count:
+            self._page += 1
+            self._load_coins(search_query=self.query_one("#search_input").value)
+
     def _load_coins(self, search_query: str = "") -> None:
         """Load coins from database and populate table."""
         search_query = search_query.strip()
@@ -178,22 +205,49 @@ class CoinsScreen(BaseScreen):
 
             sqb.order_by('timestamp', 'desc')
 
-            for chunk in sqb.chunk(500):
-                coins.extend(chunk)
-
             if self.coin_type_filter in ('image', 'token', 'files'):
+                matching_coins = []
+                matching_count = 0
+                db_offset = 0
+                chunk_size = 50
+                target_start = (self._page - 1) * self._page_size
+                target_end = target_start + self._page_size
                 target_type = self.coin_type_filter
-                filtered_coins = []
-                for coin in coins:
-                    if coin.details:
-                        stamp_data = coin.details.get('d', {})
-                        stamp_type = stamp_data.get('type', '')
-                        if target_type == 'files':
-                            if stamp_type and stamp_type not in ('image', 'token'):
-                                filtered_coins.append(coin)
-                        elif stamp_type == target_type:
-                            filtered_coins.append(coin)
-                coins = filtered_coins
+
+                while len(matching_coins) < self._page_size:
+                    chunk = sqb.skip(db_offset).take(chunk_size)
+                    if not chunk:
+                        break
+
+                    for coin in chunk:
+                        if coin.details:
+                            stamp_data = coin.details.get('d', {})
+                            stamp_type = stamp_data.get('type', '')
+                            is_match = False
+                            if target_type == 'files':
+                                is_match = (
+                                    stamp_type
+                                    and stamp_type not in ('image', 'token')
+                                )
+                            elif stamp_type == target_type:
+                                is_match = True
+
+                            if is_match:
+                                matching_count += 1
+                                if target_start <= matching_count - 1 < target_end:
+                                    matching_coins.append(coin)
+
+                    db_offset += chunk_size
+
+                self._total_count = matching_count
+                coins = matching_coins
+            else:
+                coins = sqb.skip((self._page - 1) * self._page_size).take(
+                    self._page_size
+                )
+                self._total_count = sqb.count()
+
+            self._update_pagination_controls()
         except Exception as e:
             self.log_event(f"Error loading coins: {e}", "ERROR")
             self.app.notify(f"Error loading coins: {e}", severity="error")
@@ -208,9 +262,10 @@ class CoinsScreen(BaseScreen):
             self._coins.append(coin)
 
             try:
-                # Extract and format stamp data
                 stamp_size = len(coin.data.get('details', None) or b'')
-                stamp_size_display = f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+                stamp_size_display = (
+                    f"{format_amount(stamp_size)}B" if stamp_size > 0 else ""
+                )
                 stamp_data = coin.details.get('d', None) or {}
                 stamp_type = stamp_data.get('type', '')
                 stamp_name = stamp_data.get('name', '')
@@ -230,6 +285,20 @@ class CoinsScreen(BaseScreen):
                 self._coin_row_map[row_key] = coin
             except Exception as e:
                 self.log_event(f"Error adding coin row: {e}", "ERROR")
+
+    def _update_pagination_controls(self) -> None:
+        """Update pagination info and button states."""
+        total_pages = (
+            (self._total_count + self._page_size - 1) // self._page_size
+            if self._total_count > 0 else 1
+        )
+        self.query_one("#page_info").update(
+            f"Page {self._page} of {total_pages}"
+        )
+        self.query_one("#btn_prev_page").disabled = self._page <= 1
+        self.query_one("#btn_next_page").disabled = (
+            self._page * self._page_size >= self._total_count
+        )
 
     @work(exclusive=True)
     async def _mine_coin(self, address: str, amount: int) -> None:
