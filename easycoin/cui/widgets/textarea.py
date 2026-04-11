@@ -6,6 +6,8 @@ from easycoin.cui.clipboard import universal_copy
 class ECTextArea(TextArea):
 
     BINDINGS = [
+        Binding("ctrl+a", "select_all", "Select All"),
+        Binding("ctrl+c", "copy", "Copy"),
         Binding("ctrl+e", "app.open_event_log", "Event Log")
     ]
 

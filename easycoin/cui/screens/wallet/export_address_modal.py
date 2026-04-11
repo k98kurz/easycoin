@@ -2,8 +2,9 @@ from textual import on
 from textual.screen import Screen
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll, Horizontal, ItemGrid
-from textual.widgets import Button, Static, Input, TextArea, Footer, Checkbox
+from textual.widgets import Button, Static, Input, Footer, Checkbox
 from textual.binding import Binding
+from easycoin.cui.widgets import ECTextArea
 from tapescript import Script
 from easycoin.cui.clipboard import universal_copy
 from easycoin.models import Address
@@ -54,7 +55,7 @@ class ExportAddressModal(Screen):
                     yield Checkbox(
                         "Show Secrets", id="show_secrets_checkbox", value=False
                     )
-                yield TextArea(
+                yield ECTextArea(
                     "", read_only=True, show_line_numbers=False, soft_wrap=True,
                     id="secrets_display", classes="hidden",
                 )
@@ -62,7 +63,7 @@ class ExportAddressModal(Screen):
             with Horizontal(classes="mt-1 h-10"):
                 with Vertical():
                     yield Static("Lock (Decompiled):\n", classes="text-bold")
-                    yield TextArea(
+                    yield ECTextArea(
                         self.decompiled_lock, read_only=True,
                         show_line_numbers=False, soft_wrap=True,
                         id="lock_display", classes="h-8"
@@ -71,7 +72,7 @@ class ExportAddressModal(Screen):
                     yield Static(
                         "Committed Script (Decompiled):\n", classes="text-bold"
                     )
-                    yield TextArea(
+                    yield ECTextArea(
                         "", read_only=True, show_line_numbers=False,
                         soft_wrap=True, id="committed_script_display",
                         classes="h-8"
