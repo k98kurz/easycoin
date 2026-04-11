@@ -53,7 +53,9 @@ class Output(SqlModel):
         ])).digest().hex() == self.id
 
     def pack(self) -> bytes:
-        """Serialize to bytes."""
+        """Serialize to bytes. Includes only the cryptographically
+            relevant fields; i.e. excludes wallet association.
+        """
         return packify.pack([
             self.id_bytes,
             self.net_id_bytes,

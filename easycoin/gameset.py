@@ -41,7 +41,10 @@ def _export_model_to_folder(
 
     file_paths: list[str] = []
     for record in records:
-        packed_data = record.pack()
+        if hasattr(record, 'pack_for_gameset'):
+            packed_data = record.pack_for_gameset()
+        else:
+            packed_data = record.pack()
         file_path = path.join(folder_path, record.id)
         with open(file_path, 'wb') as f:
             f.write(packed_data)

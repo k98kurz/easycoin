@@ -147,6 +147,9 @@ class TestGameSet(unittest.TestCase):
             txn2.set_timestamp()
             txn2.save()
             utxos.apply(txn2, coins)
+            for i in inputs:
+                i.spent = True
+                i.save()
 
         for i in range(6):
             create_txns(randint(1, 10), randint(1,3))
@@ -179,7 +182,7 @@ class TestGameSet(unittest.TestCase):
             assert original.timestamp == imported.timestamp
             assert original.lock == imported.lock
             assert original.amount == imported.amount
-            assert original.data == imported.data, "Coin data should match exactly"
+            assert original.spent == imported.spent
 
         for txn_id in original_txns:
             assert txn_id in imported_txns, (

@@ -119,7 +119,27 @@ class Coin(HashedModel):
         return b''
 
     def pack(self) -> bytes:
-        """Serialize to bytes."""
+        """Serialize to bytes only what must be cryptographically
+            committed, validated, and thus transmitted via network.
+        """
+        return packify.pack({
+            k: v
+            for k,v in self.data.items()
+            if k not in self.columns_excluded_from_hash
+        })
+
+    def pack_for_gameset(self) -> bytes:
+        """Serialize to bytes what is necessary for the Gameset system.
+            This excludes wallet associations but includes spent status.
+        """
+        return packify.pack({
+            k: v
+            for k,v in self.data.items()
+            if (k not in self.columns_excluded_from_hash or k == 'spent')
+        })
+
+    def pack_full(self) -> bytes:
+        """Serialize full coin to bytes."""
         return packify.pack(self.data)
 
     @classmethod
