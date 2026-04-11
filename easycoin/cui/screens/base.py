@@ -7,7 +7,6 @@ from easycoin.cui.widgets.event_log import EventLog
 from easycoin.cui.widgets.top_tabs import TopTabs
 from easycoin.models.Coin import Coin
 from easycoin.cui.widgets.right_sidebar import RightSidebar
-from easycoin.config import ConfigManager
 
 
 class BaseScreen(Screen):
@@ -25,7 +24,6 @@ class BaseScreen(Screen):
     def __init__(self, **kwargs):
         """Initialize BaseScreen."""
         super().__init__(**kwargs)
-        self.config = ConfigManager("easycoin")
 
     def compose(self) -> ComposeResult:
         """Compose screen with top tabs, main content and sidebar."""

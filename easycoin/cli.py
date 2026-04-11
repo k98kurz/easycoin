@@ -1,5 +1,5 @@
 from sys import argv
-from easycoin.config import ConfigManager
+from easycoin.config import get_config_manager
 from easycoin import models
 import os
 
@@ -34,7 +34,7 @@ def daemon():
 
 
 def interactive(debug = False):
-    config = ConfigManager("easycoin")
+    config = get_config_manager()
     config.load()
     db_path = config.get_db_path()
     migrations_path = config.path('migrations')

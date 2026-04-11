@@ -1,10 +1,9 @@
-import logging
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
-from easycoin.config import ConfigManager
-from easycoin.state import StateManager
+from easycoin.config import get_config_manager
+from easycoin.state import get_state_manager
 from easycoin.cui.screens.dashboard import DashboardScreen
 from easycoin.cui.screens.wallet.main_screen import WalletListScreen
 from easycoin.cui.screens.coins.coins_screen import CoinsScreen
@@ -63,10 +62,10 @@ class EasyCoinApp(App):
     def __init__(self):
         """Initialize the application."""
         super().__init__()
-        self.config = ConfigManager("easycoin")
+        self.config = get_config_manager()
         self.logger = logging.getLogger("easycoin")
         self._setup_file_logging()
-        self.state = StateManager(self.logger)
+        self.state = get_state_manager(self.logger)
 
     def _setup_file_logging(self) -> None:
         """Setup file-based logging for all log levels."""

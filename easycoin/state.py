@@ -5,6 +5,7 @@ StateManager: subscribe/publish + state bag for cross-screen updates.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import lru_cache
 from typing import Any, Callable
 
 
@@ -81,9 +82,27 @@ class StateManager:
         if key not in self.data:
             self.data[key] = []
         if not isinstance(self.data[key], list):
-            raise TypeError(f"state item '{key}' is not a list; cannot append")
+            raise TypeError(f"state item '{key}' is not a list; cannot append item")
         self.data[key].append(data)
         self.publish(f"append_{key}", data)
+
+    def remove(self, key: str, data: Any):
+        """Remove from a list. If the list does not yet exist, return.
+            Notify subscriptions for the `remove_{key}` event. Raises
+            `TypeError` if the state with that key is set to a non-list.
+        """
+        if key not in self.data:
+            return
+        if not isinstance(self.data[key], list):
+            raise TypeError(f"state item '{key}' is not a list; cannot remove item")
+        try:
+            self.data[key].remove(data)
+            self.publish(f"remove_{key}", data)
+        except ValueError:
+            self.logger.debug(
+                f"Data not removed from state[{key}] because it was not present: "
+                f"{data}"
+            )
 
     def add_log_entry(self, message: str, level: str) -> None:
         """Add a log entry to state and push to subscriptions."""
@@ -93,4 +112,11 @@ class StateManager:
             timestamp=datetime.now()
         )
         self.append('log', entry)
+
+
+@lru_cache(maxsize=1)
+def get_state_manager(logger: logging.Logger | None = None) -> StateManager:
+    if logger is None:
+        logger = logging.getLogger("easycoin.state")
+    return StateManager(logger)
 

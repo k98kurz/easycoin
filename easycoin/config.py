@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Any, Callable
 from crossconfig import get_config
 from easycoin.constants import _default_port
@@ -164,3 +165,8 @@ class ConfigManager:
 
     def get_log_path(self) -> str:
         return self.config.path("easycoin.log")
+
+
+@lru_cache(maxsize=1)
+def get_config_manager(app_name: str = "easycoin") -> ConfigManager:
+    return ConfigManager(app_name)

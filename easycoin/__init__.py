@@ -10,6 +10,8 @@ from .models import (
     set_connection_info, get_migrations, publish_migrations, automigrate,
 )
 from .UTXOSet import UTXOSet
+from .config import get_config_manager
+from .state import get_state_manager
 
 
 __version__ = '0.0.1'
