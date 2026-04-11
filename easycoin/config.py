@@ -81,9 +81,6 @@ _schema = {
     "current_wallet_id": {
         "default": None,
     },
-    "active_trustnet_id": {
-        "default": None,
-    },
     "sidebar_visible": {
         "default": False,
     },

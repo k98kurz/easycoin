@@ -10,7 +10,7 @@ from easycoin.cui.screens.coins.coins_screen import CoinsScreen
 from easycoin.cui.screens.transactions.txn_screen import TransactionsScreen
 from easycoin.cui.screens.stamps.stamp_templates_screen import StampTemplatesScreen
 from easycoin.cui.screens.network.network_screen import NetworkScreen
-from easycoin.cui.screens.trustnet.placeholder import TrustNetScreen
+from easycoin.cui.screens.trustnet.trustnet_screen import TrustNetScreen
 from easycoin.cui.screens.repl.repl_modal import ReplModal
 from easycoin.cui.screens.event_log_modal import EventLogModal
 from easycoin.cui.screens.welcome import WelcomeScreen
@@ -47,6 +47,7 @@ class EasyCoinApp(App):
         ("4", "switch_to_transactions", "Transactions"),
         ("5", "switch_to_stamp_templates", "Stamp Templates"),
         ("6", "switch_to_network", "Network"),
+        ("7", "switch_to_trustnet", "TrustNet"),
         ("9", "switch_to_settings", "Settings"),
         ("ctrl+e", "open_event_log", "Event Log"),
         ("ctrl+q", "quit", "Quit"),
@@ -54,8 +55,6 @@ class EasyCoinApp(App):
     ]
 
     network_connected = reactive(False)
-    active_trustnet_id = reactive(None)
-    active_trustnet_state = reactive(None)
     sidebar_visible = reactive(False)
     wallet = reactive(None)
 
@@ -90,7 +89,6 @@ class EasyCoinApp(App):
         try:
             self.config.load()
 
-            self.active_trustnet_id = self.config.get("active_trustnet_id")
             self.sidebar_visible = self.config.get("sidebar_visible")
 
             self.log_event("EasyCoin CUI started", "INFO")
@@ -103,12 +101,6 @@ class EasyCoinApp(App):
         except Exception as e:
             self.logger.error(f"Failed to initialize app: {e}")
             self.notify(f"Initialization error: {e}", severity="error")
-
-    def watch_active_trustnet_id(
-            self, old_value: str | None, new_value: str | None
-        ) -> None:
-        """Watch `active_trustnet_id` for changes."""
-        pass
 
     def watch_sidebar_visible(self, old_value: bool, new_value: bool) -> None:
         """Watch `sidebar_visible` for changes and persist to config."""
@@ -138,6 +130,10 @@ class EasyCoinApp(App):
     def action_switch_to_network(self) -> None:
         """Switch to network screen."""
         self.switch_screen("network")
+
+    def action_switch_to_trustnet(self) -> None:
+        """Switch to trustnet screen."""
+        self.switch_screen("trustnet")
 
     def action_switch_to_settings(self) -> None:
         """Switch to settings screen."""
