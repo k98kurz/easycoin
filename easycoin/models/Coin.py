@@ -192,7 +192,7 @@ class Coin(HashedModel):
             'net_state must be bytes|None')
         value_assert(amount >= _min_coin_mint_size,
             f'amount must be >= {_min_coin_mint_size}')
-        coin = cls.create(lock, amount, net_id, nonce_offset)
+        coin = cls.create(lock, amount, net_id, net_state, nonce_offset)
         # calculate mint Txn fee overhead
         overhead = len(coin.preimage(coin.data)) + 3 + 32
         difficulty = ((amount + overhead) // 1000) + _mint_difficulty

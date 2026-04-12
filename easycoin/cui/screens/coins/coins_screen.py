@@ -20,7 +20,7 @@ class CoinsScreen(BaseScreen):
 
     BINDINGS = [
         ("f5", "refresh_coins", "Refresh"),
-        ("m", "mine_coin", "Mine a Coin"),
+        ("m", "mine_coin", "Mine Coin(s)"),
         ("c", "open_mining_config", "Configure Mining"),
     ]
 
@@ -72,7 +72,7 @@ class CoinsScreen(BaseScreen):
                 )
                 yield Button("Next →", id="btn_next_page", variant="default")
                 yield Button("Refresh", id="btn_refresh", variant="default")
-                yield Button("Mine Coin", id="btn_mine_coin", variant="primary")
+                yield Button("Mine Coin(s)", id="btn_mine_coin", variant="primary")
                 yield Button(
                     "Configure Mining",
                     id="btn_mine_config",
@@ -152,18 +152,22 @@ class CoinsScreen(BaseScreen):
 
             address = result.get("address")
             amount = result.get("amount")
+            num_coins = result.get("num_coins", 1)
+            total_amount = amount * num_coins
 
             self.app.notify(
-                f"Mining coin of {amount} EC⁻¹ with address "
+                f"Mining {num_coins} coin(s) of {amount} EC⁻¹ each "
+                f"({total_amount} total) with address "
                 f"{truncate_text(address)}",
                 severity="info"
             )
             self.log_event(
-                f"Mine coin requested: amount={amount}, address={address}",
+                f"Mine coin requested: amount={amount}, num_coins={num_coins}, "
+                f"address={address}",
                 "INFO"
             )
 
-            self._mine_coin(address, amount)
+            self._mine_coin(address, amount, num_coins)
 
         self.app.push_screen(MineCoinModal(), on_mine_params)
 
@@ -301,9 +305,10 @@ class CoinsScreen(BaseScreen):
         )
 
     @work(exclusive=True)
-    async def _mine_coin(self, address: str, amount: int) -> None:
+    async def _mine_coin(self, address: str, amount: int, num_coins: int = 1) -> None:
         lock = Address.parse(address)
-        submit_mine_job(lock, amount, 1)
+        total_amount = amount * num_coins
+        submit_mine_job(lock, total_amount, num_coins)
         result = await work_mine_job()
         if result is None:
             self.app.log_event("work_mine_job() returned None", "WARNING")
@@ -336,8 +341,6 @@ class CoinsScreen(BaseScreen):
 
         # create a txn for each coin
         for c in new_coins:
-            if type(c.net_state) is not bytes:
-                c.net_state = None
             c.id = c.generate_id(c.data)
             if self.app.wallet:
                 c.wallet_id = self.app.wallet.id
