@@ -25,3 +25,5 @@ _empty = packify.pack({})
 
 # network
 _default_port = 9876
+_max_part_size = 62000 # comfortably fits into a single netaio Message
+_max_sequence_size = 100

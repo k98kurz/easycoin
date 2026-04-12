@@ -3,5 +3,5 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import easycoin
-from easycoin import constants, models, gameset
+from easycoin import cache, constants, models, gameset, sequence
 import easycoin.cryptoworker as cryptoworker
