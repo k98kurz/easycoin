@@ -265,7 +265,7 @@ of that was rewritten before being published anyway.
 
 ## Testing
 
-This project contains 81 tests, most of them unit tests but some integration
+This project contains 96 tests, most of them unit tests but some integration
 tests.
 
 To set up, clone the repository and run the following:

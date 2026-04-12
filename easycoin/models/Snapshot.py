@@ -37,7 +37,10 @@ class Snapshot(HashedModel):
             cls, net_id: str, chunks: list[str] = [], params: bytes = b'',
             timestamp: int = 0
         ) -> Snapshot:
-        """"""
+        """Creates a new Snapshot. Stores chunk IDs as comma-separated
+            string, uses current time if timestamp is 0, and calculates
+            state commitment automatically.
+        """
         type_assert(type(net_id) is str, 'net_id must be str')
         type_assert(type(chunks) is list, 'chunks must be list[str]')
         type_assert(all([type(c) is str for c in chunks]),
@@ -48,7 +51,7 @@ class Snapshot(HashedModel):
             'net_id': net_id,
             'params': params,
             'timestamp': timestamp or int(time()),
-            'chunk_ids': ','.join(chunks),
+            'chunk_ids': ','.join(sorted(chunks)),
         })
         snapshot.state = snapshot.calculate_state()
         return snapshot

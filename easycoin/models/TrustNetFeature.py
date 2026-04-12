@@ -3,6 +3,14 @@ from enum import IntEnum
 
 
 class TrustNetFeature(IntEnum):
+    """Features enabled for a TrustNet. These flags control which chunk
+        types are included in snapshots and which validation locks are
+        enforced. `SNAPSHOT_*` refers to the allowable `ChunkKinds` that
+        can be included in Snapshots. `LOCK_*` refers to where the
+        `TrustNet.lock` is enforced. `RESERVED*` are reserved for
+        forward-compatibility. `PROOFS` and `MUTATIONS` will be used in
+        future updates.
+    """
     SNAPSHOT_OUTPUTS = 1
     SNAPSHOT_INPUTS = 2
     SNAPSHOT_TXNS = 4

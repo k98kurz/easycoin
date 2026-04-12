@@ -1,5 +1,10 @@
 from __future__ import annotations
 from easycoin.errors import type_assert, value_assert
+from .Coin import Coin
+from .Input import Input
+from .Output import Output
+from .TrustNetFeature import TrustNetFeature
+from .Txn import Txn
 from enum import IntEnum
 from merkleasy import Tree
 from sqloquent import HashedModel, RelatedModel, RelatedCollection
@@ -12,6 +17,12 @@ _empty_tuple = packify.pack(tuple())
 
 
 class ChunkKind(IntEnum):
+    """Types of data chunks for TrustNet snapshots. Chunks store Merkle
+        tree commitments to data sets that are checkpointed by snapshots.
+        OUTPUTS and INPUTS are for UTXOSet management; TXNS is obvious;
+        PROOFS and MUTATIONS are for forward-compatibility with yet unplanned
+        updates; OTHER is for more general, non-Snapshot/non-TrustNet use.
+    """
     OUTPUTS = 0
     INPUTS = 1
     TXNS = 2
@@ -27,7 +38,7 @@ class Chunk(HashedModel):
     columns: tuple[str] = ('id', 'net_id', 'idx', 'kind', 'root', 'parent_ids', 'leaves')
     columns_excluded_from_hash = ('leaves',)
     id: str
-    net_id: str
+    net_id: str|None
     idx: int
     kind: int
     root: bytes
@@ -65,7 +76,7 @@ class Chunk(HashedModel):
             'leaves must be list[bytes]')
         value_assert(len(val) <= _max_leaves,
             f'maximum number of leaves is {_max_leaves}')
-        packed = packify.pack(tuple(val))
+        packed = packify.pack(tuple(sorted(val)))
         value_assert(len(packed) <= _max_chunk_size,
             f'maximum chunk size is {_max_chunk_size}; {len(packed)} is too large')
         self.data['leaves'] = packify.pack(tuple(val))
@@ -80,13 +91,13 @@ class Chunk(HashedModel):
 
     @classmethod
     def create(
-            cls, net_id: str, idx: int, kind: ChunkKind, leaves: list[bytes],
+            cls, net_id: str|None, idx: int, kind: ChunkKind, leaves: list[bytes],
             parents: list[str] = []
         ) -> Chunk:
         """Create a Chunk from the required columns/fields. Raises
             `TypeError` for invalid arguments.
         """
-        type_assert(type(net_id) is str, 'net_id must be str')
+        type_assert(type(net_id) in (str, type(None)), 'net_id must be str|None')
         type_assert(type(idx) is int, 'idx must be int')
         type_assert(type(kind) is ChunkKind, 'kind must be ChunkKind')
         type_assert(type(leaves) in (list, tuple), 'leaves must be list[bytes]')
@@ -99,4 +110,105 @@ class Chunk(HashedModel):
         c.leaves = leaves
         c.parent_ids = ','.join(parents)
         return c
+
+    def validate(self, debug: str|bool = False) -> bool:
+        """Validates a chunk by recalculating the Merkle root and chunk
+            id. If the `.trustnet` can be loaded from the database, it
+            will also check to ensure the `chunk.kind` is allowed by the
+            `self.trustnet.features` flags. If `debug` is set, debug
+            error messages will be printed on validation failure.
+        """
+        if self.trustnet:
+            kind_feature_map = {
+                ChunkKind.OUTPUTS: TrustNetFeature.SNAPSHOT_OUTPUTS,
+                ChunkKind.INPUTS: TrustNetFeature.SNAPSHOT_INPUTS,
+                ChunkKind.TXNS: TrustNetFeature.SNAPSHOT_TXNS,
+                ChunkKind.PROOFS: TrustNetFeature.SNAPSHOT_PROOFS,
+                ChunkKind.MUTATIONS: TrustNetFeature.SNAPSHOT_MUTATIONS,
+            }
+            features = self.trustnet.features
+
+            if self.kind not in kind_feature_map:
+                if debug:
+                    print(f'{debug}: {self.kind} is not supported')
+                return False
+
+            if kind_feature_map[self.kind] not in features:
+                if debug:
+                    print(f'{debug}: {self.kind} not allowed by {features}')
+                return False
+
+        calculated_root = Tree.from_leaves(self.leaves).root
+        if calculated_root != self.root:
+            if debug:
+                print(f'{debug}: {calculated_root.hex()} != {self.root.hex()}')
+            return False
+
+        return True
+
+    def apply(self) -> tuple[int, list[Exception]]:
+        """Attempt to apply the Chunk to the local database. Returns the
+            number of records processed successfully and any errors
+            encountered.
+        """
+        if not self.validate():
+            return 0, [ValueError("cannot apply an invalid Chunk")]
+
+        count, errors = 0, []
+
+        if self.kind == ChunkKind.OUTPUTS:
+            for leaf in self.leaves:
+                try:
+                    o = Output.unpack(leaf)
+                    o.save()
+                    count += 1
+                except Exception as e:
+                    errors.append(e)
+
+        if self.kind == ChunkKind.INPUTS:
+            for leaf in self.leaves:
+                try:
+                    i = Input.unpack(leaf)
+                    i.save()
+                    count += 1
+                    if Output.find(i.id):
+                        Output.query({'id': i.id}).delete()
+                        count += 1
+                    if Coin.find(i.id):
+                        Coin.query({'id': i.id}).update({'spent': True})
+                        count += 1
+                except Exception as e:
+                    errors.append(e)
+
+        if self.kind == ChunkKind.TXNS:
+            for leaf in self.leaves:
+                try:
+                    t = Txn.unpack(leaf)
+                except Exception as e:
+                    errors.append(e)
+                    continue
+
+                for coin in t.inputs:
+                    try:
+                        coin.spent = True
+                        coin.save()
+                        count += 1
+                    except Exception as e:
+                        errors.append(e)
+
+                for coin in t.outputs:
+                    try:
+                        coin.spent = False
+                        coin.save()
+                        count += 1
+                    except Exception as e:
+                        errors.append(e)
+
+                try:
+                    t.save()
+                    count += 1
+                except Exception as e:
+                    errors.append(e)
+
+        return count, errors
 
