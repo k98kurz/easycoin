@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Any, Callable
 from crossconfig import get_config
-from easycoin.constants import _default_port
+from easycoin.constants import DEFAULT_PORT
 from easycoin.cryptoworker import set_mining_pool_size
 
 
@@ -66,7 +66,7 @@ _schema = {
                 f"Invalid network port: {v}. Must be between 1 and 65535"
             )
         ),
-        "default": _default_port,
+        "default": DEFAULT_PORT,
     },
     "app_mode": {
         "validator": (

@@ -5,7 +5,7 @@ from sqloquent import HashedModel, Default, RelatedCollection, RelatedModel
 from tapehash import tapehash3, work, calculate_difficulty
 from tapescript import Script
 from time import time
-from easycoin.constants import _mint_difficulty, _min_coin_mint_size, _max_stamp_size
+from easycoin.constants import MINT_DIFFICULTY, MIN_COIN_MINT_SIZE, MAX_STAMP_SIZE
 import packify
 
 
@@ -81,8 +81,8 @@ class Coin(HashedModel):
             self.data['details'] = None
             return
         val = packify.pack(val)
-        value_assert(len(val) <= _max_stamp_size,
-            f'serialized details exceed limit of {_max_stamp_size}')
+        value_assert(len(val) <= MAX_STAMP_SIZE,
+            f'serialized details exceed limit of {MAX_STAMP_SIZE}')
         self.data['details'] = val
 
     @property
@@ -110,7 +110,7 @@ class Coin(HashedModel):
 
     def check_size(self) -> bool:
         """Returns True if the serialized details are not too large."""
-        return len(packify.pack(self.details)) < _max_stamp_size
+        return len(packify.pack(self.details)) < MAX_STAMP_SIZE
 
     @property
     def net_id_bytes(self) -> bytes:
@@ -151,11 +151,11 @@ class Coin(HashedModel):
         """Calculates the mint value of the coin (if it has one)."""
         val = tapehash3(bytes.fromhex(self.generate_id(self.data)))
         val = calculate_difficulty(val)
-        if val < _mint_difficulty:
+        if val < MINT_DIFFICULTY:
             return 0
-        if (val - _mint_difficulty) * 1000 < _min_coin_mint_size:
+        if (val - MINT_DIFFICULTY) * 1000 < MIN_COIN_MINT_SIZE:
             return 0
-        return (val - _mint_difficulty) * 1000
+        return (val - MINT_DIFFICULTY) * 1000
 
     @classmethod
     def create(
@@ -179,7 +179,7 @@ class Coin(HashedModel):
 
     @classmethod
     def mine(
-            cls, lock: bytes|Script, amount: int = _min_coin_mint_size,
+            cls, lock: bytes|Script, amount: int = MIN_COIN_MINT_SIZE,
             net_id: str|None = None, net_state: bytes|None = None,
             nonce_offset: int = 0
         ) -> Coin:
@@ -190,12 +190,12 @@ class Coin(HashedModel):
             'net_id must be str|None')
         type_assert(type(net_state) in (bytes, type(None)),
             'net_state must be bytes|None')
-        value_assert(amount >= _min_coin_mint_size,
-            f'amount must be >= {_min_coin_mint_size}')
+        value_assert(amount >= MIN_COIN_MINT_SIZE,
+            f'amount must be >= {MIN_COIN_MINT_SIZE}')
         coin = cls.create(lock, amount, net_id, net_state, nonce_offset)
         # calculate mint Txn fee overhead
         overhead = len(coin.preimage(coin.data)) + 3 + 32
-        difficulty = ((amount + overhead) // 1000) + _mint_difficulty
+        difficulty = ((amount + overhead) // 1000) + MINT_DIFFICULTY
         work(coin, lambda c: bytes.fromhex(c.generate_id(c.data)), difficulty, tapehash3)
         return coin
 

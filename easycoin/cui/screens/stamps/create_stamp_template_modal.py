@@ -9,7 +9,7 @@ from textual.widgets import (
     Button, Static, Input, RadioSet, RadioButton, Checkbox, Footer, OptionList
 )
 from textual.widgets.option_list import Option
-from easycoin.constants import _max_detail_icon_size
+from easycoin.constants import MAX_DETAIL_ICON_SIZE
 from easycoin.models import StampTemplate, Txn, StampType
 from easycoin.cui.widgets import ECTextArea, InputModal, OptionModal
 from easycoin.cui.widgets.file_picker_modal import FilePickerModal
@@ -147,7 +147,7 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
                         yield Input(
                             id="details_icon",
                             placeholder="Base64 encoded image (max "
-                            f"{_max_detail_icon_size:,} bytes)",
+                            f"{MAX_DETAIL_ICON_SIZE:,} bytes)",
                         )
 
             yield Static("Data-script-hash: ...", id="dsh", classes="mt-1 text-bold")
@@ -361,14 +361,14 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
             try:
                 data = filepath.read_bytes()
 
-                if len(data) > _max_detail_icon_size:
+                if len(data) > MAX_DETAIL_ICON_SIZE:
                     self.app.notify(
-                        f"Icon must be ≤{_max_detail_icon_size:,} bytes",
+                        f"Icon must be ≤{MAX_DETAIL_ICON_SIZE:,} bytes",
                         severity="error"
                     )
                     self.app.log_event(
                         "Import validation error: icon exceeds "
-                        f"{_max_detail_icon_size:,} bytes ({len(data):,} bytes)",
+                        f"{MAX_DETAIL_ICON_SIZE:,} bytes ({len(data):,} bytes)",
                         "WARNING"
                     )
                     return
@@ -476,8 +476,8 @@ class CreateStampTemplateModal(ModalScreen[bool|None]):
                     icon_bytes = base64.b64decode(details_icon, validate=True)
                 except Exception as e:
                     raise ValueError(f"Invalid base64 icon: {e}")
-                if len(icon_bytes) > _max_detail_icon_size:
-                    raise ValueError(f"Icon must be ≤{_max_detail_icon_size:,} bytes")
+                if len(icon_bytes) > MAX_DETAIL_ICON_SIZE:
+                    raise ValueError(f"Icon must be ≤{MAX_DETAIL_ICON_SIZE:,} bytes")
                 if get_image_type(icon_bytes) is None:
                     raise ValueError(
                         "Unsupported icon format (supported: PNG, JPEG, GIF, WebP)"

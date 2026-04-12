@@ -11,7 +11,7 @@ from textual.widgets.option_list import Option
 from textual.widgets.data_table import RowKey
 from secrets import token_hex
 from easycoin.models import Address, Coin, StampTemplate
-from easycoin.constants import _max_stamp_size
+from easycoin.constants import MAX_STAMP_SIZE
 from easycoin.helpers import format_balance, format_amount, truncate_text
 from easycoin.cui.widgets import InputModal, ConfirmationModal, FilePickerModal
 
@@ -446,10 +446,10 @@ class EditOutputModal(ModalScreen[dict|None]):
                     data = f.read()
 
                 # check file size with serialization overhead
-                if len(data) > _max_stamp_size - 20:
+                if len(data) > MAX_STAMP_SIZE - 20:
                     self.notify(
                         f"File too large ({format_amount(len(data), exact=True)}"
-                        f" > {format_amount(_max_stamp_size-20, exact=True)})",
+                        f" > {format_amount(MAX_STAMP_SIZE-20, exact=True)})",
                         severity="warning"
                     )
                     return

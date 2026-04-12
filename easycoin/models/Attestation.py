@@ -3,10 +3,8 @@ from .TrustNet import TrustNet
 from .TrustNetFeature import TrustNetFeature
 from easycoin.errors import type_assert, value_assert
 from sqloquent import HashedModel, RelatedModel, RelatedCollection
+from tapescript import run_auth_scripts
 import packify
-
-
-_empty_list = packify.pack([])
 
 
 class Attestation(HashedModel):

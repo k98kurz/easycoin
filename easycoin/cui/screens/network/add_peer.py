@@ -4,7 +4,7 @@ from textual.binding import Binding
 from textual.containers import Vertical, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Static, Input, Button, Footer
-from easycoin.constants import _default_port
+from easycoin.constants import DEFAULT_PORT
 
 
 class AddPeerModal(ModalScreen[bool]):
@@ -162,7 +162,7 @@ class AddPeerModal(ModalScreen[bool]):
         """Normalize address by appending default port if not present."""
         if ":" not in address:
             addr_part = address.strip()
-            return f"{addr_part}:{_default_port}"
+            return f"{addr_part}:{DEFAULT_PORT}"
 
         parts = address.split(":")
         if len(parts) != 2:

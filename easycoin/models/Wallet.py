@@ -1,5 +1,6 @@
 from __future__ import annotations
 from easycoin.errors import type_assert, value_assert
+from easycoin.constants import EMPTY_DICT
 from .Address import Address
 from hashlib import sha256, pbkdf2_hmac
 from nacl.bindings import crypto_core_ed25519_scalar_mul, crypto_scalarmult_ed25519
@@ -29,9 +30,6 @@ from tapescript.tools import _make_graftap_committed_script
 import os
 import packify
 import struct
-
-
-_empty_dict = packify.pack({})
 
 
 class Wallet(HashedModel):
@@ -66,7 +64,7 @@ class Wallet(HashedModel):
         """Dict mapping (nonce, child_nonce) to bytes(VerifyKey).
             Serialized by packify for ease of database persistence.
         """
-        return packify.unpack(self.data.get('pubkeys', None) or _empty_dict)
+        return packify.unpack(self.data.get('pubkeys', None) or EMPTY_DICT)
     @pubkeys.setter
     def pubkeys(self, val: dict[tuple[int, int|None], bytes]):
         type_assert(isinstance(val, dict),
@@ -85,7 +83,7 @@ class Wallet(HashedModel):
         """Dict mapping locks to secrets necessary for opening them.
             Intended for use with adapter signatures and HTLCs.
         """
-        return packify.unpack(self.data.get('secrets', None) or _empty_dict)
+        return packify.unpack(self.data.get('secrets', None) or EMPTY_DICT)
     @secrets.setter
     def secrets(self, val: dict[bytes, bytes]):
         type_assert(isinstance(val, dict), 'secrets must be dict[bytes, bytes]')

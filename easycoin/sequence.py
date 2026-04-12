@@ -4,7 +4,7 @@ from merkleasy import Tree
 from sqloquent import SqlModel
 from easycoin.cache import LRUCache, CacheKind
 from easycoin.config import get_config_manager
-from easycoin.constants import _max_part_size, _max_sequence_size
+from easycoin.constants import MAX_PART_SIZE, MAX_SEQUENCE_SIZE
 import packify
 
 
@@ -21,15 +21,15 @@ class Part:
         return hash((self.record_type, self.record_id, self.idx))
 
     def validate(self) -> bool:
-        """Validate the Part. Returns False if `idx` is < 0 or > 
-            `_max_sequence_size`, or if the blob size exceeds
-            `_max_part_size`, or if the Merkle Tree inclusion proof
+        """Validate the Part. Returns False if `idx` is < 0 or >
+            `MAX_SEQUENCE_SIZE`, or if the blob size exceeds
+            `MAX_PART_SIZE`, or if the Merkle Tree inclusion proof
             fails verification.
         """
         return (
             self.idx >= 0
-            and self.idx <= _max_sequence_size
-            and len(self.blob) <= _max_part_size
+            and self.idx <= MAX_SEQUENCE_SIZE
+            and len(self.blob) <= MAX_PART_SIZE
             and Tree.verify(self.root, self.blob, self.proof)
         )
 
@@ -66,7 +66,7 @@ class Sequence:
             and len(self.root) == 32
             and type(self.count) is int
             and self.count > 0
-            and self.count <= _max_sequence_size
+            and self.count <= MAX_SEQUENCE_SIZE
         )
 
     def has_part(self, idx: int) -> bool:
@@ -136,8 +136,8 @@ def prepare_sequence(record: packify.Packable) -> Sequence:
     leaves, parts = [], {}
     i = 0
     while i < len(blob):
-        leaves.append(blob[i:i+_max_part_size])
-        i += _max_part_size
+        leaves.append(blob[i:i+MAX_PART_SIZE])
+        i += MAX_PART_SIZE
 
     if len(leaves) == 1:
         tree = Tree.from_leaves([leaves[0], b''])

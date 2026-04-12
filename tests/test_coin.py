@@ -71,7 +71,7 @@ class TestCoin(unittest.TestCase):
     def test_details_property_raises_ValueError_for_details_over_max_size(self):
         c = models.Coin()
         with self.assertRaises(ValueError):
-            c.details = {'1': '0' * (constants._max_stamp_size + 1)}
+            c.details = {'1': '0' * (constants.MAX_STAMP_SIZE + 1)}
 
     def test_create_result_id_depends_on_arguments(self):
         c1 = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 9999)

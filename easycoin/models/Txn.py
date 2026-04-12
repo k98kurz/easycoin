@@ -2,18 +2,18 @@ from __future__ import annotations
 from .Coin import Coin
 from easycoin.errors import type_assert, value_assert
 from easycoin.constants import (
-    _witfee_mult,
-    _witfee_exp,
-    _outcountfee_mult,
-    _outcountfee_exp,
-    _outfee_mult,
-    _outfee_exp,
-    _infee_mult,
-    _infee_exp,
-    _outscriptfee_mult,
-    _outscriptfee_exp,
-    _max_txn_size,
-    _empty,
+    WITFEE_MULT,
+    WITFEE_EXP,
+    OUTCOUNTFEE_MULT,
+    OUTCOUNTFEE_EXP,
+    OUTFEE_MULT,
+    OUTFEE_EXP,
+    INFEE_MULT,
+    INFEE_EXP,
+    OUTSCRIPTFEE_MULT,
+    OUTSCRIPTFEE_EXP,
+    MAX_TXN_SIZE,
+    EMPTY_DICT,
 )
 from hashlib import sha256
 from sqloquent import HashedModel, RelatedCollection, RelatedModel
@@ -88,7 +88,7 @@ class Txn(HashedModel):
             `TypeError` for non-dict values or `packify.UsageError` if a
             type not serializable via packify is used in the dict.
         """
-        return packify.unpack(self.data.get('details', None) or _empty)
+        return packify.unpack(self.data.get('details', None) or EMPTY_DICT)
     @details.setter
     def details(self, val: dict|None):
         type_assert(isinstance(val, dict) or val is None,
@@ -100,7 +100,7 @@ class Txn(HashedModel):
         """Witness data dict mapping bytes `coin.id` to bytes witness
             script (tapescript byte code).
         """
-        return packify.unpack(self.data.get('witness', None) or _empty)
+        return packify.unpack(self.data.get('witness', None) or EMPTY_DICT)
     @witness.setter
     def witness(self, val: dict[bytes, bytes]):
         type_assert(isinstance(val, dict),
@@ -141,18 +141,18 @@ class Txn(HashedModel):
     @staticmethod
     def minimum_fee(txn: Txn) -> int:
         """Calculates the minimum burn required for the transaction."""
-        witlen = len(txn.data.get('witness', None) or _empty)
-        witfee = int(witlen * _witfee_mult)
-        witfee = int(witfee ** _witfee_exp)
+        witlen = len(txn.data.get('witness', None) or EMPTY_DICT)
+        witfee = int(witlen * WITFEE_MULT)
+        witfee = int(witfee ** WITFEE_EXP)
         out_count = len(txn.output_ids)
-        outcountfee = int(out_count * _outcountfee_mult)
-        outcountfee = int(outcountfee ** _outcountfee_exp)
+        outcountfee = int(out_count * OUTCOUNTFEE_MULT)
+        outcountfee = int(outcountfee ** OUTCOUNTFEE_EXP)
         out_len = sum([len(o.preimage(o.data)) for o in txn.outputs])
-        outfee = int(out_len * _outfee_mult)
-        outfee = int(outfee ** _outfee_exp)
+        outfee = int(out_len * OUTFEE_MULT)
+        outfee = int(outfee ** OUTFEE_EXP)
         in_len = sum([len(i.preimage(i.data)) for i in txn.inputs])
-        infee = int(in_len * _infee_mult)
-        infee = int(infee ** _infee_exp)
+        infee = int(in_len * INFEE_MULT)
+        infee = int(infee ** INFEE_EXP)
         return witfee + outcountfee + outfee + infee
 
     def validate(self, debug: bool|str = False, reload: bool = True) -> bool:
@@ -172,8 +172,8 @@ class Txn(HashedModel):
             self.outputs().reload()
 
         # reject large txns
-        if len(self.pack()) > _max_txn_size:
-            print(f'txn > _max_txn_size ({debug})') if debug else ''
+        if len(self.pack()) > MAX_TXN_SIZE:
+            print(f'txn > MAX_TXN_SIZE ({debug})') if debug else ''
             return False
 
         # minting Txn is a special case

@@ -138,7 +138,7 @@ def truncate_text(text: str, prefix_len: int = 16, suffix_len: int = 8) -> str:
 
 def estimate_fee_for_witness(lock_type: str, extra_script_len: int = 0) -> int:
     """Estimate the required fee for a witness type. Assumes unchanged
-        `_witfee_mult` and `_witfee_exp` from the `Txn` model file.
+        `WITFEE_MULT` and `WITFEE_EXP` from the `Txn` model file.
     """
     if extra_script_len < 256:
         wlen = extra_script_len

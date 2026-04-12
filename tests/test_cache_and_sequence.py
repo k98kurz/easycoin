@@ -102,8 +102,8 @@ class TestCacheAndSequence(unittest.TestCase):
         )
         assert part.validate()
         assert part.idx >= 0
-        assert part.idx <= constants._max_sequence_size
-        assert len(part.blob) <= constants._max_part_size
+        assert part.idx <= constants.MAX_SEQUENCE_SIZE
+        assert len(part.blob) <= constants.MAX_PART_SIZE
 
     def test_Part_validate_rejects_invalid_idx(self):
         tree = Tree.from_leaves([b'test_data', b''])
@@ -112,11 +112,11 @@ class TestCacheAndSequence(unittest.TestCase):
             'Coin', 'test_id', -1, tree.root, proof, b'test_data'
         )
         assert not part.validate()
-        part.idx = constants._max_sequence_size + 1
+        part.idx = constants.MAX_SEQUENCE_SIZE + 1
         assert not part.validate()
 
     def test_Part_validate_rejects_oversized_blob(self):
-        blob = b'x' * (constants._max_part_size + 1)
+        blob = b'x' * (constants.MAX_PART_SIZE + 1)
         tree = Tree.from_leaves([blob, b''])
         proof = tree.prove(blob)
         part = sequence.Part(
@@ -165,7 +165,7 @@ class TestCacheAndSequence(unittest.TestCase):
         assert len(seq.root) == 32
         assert type(seq.count) is int
         assert seq.count > 0
-        assert seq.count <= constants._max_sequence_size
+        assert seq.count <= constants.MAX_SEQUENCE_SIZE
 
     def test_Sequence_validate_rejects_invalid_data(self):
         seq = sequence.Sequence('', 'test_id', b'0' * 32, 1)
@@ -182,7 +182,7 @@ class TestCacheAndSequence(unittest.TestCase):
         assert seq.validate()
         seq.count = 0
         assert not seq.validate()
-        seq.count = constants._max_sequence_size + 1
+        seq.count = constants.MAX_SEQUENCE_SIZE + 1
         assert not seq.validate()
 
     def test_Sequence_has_part_and_get_part(self):

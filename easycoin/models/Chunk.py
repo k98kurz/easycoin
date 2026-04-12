@@ -1,5 +1,6 @@
 from __future__ import annotations
 from easycoin.errors import type_assert, value_assert
+from easycoin.constants import EMPTY_TUPLE, MAX_CHUNK_LEAVES, MAX_CHUNK_SIZE
 from .Coin import Coin
 from .Input import Input
 from .Output import Output
@@ -9,11 +10,6 @@ from enum import IntEnum
 from merkleasy import Tree
 from sqloquent import HashedModel, RelatedModel, RelatedCollection
 import packify
-
-
-_max_leaves = 1024
-_max_chunk_size = 60 * _max_leaves # 61440
-_empty_tuple = packify.pack(tuple())
 
 
 class ChunkKind(IntEnum):
@@ -63,22 +59,22 @@ class Chunk(HashedModel):
             root to the new Merkle tree root. Setting raises `TypeError`
             if setting to something other than `list[bytes]` or
             `ValueError` if the number of leaves exceeds the
-            `_max_leaves` (default 256) or if the serialized bytes size
-            exceeds `_max_chunk_size` (default 240*256). (These constraints
+            `MAX_CHUNK_LEAVES` (default 256) or if the serialized bytes size
+            exceeds `MAX_CHUNK_SIZE` (default 240*256). (These constraints
             are intended to make sure an individual chunk can fit within
             a UDP datagram.
         """
-        return packify.unpack(self.data.get('leaves', None) or _empty_tuple)
+        return packify.unpack(self.data.get('leaves', None) or EMPTY_TUPLE)
     @leaves.setter
     def leaves(self, val: list[bytes]):
         type_assert(type(val) is list, 'leaves must be list[bytes]')
         type_assert(all([type(v) is bytes for v in val]),
             'leaves must be list[bytes]')
-        value_assert(len(val) <= _max_leaves,
-            f'maximum number of leaves is {_max_leaves}')
+        value_assert(len(val) <= MAX_CHUNK_LEAVES,
+            f'maximum number of leaves is {MAX_CHUNK_LEAVES}')
         packed = packify.pack(tuple(sorted(val)))
-        value_assert(len(packed) <= _max_chunk_size,
-            f'maximum chunk size is {_max_chunk_size}; {len(packed)} is too large')
+        value_assert(len(packed) <= MAX_CHUNK_SIZE,
+            f'maximum chunk size is {MAX_CHUNK_SIZE}; {len(packed)} is too large')
         self.data['leaves'] = packify.pack(tuple(val))
         self.data['root'] = Tree.from_leaves(val).root
 
