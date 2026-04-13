@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Footer, Static, TextArea
+from textual.widgets import Button, Footer, Static
 from tapescript import Script
 from easycoin.cui.widgets import ECTextArea
 
@@ -54,8 +54,8 @@ class DelegateScriptModal(ModalScreen[str | None]):
         self.query_one("#error_display").add_class("hidden")
         self.query_one("#script_textarea").focus()
 
-    @on(TextArea.Changed, "#script_textarea")
-    def on_script_textarea_changed(self, event: TextArea.Changed) -> None:
+    @on(ECTextArea.Changed, "#script_textarea")
+    def on_script_textarea_changed(self, event: ECTextArea.Changed) -> None:
         """Validate tapescript source on text change."""
         script_src = event.text_area.text.strip()
         try:

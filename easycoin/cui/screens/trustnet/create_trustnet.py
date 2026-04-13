@@ -5,7 +5,9 @@ from textual.containers import (
     Horizontal, ItemGrid, Vertical, VerticalScroll
 )
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, DataTable, Footer, Input, Static
+from textual.widgets import (
+    Button, Checkbox, DataTable, Footer, Input, Static
+)
 from tapescript import Script
 from .delegate_script_modal import DelegateScriptModal
 from easycoin.models import TrustNet, TrustNetFeature, Address
@@ -29,6 +31,7 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
         super().__init__()
         self.members_data: dict[str, str] = {}
         self.feature_flags: set[TrustNetFeature] = set()
+        self.lock_script_error: str | None = None
 
     def compose(self) -> ComposeResult:
         """Compose modal layout."""
@@ -104,14 +107,18 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
         self.query_one("#btn_edit_delegation").disabled = not has_selection
 
     @on(ECTextArea.Changed, "#lock_script")
-    def _lock_changed(self) -> None:
-        src = self.query_one("#lock_script").text.strip()
+    def _lock_changed(self, event: ECTextArea.Changed) -> None:
+        src = event.text_area.text.strip()
         error_display = self.query_one("#error_display")
         try:
             Script.from_src(src)
+            self.lock_script_error = None
             error_display.add_class("hidden")
-        except Exception as e:
-            error_display.update(f"tapescript compilation error: {e}")
+        except BaseException as e:
+            self.lock_script_error = f"{type(e).__name__}: {e}"
+            error_display.update(
+                f"tapescript compilation error: {self.lock_script_error}"
+            )
             error_display.remove_class("hidden")
 
     @on(Button.Pressed, "#btn_add_member")
@@ -228,10 +235,8 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
         if not lock_src:
             return False, "Lock script is required"
 
-        try:
-            Script.from_src(lock_src)
-        except Exception as e:
-            return False, f"Invalid lock script: {e}"
+        if self.lock_script_error:
+            return False, f"Invalid lock script: {self.lock_script_error}"
 
         quorum_input = self.query_one("#quorum_input").value.strip()
         quorum = 0

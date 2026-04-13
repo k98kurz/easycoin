@@ -8,7 +8,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 from tapescript import Script, make_scripthash_lock
-from easycoin.cui.widgets import SigflagsModal
+from easycoin.cui.widgets import SigflagsModal, ECTextArea
 
 
 class MakeAddressModal(Screen):
@@ -89,7 +89,7 @@ class MakeAddressModal(Screen):
                     "[bold]Custom Script:[/bold] (be careful not to create a "
                     "broken lock/unspendable address)", classes="mb-1"
                 )
-                yield TextArea( "", id="custom_script")
+                yield ECTextArea( "", id="custom_script")
 
             with Vertical(classes="mt-1 h-auto"):
                 yield Static("Locking Script:", classes="text-bold mb-1")
@@ -167,8 +167,8 @@ class MakeAddressModal(Screen):
                     pass
             self._update_preview()
 
-    @on(TextArea.Changed, "#custom_script")
-    def on_custom_script_changed(self, event: TextArea.Changed) -> None:
+    @on(ECTextArea.Changed, "#custom_script")
+    def on_custom_script_changed(self, event: ECTextArea.Changed) -> None:
         """Handle custom script input changes."""
         self.custom_script_src = event.text_area.text.strip()
         self._update_preview()
