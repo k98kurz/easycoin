@@ -15,13 +15,20 @@ Once all other issues are complete, prepare to release the next version.
 
 - [ ] Review and update docstrings
   - [ ] `models/*.py`
-  - [ ] `asyncql/*.py`
+  - [ ] `cache.py`
+  - [ ] `config.py`
   - [ ] `cryptoworker.py`
+  - [ ] `gameset.py`
+  - [ ] `helpers.py`
   - [ ] `node.py`
+  - [ ] `sequence.py`
+  - [ ] `state.py`
   - [ ] `UTXOSet.py`
-- [ ] Update dox.md
 - [ ] Update readme.md
 - [ ] Update changelog.md
+- [ ] Update docs/
+  - models.md
+  - network.md
 - [ ] Review and finalize documentation
 - [ ] Ensure version strings are set to `'M.m.p'`
   - `version.py`

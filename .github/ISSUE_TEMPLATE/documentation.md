@@ -17,7 +17,8 @@ assignees: k98kurz
 <!-- Below are examples. Overwrite as needed. -->
 
 - readme.md: 
-- dox.md: 
+- docs/models.md: 
+- docs/network.md: 
 
 ## Discrepancies from Documentation Encountered
 
