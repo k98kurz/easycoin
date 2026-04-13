@@ -2,14 +2,14 @@ from tapescript import Script
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, VerticalScroll, Horizontal
+from textual.containers import Container, Vertical, VerticalScroll, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button, Static, Input, Footer, Checkbox, OptionList, DataTable
 )
 from textual.widgets.option_list import Option
 from textual.widgets.data_table import RowKey
-from secrets import token_hex
+from secrets import token_hex, randbelow
 from easycoin.models import Address, Coin, StampTemplate
 from easycoin.constants import MAX_STAMP_SIZE
 from easycoin.helpers import format_balance, format_amount, truncate_text
@@ -54,6 +54,7 @@ class EditOutputModal(ModalScreen[dict|None]):
         self._stamp_input_options = []
         self._stamp_template_options = []
         self._custom_details_rows: tuple[RowKey, str, [str|bytes, bool]] = []
+        self.nonce = coin.data.get('nonce', 0) if coin else 0
 
     def on_mount(self) -> None:
         """Focus address input on mount."""
@@ -62,6 +63,10 @@ class EditOutputModal(ModalScreen[dict|None]):
         self._load_stamp_inputs()
         self._setup_custom_details_table()
         self._populate_stamp_from_coin()
+        if self.coin is None:
+            self.nonce = randbelow(65536)
+            nonce_input = self.query_one("#nonce_input")
+            nonce_input.value = str(self.nonce)
 
     def compose(self) -> ComposeResult:
         """Compose edit output modal layout."""
@@ -77,20 +82,32 @@ class EditOutputModal(ModalScreen[dict|None]):
                 classes="form-input"
             )
 
-            yield Static("Amount (EC⁻¹):", classes="text-bold my-1")
-            yield Input(
-                placeholder="Enter amount", id="amount_input",
-                value=str(self.amount), classes="form-input"
-            )
-            if self.max_amount:
-                yield Static(
-                    f"Max: {format_balance(self.max_amount, exact=True)}",
-                    classes="my-1"
-                )
-                bal = format_balance(self.remaining_amount, exact=True)
-                yield Static(
-                    f"Remaining: {bal}", id="remaining_amount", classes="my-1",
-                )
+            with Horizontal(classes="h-10"):
+                with Vertical():
+                    yield Static("Amount (EC⁻¹):", classes="text-bold my-1")
+                    yield Input(
+                        placeholder="Enter amount", id="amount_input",
+                        value=str(self.amount), classes="form-input"
+                    )
+                    if self.max_amount:
+                        yield Static(
+                            f"Max: {format_balance(self.max_amount, exact=True)}",
+                            classes="my-1"
+                        )
+                        bal = format_balance(self.remaining_amount, exact=True)
+                        yield Static(
+                            f"Remaining: {bal}", id="remaining_amount",
+                            classes="my-1",
+                        )
+
+                with Vertical():
+                    yield Static("Nonce (>=0):", classes="text-bold my-1")
+                    yield Input(
+                        placeholder="Enter nonce",
+                        id="nonce_input",
+                        value=str(self.nonce),
+                        classes="form-input"
+                    )
 
             yield Checkbox("Stamp", id="is_stamp_checkbox", classes="my-1")
 
@@ -627,10 +644,27 @@ class EditOutputModal(ModalScreen[dict|None]):
                 )
                 return
 
+            nonce_str = self.query_one("#nonce_input").value.strip()
+            try:
+                nonce = int(nonce_str)
+                if not (0 <= nonce):
+                    self.app.notify(
+                        "Nonce must be >= 0",
+                        severity="warning"
+                    )
+                    return
+            except ValueError:
+                self.app.notify(
+                    "Nonce must be an integer",
+                    severity="warning"
+                )
+                return
+
             stamp_checkbox = self.query_one("#is_stamp_checkbox")
             result = {
                 'address': address,
                 'amount': amount,
+                'nonce': nonce,
                 'info': self.info,
                 'is_stamp': stamp_checkbox.value,
             }

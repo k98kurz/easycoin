@@ -74,6 +74,7 @@ class AddOutputsContainer(Vertical):
                 ("Stamp Type", "stamp_type"),
                 ("Stamp Name", "stamp_name"),
                 ("Stamp 'n'", "stamp_n"),
+                ("Nonce", "nonce"),
                 ("Address", "address"),
                 ("Output ID", "output_id"),
             )
@@ -86,12 +87,14 @@ class AddOutputsContainer(Vertical):
             stamp_type = stamp_data.get('type', '')
             stamp_name = stamp_data.get('name', '')
             stamp_n = str(coin.details.get('n', '')) if coin.details else ''
+            nonce = str(coin.data.get('nonce', 0))
             table.add_row(
                 format_balance(coin.amount, exact=True),
                 stamp_size_display,
                 stamp_type,
                 stamp_name,
                 stamp_n,
+                nonce,
                 Address({'lock': coin.lock}).hex,
                 truncate_text(coin.id),
                 key=i
@@ -158,7 +161,8 @@ class AddOutputsContainer(Vertical):
                     lock=Address.parse(result['address']),
                     amount=result['amount'],
                 )
-            
+
+            coin.nonce = result.get('nonce', 0)
             coin.wallet_id = self.app.wallet.id
             coin.id = coin.generate_id(coin.data)
             self.txn_data.txn.outputs = [
@@ -215,6 +219,8 @@ class AddOutputsContainer(Vertical):
                     coin.lock = Address.parse(result['address'])
                     coin.amount = result['amount']
                     coin.details = None
+
+                coin.nonce = result.get('nonce', 0)
                 
                 coin.wallet_id = self.app.wallet.id
                 coin.id = coin.generate_id(coin.data)
