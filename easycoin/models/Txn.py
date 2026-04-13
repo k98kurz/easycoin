@@ -250,11 +250,12 @@ class Txn(HashedModel):
                 return False
 
         # handle new stamping constraints
+        input_dsh = [c.dsh for c in self.inputs if c.details]
         for coin in self.outputs:
             if coin.details:
                 if 'L' not in coin.details:
                     continue
-                if coin.dsh in (c.dsh for c in self.inputs if c.details):
+                if coin.dsh in input_dsh:
                     continue
                 if not run_auth_scripts(
                         [

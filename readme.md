@@ -137,9 +137,7 @@ funded output:
 
 ```python
 coin.details = {
-    'id': b'32 bytes sha256 of all other details except dsh', # equivalent to "so_det" in runtime
-    'n': "Stamp note/name/nonce", # str|int|bytes
-    'dsh': b'32 bytes sha256 of data and scripts (automatically derived)',
+    'n': "Stamp note/name/number/nonce", # str|int|bytes
     # all the rest are optional
     'd': {'data': 'dictionary'}, # dict[str, str|int|bool|bytes]
     'L': tapescript.Script.from_src("<tapescript lock for new Stamps">).bytes,
@@ -147,6 +145,9 @@ coin.details = {
     '$': tapescript.Script.from_src("<tapescript coin lock postfix">).bytes,
 }
 ```
+Additionally, there are two derived values:
+- `coin.stamp_id`: 32 bytes sha256 of all details; equivalent to "so_det" in runtime
+- `coin.dsh`: 32 bytes sha256 of data (details['d']) and scripts ('L', '_', and '$')
 
 This can be done with the `Coin.stamp` method:
 
@@ -178,22 +179,27 @@ by only one output, and this is done by evaluating a default tapescript lock
 postfix during validation with the following form:
 
 ```s
-get_value s"so_len" push d1 equal_verify
-get_value s"so_det" get_value s"ii_det" equal_verify
+get_value s"so_len" dup push d1 swap2 leq verify
+if ( push d1 eq ) {
+    get_value s"so_det" get_value s"ii_det" equal_verify
+}
 ```
 
 This pulls the `"so_len"` value from the tapescript runtime onto the stack, which
-is the integer count of stamped outputs in the transaction. It then pushes the
-integer 1 onto the stack and runs `OP_EQUAL_VERIFY`, which fails if the two
-values are not equal. This is a covenant that requires that there can be only one
-stamped output in the transaction that sends this Stamp.
+is the integer count of stamped outputs in the transaction. It then duplicates it,
+pushes the integer 1 onto the stack, swaps the order, and runs `OP_LESS_OR_EQUAL`
+and `VERIFY`, which fails if `"so_len"` is not less than or equal to 1. This is a
+covenant that requires that there can be at most one stamped output in the
+transaction that sends this Stamp. (Note that this allows destroying std stamps.)
 
-It then pulls the `"so_det"` value from the tapescript runtime onto the stack,
-which is the sha256 hash of the `output_coin.details` (less 'id' and 'dsh')
-serialized with `packify.pack`; pushes the sha256 of the `input_coin.details` 
-(less 'id' and 'dsh') serialized with `packify.pack` onto the stack; then runs
-`OP_EQUAL_VERIFY`. This is a covenant that requires that the Stamp details be
-copied without alteration from the input coin to the new output coin.
+It then compares the `"so_len"` value to 1 and executes a further check if they
+are equal: it pulls the `"so_det"` value from the tapescript runtime onto the
+stack, which is the sha256 hash of the `output_coin.details` serialized with
+`packify.pack` (i.e. `output_coin.stamp_id`); pushes the sha256 of the
+`input_coin.details` serialized with `packify.pack` onto the stack (i.e.
+`input_coin.stamp_id`); then runs `OP_EQUAL_VERIFY`. This is a covenant that
+requires that the Stamp details be copied without alteration from the input coin
+to the new output coin.
 
 #### Stamps can be created in a series identified by the data-script-hash.
 
@@ -253,7 +259,11 @@ The CUI interface supports creation of unique stamps and fungible stamp series,
 and it allows experimentation with custom covenants, mint locks, and prefix
 scripts.
 
-NB: This covenant will become significantly more efficient after the tapescript
+NB: In practice, the loops are abstracted into functions defined in the prefix
+script to shave a few bytes in most use cases. Examine the Stamp Templates screen
+for the most up-to-date version of the standard scripts.
+
+NB2: This covenant will become significantly more efficient after the tapescript
 0.8.0 update changes how `OP_ADD_INTS` functions (final 2 loops will be replaced
 with `@il add_ints` and `@ol add_ints`).
 
@@ -261,15 +271,17 @@ with `@il add_ints` and `@ol add_ints`).
 
 If a stamp's details include 'L', validation of the mint transaction will
 execute that tapescript lock. This will occur only when there are no input
-stamps with the same dsh.
+stamps with the same dsh. Note that the result of executing the 'L' script should
+result in a single true value on the stack for valid stamping and anything
+else for an invalid stamping.
 
 #### The tapescript runtime cache will have the following serialized values:
 
 - `"i_len"`: int number of inputs
 - `"i_a"`: input amounts (in EC⁻¹)
 - `"si_len"`: int number of stamped inputs
-- `"si_det"`: `sha256(packify.pack(input_coin.details)).digest()` for every stamped `input_coin`
-- `"ii_det"`: `sha256(packify.pack(input_coin.details)).digest()` for current `input_coin`
+- `"si_det"`: stamp id for every stamped `input_coin`
+- `"ii_det"`: stamp id for current `input_coin`
 - `"si_dsh"`: sha256 of data and scripts in `input_coin.details` for every `input_coin`
 - `"ii_dsh"`: sha256 of data and scripts in `input_coin.details` for current `input_coin`
 - `"si_n"`: `input_coin.details['n']` for every stamped `input_coin`
@@ -277,10 +289,10 @@ stamps with the same dsh.
 - `"o_len"`: int number of outputs
 - `"o_a"`: output amounts (in EC⁻¹)
 - `"so_len"`: int number of stamped outputs
-- `"so_det"`: `sha256(packify.pack(output_coin.details)).digest()` for every stamped `output_coin`
+- `"so_det"`: stamp id for every stamped `output_coin`
 - `"so_dsh"`: sha256 of data and scripts `output_coin.details` for every stamped `output_coin`
 - `"so_n"`: `output_coin.details['n']` for every stamped `output_coin`
-- `"sigfield1"`: signature scope (e.g. 'Txn')
+- `"sigfield1"`: auth scope (i.e. b'Txn')
 - `"sigfield2"`: the current coin hash (input coin or output stamp)
 - `"sigfield3"`: sha256 of all input hashes, sorted and concatenated
 - `"sigfield4"`: sha256 of all output hashes, sorted and concatenated

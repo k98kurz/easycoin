@@ -20,6 +20,10 @@ class TopTabs(Tabs):
 
     def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
         """Handle tab activation to switch screens."""
+        if hasattr(self.app, 'screen_switching') and self.app.screen_switching:
+            event.stop()
+            return
+        
         tab_id = event.tab.id
         screen_map = {
             "tab_dashboard": "dashboard",
@@ -33,4 +37,6 @@ class TopTabs(Tabs):
         }
         screen_name = screen_map.get(tab_id)
         if screen_name:
+            self.app.screen_switching = True
             self.app.switch_screen(screen_name)
+            self.app.call_later(self.app._clear_screen_switching_flag)

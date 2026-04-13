@@ -31,13 +31,13 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/k98kurz/easycoin"
+"Homepage" = "https://pycelium.com"
 "Repository" = "https://github.com/k98kurz/easycoin"
 "Bug Tracker" = "https://github.com/k98kurz/easycoin/issues"
 
 [project.optional-dependencies]
 cui = [
-  "textual == 8.1.1",
+  "textual == 8.2.3",
 ]
 
 [project.scripts]

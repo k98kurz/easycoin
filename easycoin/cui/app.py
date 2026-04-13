@@ -56,6 +56,7 @@ class EasyCoinApp(App):
     network_connected = reactive(False)
     sidebar_visible = reactive(False)
     wallet = reactive(None)
+    screen_switching = reactive(False)
 
     def __init__(self):
         """Initialize the application."""
@@ -95,7 +96,9 @@ class EasyCoinApp(App):
             if not self.config.get("welcome_shown"):
                 self.call_later(self.action_open_help)
 
+            self.screen_switching = True
             self.push_screen("dashboard")
+            self.call_later(self._clear_screen_switching_flag)
 
         except Exception as e:
             self.logger.error(f"Failed to initialize app: {e}")
@@ -108,35 +111,55 @@ class EasyCoinApp(App):
 
     def action_switch_to_dashboard(self) -> None:
         """Switch to dashboard screen."""
+        self.screen_switching = True
         self.switch_screen("dashboard")
+        self.call_later(self._clear_screen_switching_flag)
 
     def action_switch_to_wallet(self) -> None:
         """Switch to wallet screen."""
+        self.screen_switching = True
         self.switch_screen("wallet")
+        self.call_later(self._clear_screen_switching_flag)
 
     def action_switch_to_coins(self) -> None:
         """Switch to coins screen."""
+        self.screen_switching = True
         self.switch_screen("coins")
+        self.call_later(self._clear_screen_switching_flag)
 
     def action_switch_to_transactions(self) -> None:
         """Switch to transactions screen."""
+        self.screen_switching = True
         self.switch_screen("transactions")
+        self.call_later(self._clear_screen_switching_flag)
 
     def action_switch_to_stamp_templates(self) -> None:
         """Switch to stamp templates screen."""
+        self.screen_switching = True
         self.switch_screen("stamp_templates")
+        self.call_later(self._clear_screen_switching_flag)
 
     def action_switch_to_network(self) -> None:
         """Switch to network screen."""
+        self.screen_switching = True
         self.switch_screen("network")
+        self.call_later(self._clear_screen_switching_flag)
 
     def action_switch_to_trustnet(self) -> None:
         """Switch to trustnet screen."""
+        self.screen_switching = True
         self.switch_screen("trustnet")
+        self.call_later(self._clear_screen_switching_flag)
 
     def action_switch_to_settings(self) -> None:
         """Switch to settings screen."""
+        self.screen_switching = True
         self.switch_screen("settings")
+        self.call_later(self._clear_screen_switching_flag)
+
+    def _clear_screen_switching_flag(self) -> None:
+        """Clear the screen_switching flag after a short delay."""
+        self.screen_switching = False
 
     def action_open_repl(self) -> None:
         """Open REPL modal for Python code execution."""
