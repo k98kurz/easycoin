@@ -41,15 +41,18 @@ class SelectInputsContainer(Vertical):
                     )
                 with Container(classes=""):
                     yield Static("Input Type Filter:", classes="text-bold mb-1")
-                yield OptionList(
-                    Option("All", id="all"),
-                    Option("Non-stamped", id="non_stamped"),
-                    Option("All Stamps", id="all_stamps"),
-                    Option("Images", id="images"),
-                    Option("Tokens", id="tokens"),
-                    Option("Files", id="files"),
-                    id="input_filter_selector", classes="h-5"
-                )
+                    yield OptionList(
+                        Option("All", id="all"),
+                        Option("Non-stamped", id="non_stamped"),
+                        Option("All Stamps", id="all_stamps"),
+                        Option("Images", id="images"),
+                        Option("Tokens", id="tokens"),
+                        Option("Files", id="files"),
+                        id="input_filter_selector", classes="h-5"
+                    )
+#                with Container(classes=""):
+#                    yield Static("TrustNet Filter:", classes="text-bold mb-1")
+#                    yield OptionList(id="trustnet_selector", classes="h-5")
             yield DataTable(id="inputs_table", classes="h-min-10")
             with Horizontal(classes="h-5"):
                 yield Button("View Details", id="btn_view_details", variant="default")

@@ -16,6 +16,7 @@ class BaseScreen(Screen):
 
     BINDINGS = [
         ("ctrl+r", "toggle_right_sidebar", "Sidebar"),
+        ("?", "show_help", "Help"),
     ]
 
     # Subclasses should override this to specify their tab ID
@@ -95,6 +96,12 @@ class BaseScreen(Screen):
             self.log_event(
                 "Sidebar widget not found in action_toggle_right_sidebar", "DEBUG"
             )
+
+    def action_show_help(self) -> None:
+        """Show context-sensitive help modal for current screen."""
+        from .help_modal import HelpModal
+        screen_id = "welcome" if self.TAB_ID == "tab_dashboard" else self.TAB_ID
+        self.app.push_screen(HelpModal(screen_id))
 
     def on_wallet_info_changed(self, wallet_info: dict) -> None:
         """Handle wallet info updates. Override in subclasses that need

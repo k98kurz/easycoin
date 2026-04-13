@@ -352,11 +352,13 @@ class Txn(HashedModel):
     def std_stamp_covenant() -> Script:
         """Returns the standard covenant ('$' script) for unique stamps.
             This requires that there is only one stamped output and that
-            it shares the same stamp ID.
+            it shares the same stamp ID, or that the stamp is burned.
         """
         return Script.from_src('''
-            get_value s"so_len" push d1 equal_verify
-            get_value s"so_det" get_value s"ii_det" equal_verify
+            get_value s"so_len" dup push d1 swap2 leq verify
+            if ( push d1 eq ) {
+                get_value s"so_det" get_value s"ii_det" equal_verify
+            }
         ''')
 
     @staticmethod

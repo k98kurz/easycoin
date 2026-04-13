@@ -12,10 +12,11 @@ class TrustNet(HashedModel):
     id_column: str = 'id'
     columns: tuple[str] = (
         'id', 'name', 'lock', 'params', 'delegate_scripts', 'root', 'members',
-        'quorum', 'root_witness', 'active'
+        'quorum', 'root_witness', 'active', 'state'
     )
     columns_excluded_from_hash = (
-        'delegate_scripts', 'root', 'members', 'quorum', 'root_witness', 'active'
+        'delegate_scripts', 'root', 'members', 'quorum', 'root_witness', 'active',
+        'state'
     )
     id: str
     name: str
@@ -27,6 +28,7 @@ class TrustNet(HashedModel):
     quorum: int|None
     root_witness: bytes|None
     active: bool
+    state: bytes|None
     coins: RelatedCollection
     snapshots: RelatedCollection
     outputs: RelatedCollection

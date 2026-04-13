@@ -37,6 +37,20 @@ class DashboardScreen(BaseScreen):
 
             with Vertical(id="dashboard"):
                 yield Static("Placeholder", classes="panel-title")
+                yield Static(
+                    "This is a WIP. If you have an idea for this, let me know.",
+                    classes="my-1"
+                )
                 yield Static("Network Status", classes="panel-title")
+                yield Static(
+                    "Coming soon: https://github.com/k98kurz/easycoin/issues/2",
+                    classes="my-1"
+                )
                 yield Static("Mining Status", classes="panel-title")
+                yield Static(
+                    "Also coming soon, after this: "
+                    "https://github.com/k98kurz/easycoin/issues/4",
+                    classes="my-1"
+                )
+
 

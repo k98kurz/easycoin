@@ -276,15 +276,19 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
         trustnet = TrustNet({
             'name': name,
             'lock': Script.from_src(lock_src).bytes,
-            'members': [Address.parse(addr) for addr in self.members_data.keys()],
-            'delegate_scripts': {
-                addr: Script.from_src(src).bytes
-                for addr, src in self.members_data.items()
-                if src
-            },
             'quorum': quorum,
             'active': True,
         })
+        if len(self.members_data) > 1:
+            trustnet.members = [
+                Address.parse(addr)
+                for addr in self.members_data.keys()
+            ]
+        trustnet.delegate_scripts = {
+            addr: Script.from_src(src).bytes
+            for addr, src in self.members_data.items()
+            if src
+        }
         trustnet.features = self.feature_flags
         trustnet.save()
 

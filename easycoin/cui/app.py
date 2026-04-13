@@ -13,7 +13,7 @@ from easycoin.cui.screens.network.network_screen import NetworkScreen
 from easycoin.cui.screens.trustnet.trustnet_screen import TrustNetScreen
 from easycoin.cui.screens.repl.repl_modal import ReplModal
 from easycoin.cui.screens.event_log_modal import EventLogModal
-from easycoin.cui.screens.welcome import WelcomeScreen
+from easycoin.cui.screens.help_modal import HelpModal
 from easycoin.cui.screens.settings.settings_screen import SettingsScreen
 import logging
 
@@ -36,7 +36,7 @@ class EasyCoinApp(App):
         "settings": SettingsScreen,
         "repl": ReplModal,
         "event_log": EventLogModal,
-        "welcome": WelcomeScreen,
+        "help": HelpModal,
     }
 
     BINDINGS = [
@@ -51,7 +51,6 @@ class EasyCoinApp(App):
         ("9", "switch_to_settings", "Settings"),
         ("ctrl+e", "open_event_log", "Event Log"),
         ("ctrl+q", "quit", "Quit"),
-        ("?", "open_welcome", "Welcome"),
     ]
 
     network_connected = reactive(False)
@@ -94,7 +93,7 @@ class EasyCoinApp(App):
             self.log_event("EasyCoin CUI started", "INFO")
 
             if not self.config.get("welcome_shown"):
-                self.call_later(self.action_open_welcome)
+                self.call_later(self.action_open_help)
 
             self.push_screen("dashboard")
 
@@ -147,11 +146,12 @@ class EasyCoinApp(App):
         """Open event log modal for viewing and managing logs."""
         self.push_screen("event_log")
 
-    def action_open_welcome(self) -> None:
-        """Open welcome screen."""
+    def action_open_help(self) -> None:
+        """Open help modal with welcome content on first launch."""
+        from easycoin.cui.screens.help_modal import HelpModal
         self.config.set("welcome_shown", True)
         self.config.save()
-        self.push_screen("welcome")
+        self.push_screen(HelpModal("welcome"))
 
     def log_event(self, message: str, level: str = "INFO") -> None:
         """Append log entry to state. Args:

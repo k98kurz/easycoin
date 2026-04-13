@@ -457,6 +457,39 @@ class TestTxn(unittest.TestCase):
         tx.output_ids = [s2.id, s3.id]
         assert tx.validate(debug='line 446'), 'mint 10, -10 should work'
 
+    def test_std_stamp_covenant_allows_burning_stamp_e2e(self):
+        """Test that the std_stamp_covenant allows burning a stamp by
+            spending it to create unstamped outputs.
+        """
+        # Create a base coin
+        coin = models.Coin.mine(ANYONE_CAN_SPEND_LOCK)
+        coin.save()
+
+        # Create a unique stamp (without token series)
+        stamp = models.Coin.stamp(ANYONE_CAN_SPEND_LOCK, coin.amount - 2000, b'test_stamp')
+        stamp.save()
+
+        # Mint the stamp
+        t = models.Txn()
+        t.input_ids = [coin.id]
+        t.output_ids = [stamp.id]
+        t.set_timestamp()
+        assert t.validate(), 'Creating a stamp should work'
+
+        # Burn the stamp by spending it to create unstamped outputs
+        output = models.Coin.create(ANYONE_CAN_SPEND_LOCK, stamp.amount - 1000)
+        output.save()
+
+        # Create transaction with 1 stamped input and 0 stamped outputs
+        t = models.Txn()
+        t.input_ids = [stamp.id]
+        t.output_ids = [output.id]
+        t.witness = {stamp.id_bytes: b''}
+        t.set_timestamp()
+
+        # The transaction should validate because the stamp is burned (so_len == 0)
+        assert t.validate(), 'Burning a stamp should work with std_stamp_covenant'
+
 
 if __name__ == '__main__':
     unittest.main()

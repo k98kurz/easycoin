@@ -153,6 +153,8 @@ class CoinsScreen(BaseScreen):
             address = result.get("address")
             amount = result.get("amount")
             num_coins = result.get("num_coins", 1)
+            net_id = result.get("net_id")
+            net_state = result.get("net_state")
             total_amount = amount * num_coins
 
             self.app.notify(
@@ -163,11 +165,11 @@ class CoinsScreen(BaseScreen):
             )
             self.log_event(
                 f"Mine coin requested: amount={amount}, num_coins={num_coins}, "
-                f"address={address}",
+                f"address={address}, net_id={net_id}",
                 "INFO"
             )
 
-            self._mine_coin(address, amount, num_coins)
+            self._mine_coin(address, amount, num_coins, net_id, net_state)
 
         self.app.push_screen(MineCoinModal(), on_mine_params)
 
@@ -305,10 +307,13 @@ class CoinsScreen(BaseScreen):
         )
 
     @work(exclusive=True)
-    async def _mine_coin(self, address: str, amount: int, num_coins: int = 1) -> None:
+    async def _mine_coin(
+            self, address: str, amount: int, num_coins: int = 1,
+            net_id: str|None = None, net_state: bytes|None = None
+        ) -> None:
         lock = Address.parse(address)
         total_amount = amount * num_coins
-        submit_mine_job(lock, total_amount, num_coins)
+        submit_mine_job(lock, total_amount, num_coins, net_id, net_state)
         result = await work_mine_job()
         if result is None:
             self.app.log_event("work_mine_job() returned None", "WARNING")

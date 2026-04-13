@@ -6,7 +6,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Input, OptionList, Static
 from textual.widgets.option_list import Option
 from easycoin.helpers import truncate_text
-from easycoin.models import Address, Wallet
+from easycoin.models import Address, TrustNet, Wallet
 
 
 class MineCoinModal(ModalScreen[dict|None]):
@@ -23,21 +23,26 @@ class MineCoinModal(ModalScreen[dict|None]):
         """Compose mine coin modal layout."""
         with VerticalScroll(classes="modal-container w-50p"):
             yield Static("Mine Coin(s)", classes="modal-title")
-            yield Static("Address:", classes="my-1")
-            yield OptionList(id="address_selector")
-            yield Input(
-                placeholder="Enter address hex",
-                id="custom_address_input",
-                classes="hidden mt-1"
-            )
-            with Horizontal(classes="h-10"):
+            with Horizontal(classes="h-11"):
+                with Vertical():
+                    yield Static("Address:", classes="my-1")
+                    yield OptionList(id="address_selector", classes="h-8")
+                    yield Input(
+                        placeholder="Enter address hex",
+                        id="custom_address_input",
+                        classes="hidden mt-1"
+                    )
+                with Vertical():
+                    yield Static("TrustNet:", classes="my-1")
+                    yield OptionList(id="trustnet_selector")
+            with Horizontal(classes="h-11"):
                 with Vertical():
                     yield Static("Amount per Coin:", classes="my-1")
                     yield OptionList(
                         Option("1M EC⁻¹", id="amount_1m"),
                         Option("500K EC⁻¹", id="amount_500k"),
                         Option("100K EC⁻¹", id="amount_100k"),
-                        id="amount_selector"
+                        id="amount_selector", classes="h-8"
                     )
                 with Vertical():
                     yield Static("Number of Coins:", classes="my-1")
@@ -54,6 +59,7 @@ class MineCoinModal(ModalScreen[dict|None]):
     def on_mount(self) -> None:
         """Initialize modal on mount."""
         self._populate_addresses()
+        self._populate_trustnets()
 
     def _populate_addresses(self):
         """Populate address selector with wallet addresses."""
@@ -77,6 +83,26 @@ class MineCoinModal(ModalScreen[dict|None]):
         address_selector = self.query_one("#address_selector")
         for option in options:
             address_selector.add_option(option)
+
+    def _populate_trustnets(self):
+        """Populate trustnet selector with active trustnets."""
+        options = [Option("None", id="none")]
+
+        try:
+            trustnets = TrustNet.query({"active": True}).get()
+            for trustnet in trustnets:
+                options.append(Option(
+                    f"{truncate_text(trustnet.name)} "
+                    f"({truncate_text(trustnet.id)})",
+                    id=trustnet.id
+                ))
+        except Exception as e:
+            self.app.log_event(f"Error loading trustnets: {e}", "ERROR")
+            self.app.notify(f"Error loading trustnets: {e}", severity="error")
+
+        trustnet_selector = self.query_one("#trustnet_selector")
+        for option in options:
+            trustnet_selector.add_option(option)
 
     @on(OptionList.OptionHighlighted, "#address_selector")
     def _on_address_selected(self, event):
@@ -127,8 +153,22 @@ class MineCoinModal(ModalScreen[dict|None]):
         num_option = self.query_one("#num_coins_selector").highlighted_option.id
         num_coins = int(num_option.split("_")[1])
 
+        trustnet_option = self.query_one("#trustnet_selector").highlighted_option
+        net_id = None
+        net_state = None
+        if trustnet_option and trustnet_option.id != "none":
+            net_id = trustnet_option.id
+            try:
+                trustnet = TrustNet.query({"id": net_id}).first()
+                if trustnet:
+                    net_state = trustnet.state
+            except Exception as e:
+                self.app.log_event(f"Error loading trustnet state: {e}", "ERROR")
+
         self.dismiss({
             "address": address_hex,
             "amount": amount,
-            "num_coins": num_coins
+            "num_coins": num_coins,
+            "net_id": net_id,
+            "net_state": net_state
         })
