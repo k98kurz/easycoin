@@ -1,3 +1,8 @@
+"""
+Functions for formatting, data conversion, fee estimation, image type
+detection, temporary file management, and cross-platform file operations.
+"""
+
 from datetime import datetime
 from easycoin.errors import type_assert, value_assert
 import atexit

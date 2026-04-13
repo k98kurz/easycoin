@@ -1,5 +1,8 @@
 # easycoin.helpers
 
+Functions for formatting, data conversion, fee estimation, image type detection,
+temporary file management, and cross-platform file operations.
+
 ## Functions
 
 ### `type_assert(condition: bool, message: str = 'invalid type'):`

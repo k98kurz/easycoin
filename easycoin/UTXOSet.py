@@ -1,3 +1,9 @@
+"""
+Manages the Unspent Transaction Output (UTXO) set with ephemeral tracking.
+Enables transaction validation, application, and reversal for double-spend
+prevention.
+"""
+
 from __future__ import annotations
 from .models import Coin, Input, Output, Txn
 from dataclasses import dataclass, field

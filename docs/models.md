@@ -1,5 +1,11 @@
 # easycoin.models
 
+Database models (and associated classes/functions) for the EasyCoin system.
+There are a few broad categories: 1) Wallet and Address manage identity; 2) Txn,
+Coin, Input, Output manage primary state; 3) TrustNet, TrustNetFeature,
+Attestation, Confirmation, Snapshot, Chunk, ChunkKind for networks managed by
+trusted/authorized nodes; 4) StampTemplate, StampType for convenient stamp UX
+
 ## Classes
 
 ### `Coin(HashedModel)`

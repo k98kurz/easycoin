@@ -1,5 +1,9 @@
 # easycoin.UTXOSet
 
+Manages the Unspent Transaction Output (UTXO) set with ephemeral tracking.
+Enables transaction validation, application, and reversal for double-spend
+prevention.
+
 ## Classes
 
 ### `UTXOSet`

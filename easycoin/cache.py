@@ -1,3 +1,11 @@
+"""
+Segmented LRU (Least Recently Used) cache implementation for managing distinct
+receive and send cache segments. Provides named cache instances with automatic
+eviction when capacity limits are reached. Each cache segment tracks access order
+independently to evict the least recently used items first, with a registry
+preventing duplicate instances of the same named segment.
+"""
+
 from __future__ import annotations
 from collections import OrderedDict
 from enum import Enum
@@ -8,6 +16,7 @@ _caches: dict[tuple[str, CacheKind], LRUCache] = {}
 
 
 class CacheKind(Enum):
+    """Enum specifying the cache type: RECEIVE or SEND."""
     RECEIVE = 'recv'
     SEND = 'send'
 

@@ -1,5 +1,11 @@
 # easycoin.sequence
 
+Supports splitting large records into verifiable parts for transmission within.
+netaio Message (UDP datagrams). Each Part includes a Merkle Tree inclusion
+proof. Parts are cached in segmented LRU caches for receive and send operations,
+enabling validation and reconstruction without requiring the full original
+record.
+
 ## Classes
 
 ### `Part`
