@@ -14,6 +14,23 @@ the emphasis on the "fun" part of "functional demonstration".)
 
 ✅ EasyCoin uses proof-of-concept consensus.
 
+## Status
+
+- [x] Core system
+- [x] CUI with Textual
+- [x] Single-player/offline mode
+- [x] Create/activate a GameSet with Txns, Coins, Inputs, and Outputs
+- [x] Restore local db from backups made prior to activating a GameSet
+- [ ] Multi-player/onlinemode (network protocol)
+- [ ] TrustNet functionality
+- [ ] Headless relay mode
+
+Issues for the project can be found
+[here](https://github.com/k98kurz/easycoin/issues/).
+
+Historical changes can be found in the
+[changelog](https://github.com/k98kurz/easycoin/blob/master/changelog.md).
+
 ## Conceptual Overview
 
 Coins are conceptually chains of digital signatures, but we will use tapescript
@@ -265,7 +282,8 @@ of that was rewritten before being published anyway.
 
 ## Testing
 
-This project contains 119 tests, a mix of unit and integration tests.
+This project contains 120 tests, a mix of unit and integration tests. The
+underlying packages I maintain have many hundreds more.
 
 To set up, clone the repository and run the following:
 

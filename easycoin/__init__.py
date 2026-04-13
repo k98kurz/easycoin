@@ -12,12 +12,5 @@ from .models import (
 from .UTXOSet import UTXOSet
 from .config import get_config_manager
 from .state import get_state_manager
-
-
-__version__ = '0.0.1'
-
-def version() -> str:
-    """Returns the version of the bookchain package."""
-    return __version__
-
+from .version import version, __version__
 
