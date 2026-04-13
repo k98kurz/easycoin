@@ -9,4 +9,4 @@ sqloquent==0.7.4
 tapehash==0.1.1
 tapescript==0.7.3
 crossconfig==0.0.3
-textual==8.1.1
+textual==8.2.3
