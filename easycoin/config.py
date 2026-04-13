@@ -1,3 +1,10 @@
+"""
+Configuration management for the easycoin application. Provides
+validated configuration settings with an event-driven pub/sub system for
+reacting to configuration changes.
+"""
+
+
 from functools import lru_cache
 from typing import Any, Callable
 from crossconfig import get_config
@@ -93,7 +100,13 @@ _schema = {
 }
 
 class ConfigManager:
+    """Manages application configuration with validation and change
+        notifications.
+    """
     def __init__(self, app_name: str = "easycoin"):
+        """Initialize the configuration manager for the specified
+            application.
+        """
         self.app_name = app_name
         self.config = get_config(app_name)
         self._subscriptions = {}
@@ -126,15 +139,21 @@ class ConfigManager:
                 pass
 
     def load(self) -> None:
+        """Load configuration from disk, updating in-memory state."""
         self.config.load()
 
     def save(self) -> None:
+        """Persist current configuration to disk."""
         self.config.save()
 
     def path(self, file_or_subdir: str | list[str] | None = None) -> str:
+        """Return the full path to a file or subdirectory in the app
+            config dir.
+        """
         return self.config.path(file_or_subdir)
 
     def get(self, key: str, default = None) -> list|bool|str|int|float|None:
+        """Retrieve a configuration value, applying schema transformations."""
         if default is None and key in _schema and 'default' in _schema[key]:
             default = _schema[key]['default']
         if key in _schema and 'get' in _schema[key]:
@@ -144,6 +163,9 @@ class ConfigManager:
         return self.config.get(key, default)
 
     def set(self, key: str, value: list|bool|str|int|float) -> ValueError|None:
+        """Update a configuration value, validating against schema and
+            notifying.
+        """
         if key in _schema and 'validator' in _schema[key]:
             validation_error = _schema[key]['validator'](value)
             if validation_error is not None:
@@ -154,16 +176,20 @@ class ConfigManager:
         self.publish(f"set_{key}", value)
 
     def unset(self, key: str) -> None:
+        """Remove a configuration value and notify subscribers."""
         self.config.unset(key)
         self.publish(f"unset_{key}", None)
 
     def get_db_path(self) -> str:
+        """Return the full path to the application database file."""
         return self.config.path("easycoin.db")
 
     def get_log_path(self) -> str:
+        """Return the full path to the application log file."""
         return self.config.path("easycoin.log")
 
 
 @lru_cache(maxsize=1)
 def get_config_manager(app_name: str = "easycoin") -> ConfigManager:
+    """Return the singleton ConfigManager instance, creating if necessary."""
     return ConfigManager(app_name)

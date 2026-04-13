@@ -27,8 +27,16 @@ Once all other issues are complete, prepare to release the next version.
 - [ ] Update readme.md
 - [ ] Update changelog.md
 - [ ] Update docs/
+  - cache.md
+  - config.md
+  - cryptoworker.md
+  - gameset.md
+  - helpers.md
   - models.md
   - network.md
+  - sequence.md
+  - state.md
+  - utxoset.md
 - [ ] Review and finalize documentation
 - [ ] Ensure version strings are set to `'M.m.p'`
   - `version.py`
