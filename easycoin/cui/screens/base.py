@@ -3,10 +3,11 @@ from textual.app import ComposeResult
 from textual.css.query import NoMatches
 from textual.containers import Horizontal
 from textual.widgets import Footer
+from .help_modal import HelpModal
 from easycoin.cui.widgets.event_log import EventLog
 from easycoin.cui.widgets.top_tabs import TopTabs
-from easycoin.models.Coin import Coin
 from easycoin.cui.widgets.right_sidebar import RightSidebar
+from easycoin.models.Coin import Coin
 
 
 class BaseScreen(Screen):
@@ -99,7 +100,6 @@ class BaseScreen(Screen):
 
     def action_show_help(self) -> None:
         """Show context-sensitive help modal for current screen."""
-        from .help_modal import HelpModal
         screen_id = "welcome" if self.TAB_ID == "tab_dashboard" else self.TAB_ID
         self.app.push_screen(HelpModal(screen_id))
 

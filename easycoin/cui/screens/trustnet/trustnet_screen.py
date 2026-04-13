@@ -1,6 +1,6 @@
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Container, VerticalScroll
 from textual.widgets import Button, DataTable, Static
 from easycoin.models import TrustNet
 from easycoin.helpers import truncate_text
@@ -24,28 +24,35 @@ class TrustNetScreen(BaseScreen):
         with VerticalScroll(id="trustnet_content"):
             yield Static("TrustNets", classes="panel-title")
 
-            with Vertical(id="joined_trustnets_section", classes="card mb-1"):
-                yield Static("Joined TrustNets", classes="text-bold mb-1")
-                yield DataTable(id="joined_trustnets_table", classes="h-10")
-                with Horizontal(classes="h-min-4"):
-                    yield Button(
-                        "Leave", id="btn_leave", variant="warning"
-                    )
+            with Horizontal(classes="h-20"):
+                with Container(
+                        id="joined_trustnets_section", classes="card mb-1 h-18"
+                    ):
+                    yield Static("Joined TrustNets", classes="text-bold mb-1")
+                    yield DataTable(id="joined_trustnets_table", classes="h-8")
+                    with Horizontal(classes="h-min-4"):
+                        yield Button(
+                            "Create TrustNet", id="btn_create", variant="primary"
+                        )
+                        yield Button(
+                            "Leave", id="btn_leave", variant="warning"
+                        )
 
-            with Vertical(id="available_trustnets_section", classes="card mb-1"):
+                with Container(
+                        id="active_trustnets_section", classes="card mb-1 h-18"
+                    ):
+                    yield Static("Active TrustNets", classes="text-bold mb-1")
+                    yield DataTable(id="active_trustnets_table", classes="h-8")
+
+            with Container(
+                    id="available_trustnets_section", classes="card mb-1 h-15"
+                ):
                 yield Static("Available TrustNets", classes="text-bold mb-1")
-                yield DataTable(id="available_trustnets_table", classes="h-10")
+                yield DataTable(id="available_trustnets_table", classes="h-8")
                 with Horizontal(classes="h-min-4"):
                     yield Button(
                         "Join", id="btn_join", variant="primary"
                     )
-
-            with Vertical(id="active_trustnets_section", classes="card mb-1"):
-                yield Static("Active TrustNets", classes="text-bold mb-1")
-                yield DataTable(id="active_trustnets_table", classes="h-10")
-
-            with Horizontal(id="trustnet_actions", classes="h-min-4"):
-                yield Button("Create TrustNet", id="btn_create", variant="primary")
 
     def on_mount(self) -> None:
         self._setup_tables()

@@ -14,6 +14,7 @@ from easycoin.cui.widgets.textarea import ECTextArea
 from .confirmation_modal import ConfirmationModal
 from easycoin.models import Address, Coin, Wallet, Input, Output
 import json
+import os
 
 
 class CoinDetailModal(ModalScreen):
@@ -247,7 +248,6 @@ class CoinDetailModal(ModalScreen):
     @on(Button.Pressed, "#btn_save_file")
     def _on_save_file(self) -> None:
         """Save file attachment to disk."""
-        import os
 
         try:
             stamp_data = self.coin.details['d']

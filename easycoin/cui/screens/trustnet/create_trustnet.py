@@ -7,6 +7,7 @@ from textual.containers import (
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, DataTable, Footer, Input, Static
 from tapescript import Script
+from .delegate_script_modal import DelegateScriptModal
 from easycoin.models import TrustNet, TrustNetFeature, Address
 from easycoin.helpers import truncate_text
 from easycoin.cui.widgets import ECTextArea, ConfirmationModal, InputModal
@@ -19,7 +20,7 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
         Binding("0", "app.open_repl", "REPL"),
         Binding("ctrl+e", "app.open_event_log", "Event Log"),
         Binding("escape", "cancel", "Cancel"),
-        Binding("ctrl+q", "quit", "Quit"),
+        Binding("ctrl+q", "app.quit", "Quit"),
         Binding("ctrl+s", "save", "Save"),
     ]
 
@@ -39,6 +40,7 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
 
             yield Static("Lock Script:", classes="text-bold my-1")
             yield ECTextArea(id="lock_script", classes="h-10")
+            yield Static("", id="error_display", classes="text-bold mt-1 hidden")
 
             yield Static("Members:", classes="text-bold my-1")
             yield DataTable(id="members_table", classes="h-8")
@@ -59,8 +61,6 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
 
             yield Static("Quorum:", classes="text-bold my-1")
             yield Input(id="quorum_input", placeholder="Number of members required")
-
-            yield Static("", id="error_display", classes="text-bold mt-1 hidden")
 
             with Horizontal(id="modal_actions"):
                 yield Button("Save", id="btn_save", variant="primary")
@@ -102,6 +102,17 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
 
         self.query_one("#btn_remove_member").disabled = not has_selection
         self.query_one("#btn_edit_delegation").disabled = not has_selection
+
+    @on(ECTextArea.Changed, "#lock_script")
+    def _lock_changed(self) -> None:
+        src = self.query_one("#lock_script").text.strip()
+        error_display = self.query_one("#error_display")
+        try:
+            Script.from_src(src)
+            error_display.add_class("hidden")
+        except Exception as e:
+            error_display.update(f"tapescript compilation error: {e}")
+            error_display.remove_class("hidden")
 
     @on(Button.Pressed, "#btn_add_member")
     def _action_add_member(self) -> None:
@@ -177,8 +188,6 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
 
         address = addresses[table.cursor_row]
         delegate_src = self.members_data[address]
-
-        from .delegate_script_modal import DelegateScriptModal
 
         modal = DelegateScriptModal(
             title=f"Edit Delegation for {address}",
@@ -257,11 +266,11 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
         if not is_valid:
             error_display = self.query_one("#error_display")
             error_display.remove_class("hidden")
-            error_display.update(f"Error: {error_message}", markup=False)
-            self.app.notify(error_message, severity="error")
+            error_display.update(f"Error: {error_message}")
+            self.app.notify(error_message, severity="warning")
             self.app.log_event(
                 f"CreateTrustNet validation error: {error_message}",
-                "ERROR"
+                "WARNING"
             )
             return
 
@@ -279,7 +288,13 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
             'quorum': quorum,
             'active': True,
         })
-        if len(self.members_data) > 1:
+        if len(self.members_data) == 1:
+            members = [
+                Address.parse(addr)
+                for addr in self.members_data.keys()
+            ]
+            trustnet.members = [members[0], b'']
+        elif len(self.members_data) > 1:
             trustnet.members = [
                 Address.parse(addr)
                 for addr in self.members_data.keys()
@@ -298,7 +313,3 @@ class CreateTrustNetModal(ModalScreen[TrustNet | None]):
     def action_cancel(self) -> None:
         """Cancel and dismiss modal."""
         self.dismiss(None)
-
-    async def action_quit(self) -> None:
-        """Quit application."""
-        await self.app.action_quit()

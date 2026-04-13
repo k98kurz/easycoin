@@ -148,7 +148,6 @@ class EasyCoinApp(App):
 
     def action_open_help(self) -> None:
         """Open help modal with welcome content on first launch."""
-        from easycoin.cui.screens.help_modal import HelpModal
         self.config.set("welcome_shown", True)
         self.config.save()
         self.push_screen(HelpModal("welcome"))

@@ -7,6 +7,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Static, TextArea
 from easycoin.cui.widgets import ECTextArea
+import traceback
 
 
 class ReplTextArea(ECTextArea):
@@ -195,14 +196,12 @@ class ReplModal(Screen):
 
             except Exception as e:
                 output.text += f"Error: {type(e).__name__}: {e}\n"
-                import traceback
                 tb_lines = traceback.format_exc().splitlines()[1:]
                 for line in tb_lines:
                     output.text += f"  {line}\n"
 
         except Exception as e:
             output.text += f"Error: {type(e).__name__}: {e}\n"
-            import traceback
             tb_lines = traceback.format_exc().splitlines()[1:]
             for line in tb_lines:
                 output.text += f"  {line}\n"

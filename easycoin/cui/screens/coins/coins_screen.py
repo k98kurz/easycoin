@@ -8,6 +8,7 @@ from easycoin.UTXOSet import UTXOSet
 from easycoin.models import Address, Coin, Txn, TrustNet, Wallet
 from easycoin.cryptoworker import submit_mine_job, work_mine_job
 from easycoin.cui.screens.base import BaseScreen
+from easycoin.cui.widgets.coin_detail_modal import CoinDetailModal
 from easycoin.helpers import format_amount, format_balance, truncate_text
 from .mine_config import MiningConfigurationModal
 from .mine_coin_modal import MineCoinModal
@@ -389,7 +390,6 @@ class CoinsScreen(BaseScreen):
     @on(DataTable.RowSelected, "#coins_table")
     def _on_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle row selection to show coin details."""
-        from easycoin.cui.widgets.coin_detail_modal import CoinDetailModal
         row_key = event.row_key
         coin = self._coin_row_map.get(row_key)
         if coin:
