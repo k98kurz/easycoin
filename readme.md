@@ -21,7 +21,7 @@ the emphasis on the "fun" part of "functional demonstration".)
 - [x] Single-player/offline mode
 - [x] Create/activate a GameSet with Txns, Coins, Inputs, and Outputs
 - [x] Restore local db from backups made prior to activating a GameSet
-- [ ] Multi-player/onlinemode (network protocol)
+- [ ] Multi-player/online mode (network protocol)
 - [ ] TrustNet functionality
 - [ ] Headless relay mode
 
@@ -30,6 +30,45 @@ Issues for the project can be found
 
 Historical changes can be found in the
 [changelog](https://github.com/k98kurz/easycoin/blob/master/changelog.md).
+
+## Installation and Quick Start
+
+To use this package, install with pip/uv and include the optional cui dependency:
+
+```bash
+pip install easycoin[cui]
+```
+
+Then, launch the Textual CUI with the `--interactive` CLI parameter:
+
+```bash
+easycoin --interactive
+```
+
+(Requires Python 3.10+)
+
+### Basic Exploration
+
+When you launch the CUI, there will be a welcome message and help info available
+on every screen. The CUI exposes a lot of information and functionality, but I
+took care to organize it in a way that makes sense and should help build an
+intuition about the topic.
+
+### Playing a Game
+
+To begin solving puzzles from a published GameSet, download the GameSet zip file,
+launch the CUI in that directory, create a wallet and an address, go to the
+Settings screen, and click the "Activate Gameset" button. It will require
+inputting the 72-char hexadecimal checksum (sha256 of the file + first 4 bytes
+of the double-hash). If the checksum is valid and matches the file, you will be
+able to activate the GameSet and replace the tables for txns, coins, inputs, and
+outputs. Then go to the Coins screen to view the coins and click the
+"Associate with Wallet" for any coin you want to claim by solving its puzzle.
+
+From there, it is just a matter of constructing transactions to move coins to an
+address in your active wallet. Explore, experiment, poke around in the REPL, and
+have fun. And don't forget your wallet password, since it is only kept unlocked
+in-memory; the database record is encrypted.
 
 ## Conceptual Overview
 
@@ -273,8 +312,8 @@ The use of LLMs was limited to primarily commit messages, and secondarily review
 and Textual CUI scaffolding. At least 99% of the logic created by AIs was wrong
 and had to be replaced; the UI had to be reorganized and pixel-pushed; many
 hallucinations had to be excised. The AGENTS.md file in the repo is the scar
-that bears witness to the many issues that occurred before I largely gave up on
-trying to use coding agents to build out the CUI app.
+that bears witness to the many issues that occurred before I found a balance
+where it was somewhat useful.
 
 All core logic is artisanal, free-range, organic, hand-crafted code. Less than
 1% of the code in the underlying libraries that I maintain came from AI, and all

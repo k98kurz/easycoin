@@ -53,4 +53,7 @@ class DashboardScreen(BaseScreen):
                     classes="my-1"
                 )
 
+    @on(Button.Pressed)
+    def _notify_nothing(self):
+        self.app.notify("The only buttons in the whole app that do nothing.")
 
