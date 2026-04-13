@@ -7,6 +7,7 @@ from easycoin.helpers import truncate_text
 from easycoin.cui.screens.base import BaseScreen
 from easycoin.cui.widgets import ConfirmationModal
 from .create_trustnet import CreateTrustNetModal
+from .trustnet_detail import TrustNetDetailModal
 
 
 class TrustNetScreen(BaseScreen):
@@ -15,6 +16,7 @@ class TrustNetScreen(BaseScreen):
     TAB_ID = "tab_trustnet"
     BINDINGS = [
         ("n", "create_trustnet", "New TrustNet"),
+        ("v", "view_trustnet", "View Details"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -35,7 +37,11 @@ class TrustNetScreen(BaseScreen):
                             "Create TrustNet", id="btn_create", variant="primary"
                         )
                         yield Button(
-                            "Leave", id="btn_leave", variant="warning"
+                            "View Details", id="btn_view_details", variant="default",
+                            disabled=True
+                        )
+                        yield Button(
+                            "Leave", id="btn_leave", variant="warning", disabled=True
                         )
 
                 with Container(
@@ -119,8 +125,8 @@ class TrustNetScreen(BaseScreen):
             ("Name", "name"),
             ("ID", "id"),
             ("Active", "active"),
-            ("Lock Length", "lock_length"),
-            ("Params Length", "params_length"),
+            ("Lock Size", "lock_size"),
+            ("Params", "param_count"),
         )
         joined_table.cursor_type = "row"
 
@@ -128,8 +134,8 @@ class TrustNetScreen(BaseScreen):
         available_table.add_columns(
             ("Name", "name"),
             ("ID", "id"),
-            ("Lock Length", "lock_length"),
-            ("Params Length", "params_length"),
+            ("Lock Size", "lock_size"),
+            ("Params", "param_count"),
         )
         available_table.cursor_type = "row"
 
@@ -194,6 +200,7 @@ class TrustNetScreen(BaseScreen):
         joined_table = self.query_one("#joined_trustnets_table")
         has_joined_selection = joined_table.cursor_row is not None
         self.query_one("#btn_leave").disabled = not has_joined_selection
+        self.query_one("#btn_view_details").disabled = not has_joined_selection
 
         available_table = self.query_one("#available_trustnets_table")
         has_available_selection = available_table.cursor_row is not None
@@ -212,6 +219,27 @@ class TrustNetScreen(BaseScreen):
 
         modal = CreateTrustNetModal()
         self.app.push_screen(modal, on_created)
+
+    @on(DataTable.RowSelected, "#joined_trustnets_table")
+    @on(Button.Pressed, "#btn_view_details")
+    def action_view_trustnet(self) -> None:
+        joined_table = self.query_one("#joined_trustnets_table")
+        if joined_table.cursor_row is None:
+            return
+
+        trustnets = TrustNet.query().get()
+        if not trustnets:
+            return
+
+        if joined_table.cursor_row >= len(trustnets):
+            self.log_event(
+                f"cursor_row {joined_table.cursor_row} >= len(trustnets) {len(trustnets)}",
+                "ERROR"
+            )
+            return
+
+        trustnet = trustnets[joined_table.cursor_row]
+        self.app.push_screen(TrustNetDetailModal(trustnet.id))
 
     @on(Button.Pressed, "#btn_join")
     def action_join_trustnet(self) -> None:
