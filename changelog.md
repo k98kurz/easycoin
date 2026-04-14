@@ -1,3 +1,9 @@
+## 0.0.2
+
+- CUI: add nonce field to New Txn -> Edit Output modal
+  - Initialized w/ random int for new output
+  - Intialized w/ `coin.nonce` for edit output
+
 ## 0.0.1
 
 - Initial release
