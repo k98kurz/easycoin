@@ -31,6 +31,14 @@ class LRUCache:
         self.limit = int(limit)
         _caches[(name, kind)] = self
 
+    def keys(self) -> list:
+        """Returns a list of cache keys in order from most recently
+            used to least. Does not affect LRU order.
+        """
+        l = list(self.od.keys())
+        l.reverse()
+        return l
+
     def get(self, key: Hashable) -> Any | None:
         """If the key exists in the cache, mark it as most recently used
             and return it.

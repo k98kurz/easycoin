@@ -97,6 +97,14 @@ _schema = {
     "active_game_set": {
         "default": None,
     },
+    "sync_cache_size": {
+        "default": 1000,
+        "validator": (
+            lambda v: None if type(v) is int else ValueError(
+                f"Invalid queue size: must be int ({type(v)} supplied)"
+            )
+        )
+    },
 }
 
 class ConfigManager:
