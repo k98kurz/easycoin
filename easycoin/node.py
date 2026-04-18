@@ -178,7 +178,7 @@ def _not_found(msg: Message, addr: tuple[str, int]):
 
 @udpnode.on(MessageType.ERROR)
 def _error(msg: Message, addr: tuple[str, int]):
-    udpnode.logger.warning(f'ERROR encountered from {addr}')
+    udpnode.logger.warning(f'ERROR encountered from {addr}: {msg.body.content}')
 
 # metadata helper + handlers
 def _get_metadata(model, cols: list[str]):
@@ -274,13 +274,17 @@ def _receive_new_txn_notification(msg: Message, addr: tuple[str, int]):
         )
 
 def _route_request_txn_scope(msg: Message, addr: tuple[str, int]):
+    udpnode.logger.debug(f'_route_request_txn_scope: {msg.body.uri}')
     if msg.body.uri == b'txn:list':
         return _get_txn_list(msg, addr)
     elif len(msg.body.uri) == 36: # b'txn:{32-byte id}'
+        udpnode.logger.debug(f'_route_request_txn_scope: _get_txn_seq')
         return _get_txn_seq(msg, addr)
     elif len(msg.body.uri) == 38: # b'txn:{32-byte id}:{idx}'
+        udpnode.logger.debug(f'_route_request_txn_scope: _get_txn_part')
         return _get_txn_part(msg, addr)
     else:
+        udpnode.logger.debug(f'_route_request_txn_scope: malformed URI')
         return make_error_msg(b'malformed URI for the txn scope', uri=msg.body.uri)
 
 def _get_txn_list(msg: Message, addr: tuple[str, int]):
@@ -310,9 +314,12 @@ def _get_txn_list(msg: Message, addr: tuple[str, int]):
 
 def _get_txn_seq(msg: Message, addr: tuple[str, int]):
     try:
-        seq = get_sequence(Txn, msg.body.uri[:-32].hex(), CacheKind.SEND)
+        txn_id = msg.body.uri[-32:].hex()
+        udpnode.logger.debug(f'_get_txn_seq: {txn_id=}')
+        seq = get_sequence(Txn, txn_id, CacheKind.SEND)
         return make_respond_uri_msg(seq.pack(), uri=msg.body.uri)
     except ValueError:
+        udpnode.logger.warn(f'_get_txn_seq: ValueError - sending NOT_FOUND')
         return make_not_found_msg(uri=msg.body.uri)
 
 def _get_txn_part(msg: Message, addr: tuple[str, int]):
@@ -369,13 +376,14 @@ def _handle_txn_ids_page(msg: Message, addr: tuple[str, int]):
         )
 
 def _synchronize_txn_seq(msg: Message, addr: tuple[str, int]):
-    txn_id_bytes = msg.body.uri[:-32]
+    txn_id_bytes = msg.body.uri[-32:]
     txn_id = txn_id_bytes.hex()
     if Txn.find(txn_id):
         return # we already have it, so skip
     try:
         seq = Sequence.unpack(msg.body.content)
-    except:
+    except BaseException as e:
+        udpnode.logger.warn(f'_synchronize_coin_seq: {e}')
         return make_error_msg(b'malformed Sequence (Txn)', uri=msg.body.uri)
     scz = conf.get('sequence_cache_size', 20)
     cache = LRUCache.get_instance('sequences', CacheKind.RECEIVE, scz)
@@ -597,7 +605,7 @@ def _synchronize_txn_part(msg: Message, addr: tuple[str, int]):
 #
 #def _get_coin_seq(msg: Message, addr: tuple[str, int]):
 #    try:
-#        seq = get_sequence(Coin, msg.body.uri[:-32].hex(), CacheKind.SEND)
+#        seq = get_sequence(Coin, msg.body.uri[-32:].hex(), CacheKind.SEND)
 #        return make_respond_uri_msg(seq.pack(), uri=msg.body.uri)
 #    except ValueError:
 #        return make_not_found_msg(uri=msg.body.uri)
@@ -619,7 +627,7 @@ def _synchronize_txn_part(msg: Message, addr: tuple[str, int]):
 #        return _synchronize_coin_part(msg, addr)
 #
 #def _synchronize_coin_seq(msg: Message, addr: tuple[str, int]):
-#    coin_id_bytes = msg.body.uri[:-32]
+#    coin_id_bytes = msg.body.uri[-32:]
 #    coin_id = coin_id_bytes.hex()
 #    if Coin.find(coin_id):
 #        return # we already have it, so skip
