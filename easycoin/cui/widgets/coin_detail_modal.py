@@ -12,6 +12,7 @@ from easycoin.helpers import (
 )
 from easycoin.cui.widgets.textarea import ECTextArea
 from .confirmation_modal import ConfirmationModal
+from .decompiled_lock_modal import DecompiledLockModal
 from easycoin.models import Address, Coin, Wallet, Input, Output
 import json
 import os
@@ -41,8 +42,11 @@ class CoinDetailModal(ModalScreen):
 
             yield Static(f"[b]Coin ID:[/b] {self.coin.id}", classes="mt-1")
             yield Static(
-                f"[b]Address:[/b] {Address({'lock': self.coin.lock}).hex}",
-                classes="my-1"
+                f"[b]Address:[/b] {Address({'lock': self.coin.lock}).hex}"
+            )
+            yield Button(
+                "Decompile Address", id="btn_view_lock", variant="primary",
+                classes="p-0"
             )
 
             with Horizontal(classes="h-6"):
@@ -231,6 +235,12 @@ class CoinDetailModal(ModalScreen):
     def action_close(self) -> None:
         """Close the modal."""
         self.dismiss()
+
+    @on(Button.Pressed, "#btn_view_lock")
+    def _on_view_lock(self) -> None:
+        """Open decompiled lock script modal."""
+        modal = DecompiledLockModal(self.coin)
+        self.app.push_screen(modal)
 
     @on(Button.Pressed, "#btn_open_file")
     def _on_open_file(self) -> None:
