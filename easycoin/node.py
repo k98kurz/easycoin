@@ -38,6 +38,7 @@ _run_node = True
 peers_synched = TimeoutCache(limit=1000, timeout=120.0)
 _state_manager = None
 _last_peer_list = set()
+_last_bootstrap_attempt = 0.0
 
 
 def set_node_state_manager(state_manager, logger=None):
@@ -67,6 +68,33 @@ def _monitor_peers():
         _last_peer_list = current_peer_list
 
 
+def _connect_to_bootstrap_nodes():
+    """Connect to bootstrap nodes by sending ADVERTISE_PEER messages."""
+    bootstrap_nodes = conf.get('bootstrap_nodes')
+    if not bootstrap_nodes:
+        return
+
+    for node_addr in bootstrap_nodes:
+        try:
+            parts = node_addr.split(':')
+            if len(parts) != 2:
+                continue
+            addr = parts[0].strip()
+            port = int(parts[1].strip())
+            peer_addr = (addr, port)
+
+            msg = Message.prepare(
+                Body.prepare(
+                    DefaultPeerPlugin().pack(udpnode.local_peer),
+                    uri=b'easycoin'
+                ),
+                MessageType.ADVERTISE_PEER
+            )
+            udpnode.send(msg, peer_addr)
+        except (ValueError, IndexError):
+            continue
+
+
 # main node controls
 def stop():
     global _run_node
@@ -74,17 +102,24 @@ def stop():
 
 async def run_node(state_manager=None):
     """Run the networking node with optional state manager."""
-    global _state_manager
+    global _state_manager, _last_bootstrap_attempt
     if state_manager:
         _state_manager = state_manager
 
     await udpnode.start()
     await udpnode.manage_peers_automatically(app_id=b'easycoin')
+    _connect_to_bootstrap_nodes()
+    _last_bootstrap_attempt = asyncio.get_event_loop().time()
     while _run_node:
         await asyncio.sleep(1.0)
         _sync_peer()
         _attempt_sync()
         _monitor_peers()
+
+        current_time = asyncio.get_event_loop().time()
+        if current_time - _last_bootstrap_attempt >= 120.0:
+            _connect_to_bootstrap_nodes()
+            _last_bootstrap_attempt = current_time
 
 def _sync_peer():
     candidates = set(udpnode.peer_addrs.keys()).difference(set(peers_synched.keys()))
