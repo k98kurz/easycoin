@@ -21,9 +21,9 @@ the emphasis on the "fun" part of "functional demonstration".)
 - [x] Single-player/offline mode
 - [x] Create/activate a GameSet with Txns, Coins, Inputs, and Outputs
 - [x] Restore local db from backups made prior to activating a GameSet
-- [ ] Multi-player/online mode (network protocol)
+- [x] Multi-player/online mode (network protocol)
 - [ ] TrustNet functionality
-- [ ] Headless relay mode
+- [x] Headless relay mode
 
 Issues for the project can be found
 [here](https://github.com/k98kurz/easycoin/issues/).
@@ -42,10 +42,16 @@ pip install easycoin[cui]
 Then, launch the Textual CUI with the `--interactive` CLI parameter:
 
 ```bash
-easycoin --interactive
+easycoin --interactive [--debug]
 ```
 
-(Requires Python 3.10+)
+Or launch the headless relay:
+```bash
+easycoin --daemon [--debug]
+```
+
+(Requires Python 3.10+. Networking may not currently work in Windows due to
+UDP multicast issues.)
 
 ### Basic Exploration
 
@@ -333,7 +339,7 @@ of that was rewritten before being published anyway.
 
 ## Testing
 
-This project contains 120 tests, a mix of unit and integration tests. The
+This project contains 129 tests, a mix of unit and integration tests. The
 underlying packages I maintain have many hundreds more.
 
 To set up, clone the repository and run the following:

@@ -2,7 +2,19 @@
 
 - CUI: add nonce field to New Txn -> Edit Output modal
   - Initialized w/ random int for new output
-  - Intialized w/ `coin.nonce` for edit output
+  - Initialized w/ `coin.nonce` for edit output
+  - Added button + modal to decompile addresses in coin detail modal
+- Added basic network protocol
+  - Attempts to connect to bootstrap nodes periodically
+  - Uses multi-Part Sequences for synchronizing large data over multiple Messages
+  with Merkle Tree inclusion proofs for validation
+  - Attempts periodic synchronization with bootstraps and discovered peers
+  - Real-time Txn publication
+- Added simple headless mode (`easycoin --daemon [--debug]`)
+- Under-the-hood improvements:
+  - Added `TimeoutCache` class
+  - Extended functionality of `LRUCache` class
+  - Added 9 new tests
 
 ## 0.0.1
 

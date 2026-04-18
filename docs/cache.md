@@ -18,6 +18,11 @@ Enum specifying the cache type: RECEIVE or SEND.
 
 ##### `__init__(name: str, kind: CacheKind, limit: int = 1000):`
 
+##### `keys() -> list:`
+
+Returns a list of cache keys in order from most recently used to least. Does not
+affect LRU order.
+
 ##### `get(key: Hashable) -> Any | None:`
 
 If the key exists in the cache, mark it as most recently used and return it.
@@ -35,6 +40,14 @@ the least recently used cache item.
 
 If the key exists in the cache, remove and return it.
 
+##### `peak_last() -> tuple[Hashable, Any] | None:`
+
+Peak at the last (LRU) item in the cache. Does not affect ordering.
+
+##### `peak_random() -> tuple[Hashable, Any] | None:`
+
+Peak at a random item in the cache. Does not affect LRU order.
+
 ##### `clear() -> None:`
 
 Clears the cache.
@@ -43,4 +56,41 @@ Clears the cache.
 
 Get a named LRUCache instance. If it does not yet exist, instantiate it.
 
+### `TimeoutCache`
+
+#### Methods
+
+##### `__init__(limit: int = 1000, timeout: float = 60.0):`
+
+##### `keys() -> list:`
+
+Returns a list of cache keys in order from most recently used to least. Does not
+affect LRU order.
+
+##### `get(key: Hashable) -> Any | None:`
+
+If the key exists in the cache, mark it as most recently used and return it.
+
+##### `peak(key: Hashable) -> Any | None:`
+
+If the key exists in the cache, return it without updating LRU order or expiring
+items.
+
+##### `put(key: Hashable, value: Any) -> None:`
+
+Put the value in the cache at the key. If the cache growth hits its limit, evict
+the least recently used cache item.
+
+##### `pop(key: Hashable) -> Any | None:`
+
+If the key exists in the cache, remove and return it.
+
+##### `clear() -> None:`
+
+Clears the cache.
+
+## Values
+
+- `random_choice`: method
+- `time`: builtin_function_or_method
 

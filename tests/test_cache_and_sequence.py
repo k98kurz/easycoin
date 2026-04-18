@@ -360,6 +360,25 @@ class TestCacheAndSequence(unittest.TestCase):
         assert unpacked.root == seq.root
         assert unpacked.count == seq.count
 
+    def test_Sequence_pack_unpack_roundtrip_single_part(self):
+        tree = Tree.from_leaves([b'single_part_data', b''])
+        proof = tree.prove(b'single_part_data')
+        part = sequence.Part('Coin', 'test_id', 0, tree.root, proof, b'single_part_data')
+        seq = sequence.Sequence('Coin', 'test_id', tree.root, 1, {0: part})
+        packed = seq.pack()
+        unpacked = sequence.Sequence.unpack(packed)
+        assert unpacked.record_type == seq.record_type
+        assert unpacked.record_id == seq.record_id
+        assert unpacked.root == seq.root
+        assert unpacked.count == seq.count
+        assert 0 in unpacked.parts
+        assert unpacked.parts[0].record_type == seq.parts[0].record_type
+        assert unpacked.parts[0].record_id == seq.parts[0].record_id
+        assert unpacked.parts[0].idx == seq.parts[0].idx
+        assert unpacked.parts[0].root == seq.parts[0].root
+        assert unpacked.parts[0].proof == seq.parts[0].proof
+        assert unpacked.parts[0].blob == seq.parts[0].blob
+
     def test_prepare_sequence_creates_parts_from_record(self):
         coin = models.Coin.create(ANYONE_CAN_SPEND_LOCK, 1000)
         coin.id = 'test_coin_id'

@@ -34,7 +34,7 @@ fails verification.
 
 ##### `pack() -> bytes:`
 
-##### `@classmethod unpack(data: bytes) -> Part:`
+##### `@classmethod unpack(data: bytes, inject: dict | None = None) -> Part:`
 
 ### `Sequence`
 
@@ -76,7 +76,7 @@ reconstructed.
 
 ##### `pack() -> bytes:`
 
-##### `@classmethod unpack(data: bytes) -> Sequence:`
+##### `@classmethod unpack(data: bytes, inject: dict | None = None) -> Sequence:`
 
 ## Functions
 

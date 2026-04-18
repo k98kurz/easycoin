@@ -51,8 +51,9 @@ class Part:
         ))
 
     @classmethod
-    def unpack(cls, data: bytes, inject={}) -> Part:
-        return cls(*packify.unpack(data, inject={}))
+    def unpack(cls, data: bytes, inject: dict|None = None) -> Part:
+        inject = inject or {}
+        return cls(*packify.unpack(data, inject={**inject, **globals()}))
 
 
 @dataclass
@@ -129,7 +130,8 @@ class Sequence:
         ))
 
     @classmethod
-    def unpack(cls, data: bytes, inject={}) -> Sequence:
+    def unpack(cls, data: bytes, inject: dict | None = None) -> Sequence:
+        inject = inject or {}
         return cls(*packify.unpack(data, inject={'Part': Part, **inject}))
 
 
