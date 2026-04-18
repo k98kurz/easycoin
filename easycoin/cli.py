@@ -10,8 +10,8 @@ import os
 def print_help():
     print("Usage: easycoin --setup_wallet")
     print("Usage: easycoin --query [coin|txn|utxo] [--id hex_id]")
-    print("Usage: easycoin --daemon")
-    print("\tRuns the node in headless mode.")
+    print("Usage: easycoin --daemon [--debug]")
+    print("\tRuns the node in headless mode. Use --debug for verbose logging.")
     print("Usage: easycoin --interactive")
     print("\tRuns the node with Textual console UI (requires optional cui dependency)")
     print("Usage: easycoin --mine [--goal int_goal] [--wallet wallet_id]")
@@ -32,7 +32,7 @@ def query():
     print("Not yet implemented")
 
 
-def daemon():
+def daemon(debug = False):
     """Run node in headless daemon mode."""
     config = get_config_manager()
     config.load()
@@ -44,6 +44,8 @@ def daemon():
     models.automigrate(migrations_path, db_path)
 
     logger = logging.getLogger("easycoin")
+    if debug:
+        logger.setLevel(logging.DEBUG)
     logger.info("Starting EasyCoin node in daemon mode")
 
     try:
@@ -98,7 +100,7 @@ def run():
         exit()
 
     if '--daemon' in argv or '-d' in argv:
-        daemon()
+        daemon('--debug' in argv)
         exit()
 
     if '--mine' in argv or '-m' in argv:
