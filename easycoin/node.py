@@ -41,6 +41,32 @@ _last_peer_list = set()
 _last_bootstrap_attempt = 0.0
 
 
+# main node controls
+def stop():
+    global _run_node
+    _run_node = False
+
+async def run_node(state_manager=None):
+    """Run the networking node with optional state manager."""
+    global _state_manager, _last_bootstrap_attempt
+    if state_manager:
+        _state_manager = state_manager
+
+    await udpnode.start()
+    await udpnode.manage_peers_automatically(app_id=b'easycoin')
+    _connect_to_bootstrap_nodes()
+    _last_bootstrap_attempt = asyncio.get_event_loop().time()
+    while _run_node:
+        await asyncio.sleep(1.0)
+        _sync_peer()
+        _attempt_sync()
+        _monitor_peers()
+
+        current_time = asyncio.get_event_loop().time()
+        if current_time - _last_bootstrap_attempt >= 120.0:
+            _connect_to_bootstrap_nodes()
+            _last_bootstrap_attempt = current_time
+
 def set_node_state_manager(state_manager, logger=None):
     """Set state manager and optionally logger for node."""
     global _state_manager
@@ -49,14 +75,12 @@ def set_node_state_manager(state_manager, logger=None):
     if logger:
         udpnode.set_logger(logger)
 
-
 def _get_connected_peers():
     """Get current connected peers list."""
     return [
         {"address": addr[0], "port": addr[1]}
         for addr in udpnode.peer_addrs.keys()
     ]
-
 
 def _monitor_peers():
     """Monitor peer connections and publish changes."""
@@ -66,7 +90,6 @@ def _monitor_peers():
         peers_data = _get_connected_peers()
         _state_manager.set("connected_peers", peers_data)
         _last_peer_list = current_peer_list
-
 
 def _connect_to_bootstrap_nodes():
     """Connect to bootstrap nodes by sending ADVERTISE_PEER messages."""
@@ -93,33 +116,6 @@ def _connect_to_bootstrap_nodes():
             udpnode.send(msg, peer_addr)
         except (ValueError, IndexError):
             continue
-
-
-# main node controls
-def stop():
-    global _run_node
-    _run_node = False
-
-async def run_node(state_manager=None):
-    """Run the networking node with optional state manager."""
-    global _state_manager, _last_bootstrap_attempt
-    if state_manager:
-        _state_manager = state_manager
-
-    await udpnode.start()
-    await udpnode.manage_peers_automatically(app_id=b'easycoin')
-    _connect_to_bootstrap_nodes()
-    _last_bootstrap_attempt = asyncio.get_event_loop().time()
-    while _run_node:
-        await asyncio.sleep(1.0)
-        _sync_peer()
-        _attempt_sync()
-        _monitor_peers()
-
-        current_time = asyncio.get_event_loop().time()
-        if current_time - _last_bootstrap_attempt >= 120.0:
-            _connect_to_bootstrap_nodes()
-            _last_bootstrap_attempt = current_time
 
 def _sync_peer():
     candidates = set(udpnode.peer_addrs.keys()).difference(set(peers_synched.keys()))

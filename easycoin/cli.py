@@ -43,7 +43,7 @@ def daemon(debug = False):
     models.publish_migrations(migrations_path)
     models.automigrate(migrations_path, db_path)
 
-    logger = logging.getLogger("easycoin")
+    logger = logging.getLogger("netaio.node")
     if debug:
         logger.setLevel(logging.DEBUG)
     logger.info("Starting EasyCoin node in daemon mode")
