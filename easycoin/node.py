@@ -6,6 +6,7 @@ from netaio import (
 from netaio.asymmetric import X25519CipherPlugin
 from netaio.node import get_ip
 from random import choice as random_choice
+from time import time
 from easycoin.UTXOSet import UTXOSet
 from easycoin.cache import LRUCache, CacheKind, TimeoutCache
 from easycoin.config import get_config_manager
@@ -57,13 +58,16 @@ async def run_node(state_manager=None):
     _connect_to_bootstrap_nodes()
     _last_bootstrap_attempt = asyncio.get_event_loop().time()
     while _run_node:
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(0.25)
         _sync_peer()
+        await asyncio.sleep(0.25)
         _attempt_sync()
+        await asyncio.sleep(0.25)
         _monitor_peers()
 
         current_time = asyncio.get_event_loop().time()
         if current_time - _last_bootstrap_attempt >= 120.0:
+            await asyncio.sleep(0.25)
             _connect_to_bootstrap_nodes()
             _last_bootstrap_attempt = current_time
 
@@ -126,7 +130,7 @@ def _sync_peer():
     peers_synched.put(peer, {})
     udpnode.send(
         Message.prepare(
-            Body.prepare(b'', uri=b'txns'),
+            Body.prepare(int(time()).to_bytes(8, 'big'), uri=b'txns'),
             MessageType.REQUEST_URI
         ),
         peer
@@ -204,6 +208,7 @@ def _get_metadata(model, cols: list[str]):
 
 @udpnode.on((MessageType.REQUEST_URI, b'txns'))
 def _respond_with_txns_metadata(msg: Message, addr: tuple[str, int]):
+    udpnode.logger.debug(f'_respond_with_txns_metadata to {addr}')
     return make_respond_uri_msg(_get_metadata(Txn, ['timestamp']), msg.body.uri)
 
 @udpnode.on((MessageType.RESPOND_URI, b'txns'))
@@ -255,6 +260,7 @@ def route_respond(msg: Message, addr: tuple[str, int]):
 
 # txn scope routers + handlers + helpers
 def publish_txn(txn: Txn):
+    metadata_cache.clear()
     msg = Message.prepare(
         Body.prepare(bytes.fromhex(txn.id), uri=b'txn:new'),
         MessageType.NOTIFY_URI
@@ -445,6 +451,7 @@ def _synchronize_txn_seq(msg: Message, addr: tuple[str, int]):
             )
             return
         txn.save()
+        metadata_cache.clear()
         coins = [*txn.inputs, *txn.outputs]
         for c in coins:
             try:
