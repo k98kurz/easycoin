@@ -71,7 +71,7 @@ def set_node_state_manager(state_manager, logger=None):
     """Set state manager and optionally logger for node."""
     global _state_manager
     _state_manager = state_manager
-    
+
     if logger:
         udpnode.set_logger(logger)
 
@@ -143,6 +143,7 @@ def _attempt_sync():
     # if the record has been acquired, remove it from the sync cache
     key, addrs = item
     udpnode.logger.debug(f'_attempt_sync: {key=}, {addrs=}')
+    sync_cache.pop(key)
     if len(key.split(':')) == 2:
         scope, record_id = key.split(':')
         idx = None
@@ -153,9 +154,9 @@ def _attempt_sync():
         udpnode.logger.warn('malformed sync cache data')
         return # malformed data
     if scope == 'txn' and Txn.find(record_id):
-        return sync_cache.pop(key)
+        return
     elif scope == 'coin' and Coin.find(record_id):
-        return sync_cache.pop(key)
+        return
 
     # request it from each node that should have it
     if idx:

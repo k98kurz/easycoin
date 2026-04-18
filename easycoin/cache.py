@@ -77,6 +77,7 @@ class LRUCache:
         """Peak at the last (LRU) item in the cache. Does not affect ordering."""
         keys = list(self.od.keys())
         if keys:
+            keys.reverse()
             return (keys[-1], self.peak(keys[-1]))
 
     def peak_random(self) -> tuple[Hashable, Any] | None:
