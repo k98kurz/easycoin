@@ -235,7 +235,7 @@ def _pull_txn_ids_from_peer(msg: Message, addr: tuple[str, int]):
 #    return make_respond_uri_msg(_get_metadata(Coin, ['timestamp']), msg.body.uri)
 
 # main request router
-@udpnode.on((MessageType.REQUEST_URI,))
+@udpnode.on(MessageType.REQUEST_URI)
 def route_request(msg: Message, addr: tuple[str, int]):
     if msg.body.uri[:4] == b'txn:':
         return _route_request_txn_scope(msg, addr)
@@ -244,7 +244,7 @@ def route_request(msg: Message, addr: tuple[str, int]):
     return make_not_found_msg(uri=msg.body.uri)
 
 # main respond router (pull synchronizer)
-@udpnode.on((MessageType.RESPOND_URI,))
+@udpnode.on(MessageType.RESPOND_URI)
 def route_respond(msg: Message, addr: tuple[str, int]):
     if msg.body.uri[:4] == b'txn:':
         return _route_respond_txn_scope(msg, addr)
