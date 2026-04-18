@@ -3,6 +3,7 @@ from genericpath import isfile
 from merkleasy import Tree
 from os import remove
 from tapescript import Script
+from time import sleep, time
 import os
 import unittest
 
@@ -93,6 +94,95 @@ class TestCacheAndSequence(unittest.TestCase):
         assert result == 'value1'
         assert c.get('key1') is None
         assert c.pop('nonexistent') is None
+
+    def test_TimeoutCache_expires_old_items_on_get(self):
+        c = cache.TimeoutCache(limit=10, timeout=0.1)
+        c.put('key1', 'value1')
+        c.put('key2', 'value2')
+        sleep(0.15)
+        c.put('key3', 'value3')
+        assert c.get('key1') is None, 'key1 should be expired'
+        assert c.get('key2') is None, 'key2 should be expired'
+        assert c.get('key3') == 'value3', 'key3 should still exist'
+
+    def test_TimeoutCache_expires_old_items_on_put(self):
+        c = cache.TimeoutCache(limit=10, timeout=0.1)
+        c.put('key1', 'value1')
+        sleep(0.15)
+        c.put('key2', 'value2')
+        assert c.get('key1') is None, 'key1 should be expired'
+        assert c.get('key2') == 'value2', 'key2 should still exist'
+
+    def test_TimeoutCache_get_updates_LRU_order(self):
+        c = cache.TimeoutCache(limit=3, timeout=10.0)
+        c.put('key1', 'value1')
+        c.put('key2', 'value2')
+        c.put('key3', 'value3')
+        c.get('key1')
+        c.put('key4', 'value4')
+        assert c.get('key1') == 'value1', 'key1 should still exist'
+        assert c.get('key2') is None, 'key2 should be evicted'
+        assert c.get('key3') == 'value3', 'key3 should still exist'
+        assert c.get('key4') == 'value4', 'key4 should exist'
+
+    def test_TimeoutCache_peak_does_not_update_LRU_order(self):
+        c = cache.TimeoutCache(limit=3, timeout=10.0)
+        c.put('key1', 'value1')
+        c.put('key2', 'value2')
+        c.put('key3', 'value3')
+        c.peak('key1')
+        c.put('key4', 'value4')
+        assert c.get('key1') is None, 'key1 should be evicted'
+        assert c.get('key2') == 'value2', 'key2 should still exist'
+        assert c.get('key3') == 'value3', 'key3 should still exist'
+        assert c.get('key4') == 'value4', 'key4 should exist'
+
+    def test_TimeoutCache_put_enforces_limit_and_evicts_LRU(self):
+        c = cache.TimeoutCache(limit=3, timeout=10.0)
+        c.put('key1', 'value1')
+        c.put('key2', 'value2')
+        c.put('key3', 'value3')
+        assert len(c.od) == 3
+        c.put('key4', 'value4')
+        assert len(c.od) == 3
+        assert c.get('key1') is None, 'key1 should be evicted'
+        assert c.get('key4') == 'value4', 'key4 should exist'
+
+    def test_TimeoutCache_pop_removes_item(self):
+        c = cache.TimeoutCache(limit=10, timeout=10.0)
+        c.put('key1', 'value1')
+        result = c.pop('key1')
+        assert result == 'value1'
+        assert c.get('key1') is None
+        assert c.pop('nonexistent') is None
+
+    def test_TimeoutCache_clear(self):
+        c = cache.TimeoutCache(limit=10, timeout=10.0)
+        c.put('key1', 'value1')
+        c.put('key2', 'value2')
+        assert len(c.od) == 2
+        c.clear()
+        assert len(c.od) == 0
+        assert c.get('key1') is None
+
+    def test_TimeoutCache_expire_only_iterates_to_first_unexpired(self):
+        c = cache.TimeoutCache(limit=10, timeout=0.1)
+        c.put('key1', 'value1')
+        sleep(0.05)
+        c.put('key2', 'value2')
+        sleep(0.05)
+        c.put('key3', 'value3')
+        sleep(0.05)
+        c.put('key4', 'value4')
+        sleep(0.05)
+        c.put('key5', 'value5')
+        c.put('key6', 'value6')
+        assert c.get('key1') is None, 'key1 should be expired'
+        assert c.get('key2') is None, 'key2 should be expired'
+        assert c.get('key3') is None, 'key3 should be expired'
+        assert c.get('key4') == 'value4', 'key4 should still exist'
+        assert c.get('key5') == 'value5', 'key5 should still exist'
+        assert c.get('key6') == 'value6', 'key6 should still exist'
 
     def test_Part_validate_checks_constraints(self):
         tree = Tree.from_leaves([b'test_data', b''])

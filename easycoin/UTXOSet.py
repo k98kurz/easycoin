@@ -137,7 +137,7 @@ class UTXOSet:
         """
         coins = coins or {}
         ephemeral = len(self.sub_outputs) + len(self.add_outputs)
-        ephemeral = len(self.sub_inputs) + len(self.add_inputs)
+        ephemeral += len(self.sub_inputs) + len(self.add_inputs)
         if ephemeral:
             raise ValueError('txn cannot be applied to an ephemeral UTXOSet')
         if not self.can_apply(txn):
@@ -177,7 +177,7 @@ class UTXOSet:
         """
         coins = coins or {}
         ephemeral = len(self.sub_outputs) + len(self.add_outputs)
-        ephemeral = len(self.sub_inputs) + len(self.add_inputs)
+        ephemeral += len(self.sub_inputs) + len(self.add_inputs)
         if ephemeral:
             raise ValueError('txn cannot be reversed in an ephemeral UTXOSet')
         if not self.can_reverse(txn):

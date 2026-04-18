@@ -1,4 +1,3 @@
-from collections import deque
 from netaio import (
     UDPNode, Peer, Body, Message, MessageType, DefaultPeerPlugin,
     make_error_msg, make_not_found_msg, make_not_permitted_msg,
@@ -6,14 +5,18 @@ from netaio import (
 )
 from netaio.asymmetric import X25519CipherPlugin
 from netaio.node import get_ip
-from easycoin.cache import LRUCache, CacheKind
+from random import choice as random_choice
+from easycoin.UTXOSet import UTXOSet
+from easycoin.cache import LRUCache, CacheKind, TimeoutCache
 from easycoin.config import get_config_manager
-from easycoin.constants import DEFAULT_PORT
+from easycoin.constants import DEFAULT_PORT, MAX_PART_SIZE
 from easycoin.cryptoworker import work, submit_txn_job
 from easycoin.errors import type_assert, value_assert
 from easycoin.models import Coin, Txn, Input, Output
-from easycion.sequence import Part, Sequence, get_sequence, get_part
+from easycoin.sequence import Part, Sequence, get_sequence, get_part
+import asyncio
 import os
+import packify
 
 
 conf = get_config_manager()
@@ -30,8 +33,9 @@ udpnode.local_peer = Peer(
     })
 )
 sync_cache = LRUCache('sync', CacheKind.RECEIVE, conf.get('sync_cache_size'))
-metadata_cache = LRUCache.get_instance('metadata', CacheKind.SEND, 10)
+metadata_cache = TimeoutCache(limit=10, timeout=120.0)
 _run_node = True
+peers_synched = TimeoutCache(limit=1000, timeout=120.0)
 
 
 # main node controls
@@ -43,7 +47,60 @@ async def run_node():
     await udpnode.start()
     await udpnode.manage_peers_automatically(app_id=b'easycoin')
     while _run_node:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(1.0)
+        _sync_peer()
+        _attempt_sync()
+
+def _sync_peer():
+    candidates = set(udpnode.peer_addrs.keys()).difference(set(peers_synched.keys()))
+    if not candidates:
+        return
+    peer = random_choice(candidates)
+    peers_synched.put(peer, {})
+    udpnode.send(
+        Message.prepare(
+            Body.prepare(b'', uri=b'txns'),
+            MessageType.REQUEST_URI
+        ),
+        peer
+    )
+
+def _attempt_sync():
+    # choose a random item that needs to be synchronized
+    item = sync_cache.peak_random()
+
+    # do nothing if there is nothing to do
+    if not item:
+        return
+
+    # if the record has been acquired, remove it from the sync cache
+    key, addrs = item
+    if len(key.split(':')) == 2:
+        scope, record_id = key.split(':')
+        idx = None
+    elif len(key.split(':')) == 3:
+        scope, record_id, idx = key.split(':')
+        idx = int(idx)
+    else:
+        udpnode.logger.warn('malformed sync cache data')
+        return # malformed data
+    if scope == 'txn' and Txn.find(record_id):
+        return sync_cache.pop(key)
+    elif scope == 'coin' and Coin.find(record_id):
+        return sync_cache.pop(key)
+
+    # request it from each node that should have it
+    if idx:
+        uri = b':'.join([
+            scope.encode(), bytes.fromhex(record_id), idx.to_bytes(1, 'big')
+        ])
+    else:
+        uri = b':'.join([scope.encode(), bytes.fromhex(record_id)])
+    for addr in addrs:
+        udpnode.send(
+            Message.prepare(Body.prepare(b'', uri=uri), MessageType.REQUEST_URI),
+            addr
+        )
 
 
 # metadata helper + handlers
@@ -57,10 +114,11 @@ def _get_metadata(model, cols: list[str]):
     }
     if not meta['count']:
         return packify.pack(meta)
+    meta['cols'] = {}
     for c in cols:
-        meta['cols'] = {
-            'min': model.query().order_by(c, 'asc').first().data.get[c, None],
-            'max': model.query().order_by(c, 'desc').first().data.get[c, None],
+        meta['cols'][c] = {
+            'min': model.query().order_by(c, 'asc').first().data.get(c, None),
+            'max': model.query().order_by(c, 'desc').first().data.get(c, None),
         }
     meta = packify.pack(meta)
     metadata_cache.put(model.__name__, meta)
@@ -70,35 +128,79 @@ def _get_metadata(model, cols: list[str]):
 def _respond_with_txns_metadata(msg: Message, addr: tuple[str, int]):
     return make_respond_uri_msg(_get_metadata(Txn, ['timestamp']), msg.body.uri)
 
-@udpnode.on((MessageType.REQUEST_URI, b'coins'))
-def _respond_with_coins_metadata(msg: Message, addr: tuple[str, int]):
-    return make_respond_uri_msg(_get_metadata(Coin, ['timestamp']), msg.body.uri)
+@udpnode.on((MessageType.RESPOND_URI, b'txns'))
+def _pull_txn_ids_from_peer(msg: Message, addr: tuple[str, int]):
+    try:
+        info = packify.unpack(msg.body.content)
+        type_assert(type(info) is dict)
+    except:
+        udpnode.logger.warn('failed to parse txns metadata from peer')
+        return
+    data = peers_synched.get(addr) or {}
+    data['count'] = info.get('count', 0)
+    data['cols'] = info.get('cols', {})
+    peers_synched.put(addr, data)
+
+    if data['count'] == 0:
+        return
+
+    # request first page of ids
+    return Message.prepare(
+        Body.prepare(
+            packify.pack({}), uri=b'txn:list'
+        ),
+        MessageType.REQUEST_URI
+    )
+
+#@udpnode.on((MessageType.REQUEST_URI, b'coins'))
+#def _respond_with_coins_metadata(msg: Message, addr: tuple[str, int]):
+#    return make_respond_uri_msg(_get_metadata(Coin, ['timestamp']), msg.body.uri)
 
 # main request router
-@udonode.on((MessageType.REQUEST_URI,))
+@udpnode.on((MessageType.REQUEST_URI,))
 def route_request(msg: Message, addr: tuple[str, int]):
     if msg.body.uri[:4] == b'txn:':
         return _route_request_txn_scope(msg, addr)
-    elif msg.body.uri[:5] == b'coin:'
-        return _route_request_coin_scope(msg, addr)
-    return make_not_found_msg.body.uri=msg.body.uri)
+#    elif msg.body.uri[:5] == b'coin:'
+#        return _route_request_coin_scope(msg, addr)
+    return make_not_found_msg(uri=msg.body.uri)
 
 # main respond router (pull synchronizer)
-@udpnode.on((MessageType.RESPOND_URI,)
+@udpnode.on((MessageType.RESPOND_URI,))
 def route_respond(msg: Message, addr: tuple[str, int]):
     if msg.body.uri[:4] == b'txn:':
         return _route_respond_txn_scope(msg, addr)
     elif msg.body.uri[:5] == b'coin:':
         return _route_respond_coin_scope(msg, addr)
-    return make_not_found_msg.body.uri=msg.body.uri)
+    return make_not_found_msg(uri=msg.body.uri)
 
-# txn scope routers + handlers
+# txn scope routers + handlers + helpers
+def publish_txn(txn: Txn):
+    msg = Message.prepare(
+        Body.prepare(bytes.fromhex(txn.id), uri=b'txn:new'),
+        MessageType.NOTIFY_URI
+    )
+    udpnode.notify('txn', msg)
+
+@udpnode.on((MessageType.NOTIFY_URI, b'txn:new'))
+def _receive_new_txn_notification(msg: Message, addr: tuple[str, int]):
+    txn_id_bytes = msg.body.content
+    if len(txn_id_bytes) != 32:
+        return make_error_msg(b'malformed txn id published', uri=msg.body.uri)
+
+    if not Txn.find(txn_id_bytes.hex()):
+        # begin pull synchronization
+        return Message.prepare(
+            Body.prepare(b'', uri=b'txn:' + txn_id_bytes),
+            MessageType.REQUEST_URI
+        )
+
 def _route_request_txn_scope(msg: Message, addr: tuple[str, int]):
     if msg.body.uri == b'txn:list':
         return _get_txn_list(msg, addr)
     elif len(msg.body.uri) == 36: # b'txn:{32-byte id}'
         return _get_txn_seq(msg, addr)
-    elif len(msg.body.uri) == 38: # b'txn:{32-byte id}:{part_idx}'
+    elif len(msg.body.uri) == 38: # b'txn:{32-byte id}:{idx}'
         return _get_txn_part(msg, addr)
     else:
         return make_error_msg(b'malformed URI for the txn scope', uri=msg.body.uri)
@@ -133,27 +235,62 @@ def _get_txn_seq(msg: Message, addr: tuple[str, int]):
         seq = get_sequence(Txn, msg.body.uri[:-32].hex(), CacheKind.SEND)
         return make_respond_uri_msg(seq.pack(), uri=msg.body.uri)
     except ValueError:
-        return make_not_found_msg.body.uri=msg.body.uri)
+        return make_not_found_msg(uri=msg.body.uri)
 
 def _get_txn_part(msg: Message, addr: tuple[str, int]):
     try:
-        # b'txn:{id}:{part_idx}'
+        # b'txn:{id}:{idx}'
         txn_id = msg.body.uri[4:36]
-        part_idx = int.from_bytes(msg.body.uri[37:], 'big')
+        idx = int.from_bytes(msg.body.uri[37:], 'big')
         part = get_part(Txn, txn_id, CacheKind.SEND, idx)
         return make_respond_uri_msg(part.pack(), uri=msg.body.uri)
     except ValueError:
-        return make_not_found_msg.body.uri=msg.body.uri)
+        return make_not_found_msg(uri=msg.body.uri)
 
 def _route_respond_txn_scope(msg: Message, addr: tuple[str, int]):
-    if len(msg.body.uri) == 36: # sequence; b'txn:{id}'
+    if msg.body.uri == b'txn:list':
+        return _handle_txn_ids_page(msg, addr)
+    elif len(msg.body.uri) == 36: # sequence; b'txn:{id}'
         return _synchronize_txn_seq(msg, addr)
-    elif len(msg.body.uri) == 38: # part; b'txn:{id}:{part_idx}'
+    elif len(msg.body.uri) == 38: # part; b'txn:{id}:{idx}'
         return _synchronize_txn_part(msg, addr)
+
+def _handle_txn_ids_page(msg: Message, addr: tuple[str, int]):
+    try:
+        txn_ids = packify.unpack(msg.body.content)
+        type_assert(type(txn_ids) is list)
+    except:
+        udpnode.logger.warn('failed to parse txn:list page from peer')
+        return
+
+    # queue up for synchronization any missing txns
+    txn_ids = [t.hex() for t in txn_ids]
+    sqb = Txn.query().is_in('id', txn_ids)
+    if sqb.count() < len(txn_ids):
+        already_have = [t.id for t in sqb.select(['id']).get()]
+        missing = list(set(txn_ids).difference(set(already_have)))
+        for txn_id in missing:
+            key = f'txn:{txn_id}'
+            sync_cache.put(key, {addr})
+
+    # request next page if we can and should
+    info = peers_synched.get(addr)
+    if not info:
+        return
+    offset = info.get('offset', 0) + len(txn_ids)
+    info['offset'] = offset
+    peers_synched.put(addr, info)
+    if offset < info.get('count', 0):
+        return Message.prepare(
+            Body.prepare(
+                packify.pack({'offset': offset}), uri=b'txn:list'
+            ),
+            MessageType.REQUEST_URI
+        )
 
 def _synchronize_txn_seq(msg: Message, addr: tuple[str, int]):
     txn_id_bytes = msg.body.uri[:-32]
-    txn_id = msg.body.uri[:-32].hex()
+    txn_id = txn_id_bytes.hex()
     if Txn.find(txn_id):
         return # we already have it, so skip
     try:
@@ -189,8 +326,13 @@ def _synchronize_txn_seq(msg: Message, addr: tuple[str, int]):
 
     # request up to one missing part and add the rest to synchronization cache
     if missing:
-        for m in missing[1:]:
-            sync_cache.put(f'txn:{txn_id}:{m}', addr)
+        addrs = {addr}
+        for i in missing[1:]:
+            key = f'txn:{txn_id}:{i}'
+            m = sync_cache.get(key)
+            if m:
+                addrs.update(m)
+            sync_cache.put(key, addrs)
         return Message.prepare(
             Body.prepare(
                 b'', uri=b'txn:'+txn_id_bytes+':'+missing[0].to_bytes(1, 'big')
@@ -200,23 +342,47 @@ def _synchronize_txn_seq(msg: Message, addr: tuple[str, int]):
 
     # otherwise, all parts have been accumulated, so should be able to reconstruct
     try:
-        txn = Txn.unpack(seq.reconstruct()
+        txn = Txn.unpack(seq.reconstruct())
+        if not txn.validate(reload=False):
+            udpnode.logger.warn(
+                f'received txn failed validation: {txn.id}; ignoring'
+            )
+            return
+        utxos = UTXOSet()
+        if not utxos.can_apply(txn):
+            udpnode.logger.warn(
+                f'received txn could not be applied to the UTXOSet: {txn.id}; '
+                'ignoring'
+            )
+            return
         txn.save()
+        coins = [*txn.inputs, *txn.outputs]
+        for c in coins:
+            try:
+                c.save()
+            except:
+                udpnode.logger.warn(
+                    f'coin in txn ({txn.id}) could not be saved: {c.id}'
+                )
+        utxos.apply(txn, {c.id: c for c in coins})
         publish_txn(txn)
     except:
-        ...
+        udpnode.logger.warn(
+            'malicious or duplicate Txn data encountered; dropped'
+        )
 
 def _synchronize_txn_part(msg: Message, addr: tuple[str, int]):
-    txn_id = msg.body.uri[4:36]
-    if Txn.find(txn_id.hex():
-        continue # skip since we already have the record
-    part_idx = int.from_bytes(msg.body.uri[37:], 'big')
+    txn_id_bytes = msg.body.uri[4:36]
+    txn_id = txn_id_bytes.hex()
+    if Txn.find(txn_id):
+        return # skip since we already have the record
+    idx = int.from_bytes(msg.body.uri[37:], 'big')
     try:
         part = Part.unpack(msg.body.content)
         assert part.validate()
         assert part.record_type == 'Txn'
-        assert part.record_id == txn_id.hex()
-        assert part.idx == part_idx
+        assert part.record_id == txn_id
+        assert part.idx == idx
     except:
         return make_error_msg(b'malformed Part (Txn)', uri=msg.body.uri)
     pcz = conf.get('parts_cache_size', 1000)
@@ -226,121 +392,31 @@ def _synchronize_txn_part(msg: Message, addr: tuple[str, int]):
     if not part2:
         cache.put(key, part)
 
+    # remove from sync cache
+    sync_cache.pop(key)
+
+    # try to add to the seqence
+    scz = conf.get('sequence_cache_size', 20)
+    cache2 = LRUCache.get_instance('sequences', CacheKind.RECEIVE, scz)
+    key2 = f'txn:{txn_id}'
+    seq = cache2.get(key2)
     # if the sequence info itself is missing, request it
-    cache = LRUCache.get_instance('sequences', CacheKind.RECEIVE, scz)
-    key = f'txn:{txn_id}'
-    if not cache.get(key):
+    if not seq:
         return Message.prepare(
             Body.prepare(b'', uri=b'txn:' + txn_id),
             MessageType.REQUEST_URI
         )
-
-def publish_txn(txn: Txn):
-    msg = Message.prepare(
-        Body.prepare(bytes.fromhex(txn.id), uri=b'txn:new'),
-        MessageType.NOTIFY_URI
-    )
-    udpnode.notify('txn', msg)
-
-@udpnode.on((MessageType.NOTIFY_URI, b'txn:new'))
-def _receive_new_txn_notification(msg: Message, addr: tuple[str, int]):
-    txn_id_bytes = msg.body.content
-    if len(txn_id_bytes) != 32:
-        return make_error_msg(b'malformed txn id published', uri=msg.body.uri)
-
-    if not Txn.find(txn_id_bytes.hex()):
-        # begin pull synchronization
-        return Message.prepare(
-            Body.prepare(b'', uri=b'txn:' + txn_id_bytes),
-            MessageType.REQUEST_URI
-        )
-
-
-# coin scope routers + helpers + handlers
-def _route_request_coin_scope(msg: Message, addr: tuple[str, int]):
-    if msg.body.uri[:9] == b'coin:list':
-        return _get_coin_list(msg, addr)
-    elif len(msg.body.uri) == 37: # b'coin:{32-byte id}'
-        return _get_coin_seq(msg, addr)
-    elif len(msg.body.uri) >= 38: # b'coin:{32-byte id}:{part_idx}'
-        return _get_coin_part(msg, addr)
-    else:
-        return make_error_msg(b'malformed URI for the coin scope', uri=msg.body.uri)
-
-def _get_coin_list(msg: Message, addr: tuple[str, int]):
-    """Paginated handler for listing available coin ids."""
-    total = Coin.query().count()
-    offset, limit = 0, MAX_PART_SIZE // 40 # allow for overhead
-    if msg.body.content:
-        try:
-            params = packify.unpack(msg.body.content)
-            type_assert(type(params) is dict)
-            offset = params.get('offset', 0)
-        except:
-            return make_error_msg(b'malformed request', uri=msg.body.uri)
-
-    key = f'coin:ids:{offset}'
-    coin_ids = metadata_cache.get(key)
-    if coin_ids:
-        return make_respond_uri_msg(coin_ids, uri=msg.body.uri)
-
-    sqb = Coin.query().order_by('timestamp', 'asc').select(['id'])
-    coin_ids = packify.pack([
-        bytes.fromhex(t.id) for t in
-        sqb.skip(offset).take(limit)
-    ])
-    metadata_cache.put(key, coin_ids)
-    return make_respond_uri_msg(coin_ids, uri=msg.body.uri)
-
-def _get_coin_seq(msg: Message, addr: tuple[str, int]):
     try:
-        seq = get_sequence(Coin, msg.body.uri[:-32].hex(), CacheKind.SEND)
-        return make_respond_uri_msg(seq.pack(), uri=msg.body.uri)
-    except ValueError:
-        return make_not_found_msg.body.uri=msg.body.uri)
-
-def _get_coin_part(msg: Message, addr: tuple[str, int]):
-    try:
-        # b'coin:{id}:{part_idx}'
-        coin_id = msg.body.uri[5:37]
-        part_idx = int.from_bytes(msg.body.uri[38:])
-        part = get_part(Coin, coin_id, CacheKind.SEND, idx)
-        return make_respond_uri_msg(part.pack(), uri=msg.body.uri)
-    except ValueError:
-        return make_not_found_msg.body.uri=msg.body.uri)
-
-def _route_respond_coin_scope(msg: Message, addr: tuple[str, int]):
-    if len(msg.body.uri) == 37: # sequence; b'coin:{id}'
-        return _synchronize_coin_seq(msg, addr)
-    elif len(msg.body.uri) == 39: # part; b'coin:{id}:{part_idx}'
-        return _synchronize_coin_part(msg, addr)
-
-def _synchronize_coin_seq(msg: Message, addr: tuple[str, int]):
-    coin_id_bytes = msg.body.uri[:-32]
-    coin_id = coin_id_bytes.hex()
-    if Coin.find(coin_id):
-        return # we already have it, so skip
-    try:
-        seq = Sequence.unpack(msg.body.content)
+        seq.add_part(part)
     except:
-        return make_error_msg(b'malformed Sequence (Coin)', uri=msg.body.uri)
-    scz = conf.get('sequence_cache_size', 20)
-    cache = LRUCache.get_instance('sequences', CacheKind.RECEIVE, scz)
-    key = f'coin:{coin_id}'
-    seq2 = cache.get(key)
-    if seq2:
-        seq = seq2
-    else:
-        cache.put(key, seq)
+        cache.remove(key) # invalid
 
     # see if any parts are in the cache and populate to the sequence parts
-    pcz = conf.get('parts_cache_size', 1000)
-    cache = LRUCache.get_instance('parts', CacheKind.RECEIVE, pcz)
     missing = []
     for i in range(seq.count):
         if seq.has_part(i):
             continue
-        key = f'coin:{coin_id}:{i}'
+        key = f'txn:{txn_id}:{i}'
         part = cache.get(key)
         if part:
             try:
@@ -353,71 +429,272 @@ def _synchronize_coin_seq(msg: Message, addr: tuple[str, int]):
 
     # request up to one missing part and add the rest to synchronization cache
     if missing:
-        for m in missing[1:]:
-            sync_cache.put(f'coin:{coin_id}:{m}', addr)
+        addrs = {addr}
+        for i in missing[1:]:
+            key = f'txn:{txn_id}:{i}'
+            m = sync_cache.get(key)
+            if m:
+                addrs.update(m)
+            sync_cache.put(key, addrs)
         return Message.prepare(
             Body.prepare(
-                b'', uri=b'coin:'+coin_id_bytes+':'+missing[0].to_bytes(1, 'big')
+                b'', uri=b'txn:'+txn_id_bytes+':'+missing[0].to_bytes(1, 'big')
             ),
             MessageType.REQUEST_URI
         )
 
     # otherwise, all parts have been accumulated, so should be able to reconstruct
     try:
-        coin = Coin.unpack(seq.reconstruct()
-        coin.save()
-        publish_coin(coin)
+        txn = Txn.unpack(seq.reconstruct())
+        if not txn.validate(reload=False):
+            udpnode.logger.warn(
+                f'received txn failed validation: {txn.id}; ignoring'
+            )
+            return
+        utxos = UTXOSet()
+        if not utxos.can_apply(txn):
+            udpnode.logger.warn(
+                f'received txn could not be applied to the UTXOSet: {txn.id}; '
+                'ignoring'
+            )
+            return
+        txn.save()
+        coins = [*txn.inputs, *txn.outputs]
+        for c in coins:
+            try:
+                c.save()
+            except:
+                udpnode.logger.warn(
+                    f'coin in txn ({txn.id}) could not be saved: {c.id}'
+                )
+        utxos.apply(txn, {c.id: c for c in coins})
+        publish_txn(txn)
     except:
-        ...
-
-def _synchronize_coin_part(msg: Message, addr: tuple[str, int]):
-    coin_id = msg.body.uri[4:36]
-    if Coin.find(coin_id.hex():
-        continue # skip since we already have the record
-    part_idx = int.from_bytes(msg.body.uri[37:], 'big')
-    try:
-        part = Part.unpack(msg.body.content)
-        assert part.validate()
-        assert part.record_type == 'Coin'
-        assert part.record_id == coin_id.hex()
-        assert part.idx == part_idx
-    except:
-        return make_error_msg(b'malformed Part (Coin)', uri=msg.body.uri)
-    pcz = conf.get('parts_cache_size', 1000)
-    cache = LRUCache.get_instance('parts', CacheKind.RECEIVE, pcz)
-    key = f'coin:{coin_id}:{idx}'
-    part2 = cache.get(key)
-    if not part2:
-        cache.put(key, part)
-
-    # if the sequence info itself is missing, request it
-    cache = LRUCache.get_instance('sequences', CacheKind.RECEIVE, scz)
-    key = f'coin:{coin_id}'
-    if not cache.get(key):
-        return Message.prepare(
-            Body.prepare(b'', uri=b'coin:' + coin_id),
-            MessageType.REQUEST_URI
+        udpnode.logger.warn(
+            'malicious or duplicate Txn data encountered; dropped'
         )
 
-def publish_coin(coin: Coin):
-    msg = Message.prepare(
-        Body.prepare(bytes.fromhex(coin.id), uri=b'coin:new'),
-        MessageType.NOTIFY_URI
-    )
-    udpnode.notify('coin', msg)
 
-@udpnode.on((MessageType.NOTIFY_URI, b'coin:new'))
-def _receive_new_coin_notification(msg: Message, addr: tuple[str, int]):
-    coin_id_bytes = msg.body.content
-    if len(coin_id_bytes) != 32:
-        return make_error_msg(b'malformed coin id published', uri=msg.body.uri)
-
-    if not Coin.find(coin_id_bytes.hex()):
-        # begin pull synchronization
-        return Message.prepare(
-            Body.prepare(b'', uri=b'coin:' + coin_id_bytes),
-            MessageType.REQUEST_URI
-        )
+# coin scope routers + helpers + handlers
+#def _route_request_coin_scope(msg: Message, addr: tuple[str, int]):
+#    if msg.body.uri[:9] == b'coin:list':
+#        return _get_coin_list(msg, addr)
+#    elif len(msg.body.uri) == 37: # b'coin:{32-byte id}'
+#        return _get_coin_seq(msg, addr)
+#    elif len(msg.body.uri) >= 38: # b'coin:{32-byte id}:{idx}'
+#        return _get_coin_part(msg, addr)
+#    else:
+#        return make_error_msg(b'malformed URI for the coin scope', uri=msg.body.uri)
+#
+#def _get_coin_list(msg: Message, addr: tuple[str, int]):
+#    """Paginated handler for listing available coin ids."""
+#    total = Coin.query().count()
+#    offset, limit = 0, MAX_PART_SIZE // 40 # allow for overhead
+#    if msg.body.content:
+#        try:
+#            params = packify.unpack(msg.body.content)
+#            type_assert(type(params) is dict)
+#            offset = params.get('offset', 0)
+#        except:
+#            return make_error_msg(b'malformed request', uri=msg.body.uri)
+#
+#    key = f'coin:ids:{offset}'
+#    coin_ids = metadata_cache.get(key)
+#    if coin_ids:
+#        return make_respond_uri_msg(coin_ids, uri=msg.body.uri)
+#
+#    sqb = Coin.query().order_by('timestamp', 'asc').select(['id'])
+#    coin_ids = packify.pack([
+#        bytes.fromhex(t.id) for t in
+#        sqb.skip(offset).take(limit)
+#    ])
+#    metadata_cache.put(key, coin_ids)
+#    return make_respond_uri_msg(coin_ids, uri=msg.body.uri)
+#
+#def _get_coin_seq(msg: Message, addr: tuple[str, int]):
+#    try:
+#        seq = get_sequence(Coin, msg.body.uri[:-32].hex(), CacheKind.SEND)
+#        return make_respond_uri_msg(seq.pack(), uri=msg.body.uri)
+#    except ValueError:
+#        return make_not_found_msg(uri=msg.body.uri)
+#
+#def _get_coin_part(msg: Message, addr: tuple[str, int]):
+#    try:
+#        # b'coin:{id}:{idx}'
+#        coin_id = msg.body.uri[5:37]
+#        idx = int.from_bytes(msg.body.uri[38:])
+#        part = get_part(Coin, coin_id, CacheKind.SEND, idx)
+#        return make_respond_uri_msg(part.pack(), uri=msg.body.uri)
+#    except ValueError:
+#        return make_not_found_msg(uri=msg.body.uri)
+#
+#def _route_respond_coin_scope(msg: Message, addr: tuple[str, int]):
+#    if len(msg.body.uri) == 37: # sequence; b'coin:{id}'
+#        return _synchronize_coin_seq(msg, addr)
+#    elif len(msg.body.uri) == 39: # part; b'coin:{id}:{idx}'
+#        return _synchronize_coin_part(msg, addr)
+#
+#def _synchronize_coin_seq(msg: Message, addr: tuple[str, int]):
+#    coin_id_bytes = msg.body.uri[:-32]
+#    coin_id = coin_id_bytes.hex()
+#    if Coin.find(coin_id):
+#        return # we already have it, so skip
+#    try:
+#        seq = Sequence.unpack(msg.body.content)
+#    except:
+#        return make_error_msg(b'malformed Sequence (Coin)', uri=msg.body.uri)
+#    scz = conf.get('sequence_cache_size', 20)
+#    cache = LRUCache.get_instance('sequences', CacheKind.RECEIVE, scz)
+#    key = f'coin:{coin_id}'
+#    seq2 = cache.get(key)
+#    if seq2:
+#        seq = seq2
+#    else:
+#        cache.put(key, seq)
+#
+#    # see if any parts are in the cache and populate to the sequence parts
+#    pcz = conf.get('parts_cache_size', 1000)
+#    cache2 = LRUCache.get_instance('parts', CacheKind.RECEIVE, pcz)
+#    missing = []
+#    for i in range(seq.count):
+#        if seq.has_part(i):
+#            continue
+#        key = f'coin:{coin_id}:{i}'
+#        part = cache2.get(key)
+#        if part:
+#            try:
+#                seq.add_part(part)
+#            except:
+#                cache2.remove(key) # invalid
+#                missing.append(i)
+#        else:
+#            missing.append(i)
+#
+#    # request up to one missing part and add the rest to synchronization cache
+#    if missing:
+#        addrs = {addr}
+#        for i in missing[1:]:
+#            key = f'coin:{coin_id}:{i}'
+#            m = sync_cache.get(key)
+#            if m:
+#                addrs.update(m)
+#            sync_cache.put(key, addrs)
+#        return Message.prepare(
+#            Body.prepare(
+#                b'', uri=b'coin:'+coin_id_bytes+':'+missing[0].to_bytes(1, 'big')
+#            ),
+#            MessageType.REQUEST_URI
+#        )
+#
+#    # otherwise, all parts have been accumulated, so should be able to reconstruct
+#    try:
+#        coin = Coin.unpack(seq.reconstruct())
+#        coin.save()
+#        publish_coin(coin)
+#    except:
+#        udpnode.logger.warn(
+#            'malicious or duplicate Coin data encountered; dropped'
+#        )
+#
+#def _synchronize_coin_part(msg: Message, addr: tuple[str, int]):
+#    coin_id_bytes = msg.body.uri[5:37]
+#    coin_id = coin_id_bytes.hex()
+#    if Coin.find(coin_id):
+#        return # skip since we already have the record
+#    idx = int.from_bytes(msg.body.uri[38:], 'big')
+#    try:
+#        part = Part.unpack(msg.body.content)
+#        assert part.validate()
+#        assert part.record_type == 'Coin'
+#        assert part.record_id == coin_id
+#        assert part.idx == idx
+#    except:
+#        return make_error_msg(b'malformed Part (Coin)', uri=msg.body.uri)
+#    pcz = conf.get('parts_cache_size', 1000)
+#    cache = LRUCache.get_instance('parts', CacheKind.RECEIVE, pcz)
+#    key = f'coin:{coin_id}:{idx}'
+#    part2 = cache.get(key)
+#    if not part2:
+#        cache.put(key, part)
+#
+#    # remove from sync cache
+#    sync_cache.pop(key)
+#
+#    # try to add to the seqence
+#    scz = conf.get('sequence_cache_size', 20)
+#    cache2 = LRUCache.get_instance('sequences', CacheKind.RECEIVE, scz)
+#    key2 = f'coin:{coin_id}'
+#    seq = cache2.get(key2)
+#    # if the sequence info itself is missing, request it
+#    if not seq:
+#        return Message.prepare(
+#            Body.prepare(b'', uri=b'coin:' + coin_id),
+#            MessageType.REQUEST_URI
+#        )
+#    try:
+#        seq.add_part(part)
+#    except:
+#        cache.remove(key) # invalid
+#
+#    # see if any parts are in the cache and populate to the sequence parts
+#    missing = []
+#    for i in range(seq.count):
+#        if seq.has_part(i):
+#            continue
+#        key = f'coin:{coin_id}:{i}'
+#        part = cache.get(key)
+#        if part:
+#            try:
+#                seq.add_part(part)
+#            except:
+#                cache.remove(key) # invalid
+#                missing.append(i)
+#        else:
+#            missing.append(i)
+#
+#    # request up to one missing part and add the rest to synchronization cache
+#    if missing:
+#        addrs = {addr}
+#        for i in missing[1:]:
+#            key = f'coin:{coin_id}:{i}'
+#            m = sync_cache.get(key)
+#            if m:
+#                addrs.update(m)
+#            sync_cache.put(key, addrs)
+#        return Message.prepare(
+#            Body.prepare(
+#                b'', uri=b'coin:'+coin_id_bytes+':'+missing[0].to_bytes(1, 'big')
+#            ),
+#            MessageType.REQUEST_URI
+#        )
+#
+#    # otherwise, all parts have been accumulated, so should be able to reconstruct
+#    try:
+#        coin = Coin.unpack(seq.reconstruct())
+#        coin.save()
+#        publish_coin(coin)
+#    except:
+#        ...
+#
+#def publish_coin(coin: Coin):
+#    msg = Message.prepare(
+#        Body.prepare(bytes.fromhex(coin.id), uri=b'coin:new'),
+#        MessageType.NOTIFY_URI
+#    )
+#    udpnode.notify('coin', msg)
+#
+#@udpnode.on((MessageType.NOTIFY_URI, b'coin:new'))
+#def _receive_new_coin_notification(msg: Message, addr: tuple[str, int]):
+#    coin_id_bytes = msg.body.content
+#    if len(coin_id_bytes) != 32:
+#        return make_error_msg(b'malformed coin id published', uri=msg.body.uri)
+#
+#    if not Coin.find(coin_id_bytes.hex()):
+#        # begin pull synchronization
+#        return Message.prepare(
+#            Body.prepare(b'', uri=b'coin:' + coin_id_bytes),
+#            MessageType.REQUEST_URI
+#        )
 
 #@udpnode.on((MessageType.REQUEST_URI, b'nodes'))
 #def receive_request_nodes(msg: Message, addr: tuple[str, int]):
