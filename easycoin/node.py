@@ -122,7 +122,7 @@ def _sync_peer():
     if not candidates:
         return
     peer = random_choice(list(candidates))
-    node.logger.debug(f'_sync_peer choose: {peer}')
+    udpnode.logger.debug(f'_sync_peer choose: {peer}')
     peers_synched.put(peer, {})
     udpnode.send(
         Message.prepare(
