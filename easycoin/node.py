@@ -133,8 +133,8 @@ def _sync_peer():
     )
 
 def _attempt_sync():
-    # choose a random item that needs to be synchronized
-    item = sync_cache.peak_random()
+    # choose the next item that needs to be synchronized
+    item = sync_cache.peak_last()
 
     # do nothing if there is nothing to do
     if not item:
