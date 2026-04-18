@@ -125,7 +125,7 @@ def _sync_peer():
     candidates = set(udpnode.peer_addrs.keys()).difference(set(peers_synched.keys()))
     if not candidates:
         return
-    peer = random_choice(candidates)
+    peer = random_choice(list(candidates))
     peers_synched.put(peer, {})
     udpnode.send(
         Message.prepare(
