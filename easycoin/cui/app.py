@@ -2,6 +2,8 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
+from textual import work
+from easycoin import node
 from easycoin.config import get_config_manager
 from easycoin.state import get_state_manager
 from easycoin.cui.screens.dashboard import DashboardScreen
@@ -93,6 +95,15 @@ class EasyCoinApp(App):
 
             self.log_event("EasyCoin CUI started", "INFO")
 
+            if self.config.get("app_mode") == "multiplayer":
+                node.set_node_state_manager(self.state, self.logger)
+                self.log_event("Starting network node in multiplayer mode", "INFO")
+                self._run_node_task()
+            else:
+                self.log_event("Running in singleplayer mode", "INFO")
+
+            self.state.subscribe("append_new_txn", self._on_new_transaction)
+
             if not self.config.get("welcome_shown"):
                 self.call_later(self.action_open_help)
 
@@ -174,6 +185,18 @@ class EasyCoinApp(App):
         self.config.set("welcome_shown", True)
         self.config.save()
         self.push_screen(HelpModal("welcome"))
+
+    @work(exclusive=True)
+    async def _run_node_task(self) -> None:
+        """Background task to run networking node."""
+        await node.run_node()
+
+    def _on_new_transaction(self, txn_id: str) -> None:
+        """Log new transaction synced from network."""
+        self.log_event(
+            f"New transaction synced: {txn_id[:16]}...",
+            "INFO"
+        )
 
     def log_event(self, message: str, level: str = "INFO") -> None:
         """Append log entry to state. Args:

@@ -8,6 +8,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Static, Footer
 from easycoin.models import Txn, Coin, Address
 from easycoin.UTXOSet import UTXOSet
+from easycoin.node import publish_txn
 from .data import TransactionData
 from .step_1 import SelectInputsContainer
 from .step_2 import AddOutputsContainer
@@ -241,12 +242,16 @@ class NewTransactionModal(ModalScreen):
             coins[c.id] = c
         utxoset.apply(self.txn_data.txn, coins)
 
-        self.app.notify(
-            "Txn has been validated and changes saved to database. "
-            "@todo network stuff"
-        )
+        # Broadcast to network (only in multiplayer)
+        if self.app.config.get("app_mode") == "multiplayer":
+            publish_txn(txn)
+            notification_msg = "Transaction broadcast to network..."
+        else:
+            notification_msg = "Transaction saved to database..."
+
+        self.app.notify(notification_msg)
         self.app.log_event(
-            f"Txn persisted to database: {txn.id}",
+            f"Txn persisted: {txn.id}",
             "INFO"
         )
 

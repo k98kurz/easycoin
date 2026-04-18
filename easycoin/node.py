@@ -36,6 +36,35 @@ sync_cache = LRUCache('sync', CacheKind.RECEIVE, conf.get('sync_cache_size'))
 metadata_cache = TimeoutCache(limit=10, timeout=120.0)
 _run_node = True
 peers_synched = TimeoutCache(limit=1000, timeout=120.0)
+_state_manager = None
+_last_peer_list = set()
+
+
+def set_node_state_manager(state_manager, logger=None):
+    """Set state manager and optionally logger for node."""
+    global _state_manager
+    _state_manager = state_manager
+    
+    if logger:
+        udpnode.set_logger(logger)
+
+
+def _get_connected_peers():
+    """Get current connected peers list."""
+    return [
+        {"address": addr[0], "port": addr[1]}
+        for addr in udpnode.peer_addrs.keys()
+    ]
+
+
+def _monitor_peers():
+    """Monitor peer connections and publish changes."""
+    global _last_peer_list
+    current_peer_list = set(udpnode.peer_addrs.keys())
+    if _state_manager and current_peer_list != _last_peer_list:
+        peers_data = _get_connected_peers()
+        _state_manager.set("connected_peers", peers_data)
+        _last_peer_list = current_peer_list
 
 
 # main node controls
@@ -43,13 +72,19 @@ def stop():
     global _run_node
     _run_node = False
 
-async def run_node():
+async def run_node(state_manager=None):
+    """Run the networking node with optional state manager."""
+    global _state_manager
+    if state_manager:
+        _state_manager = state_manager
+
     await udpnode.start()
     await udpnode.manage_peers_automatically(app_id=b'easycoin')
     while _run_node:
         await asyncio.sleep(1.0)
         _sync_peer()
         _attempt_sync()
+        _monitor_peers()
 
 def _sync_peer():
     candidates = set(udpnode.peer_addrs.keys()).difference(set(peers_synched.keys()))
@@ -366,6 +401,8 @@ def _synchronize_txn_seq(msg: Message, addr: tuple[str, int]):
                 )
         utxos.apply(txn, {c.id: c for c in coins})
         publish_txn(txn)
+        if _state_manager:
+            _state_manager.publish("append_new_txn", txn.id)
     except:
         udpnode.logger.warn(
             'malicious or duplicate Txn data encountered; dropped'
@@ -469,6 +506,8 @@ def _synchronize_txn_part(msg: Message, addr: tuple[str, int]):
                 )
         utxos.apply(txn, {c.id: c for c in coins})
         publish_txn(txn)
+        if _state_manager:
+            _state_manager.publish("append_new_txn", txn.id)
     except:
         udpnode.logger.warn(
             'malicious or duplicate Txn data encountered; dropped'

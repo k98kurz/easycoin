@@ -113,16 +113,26 @@ class TransactionsScreen(BaseScreen):
             "Attestations",
             "Confirmed"
         )
+        self.app.state.subscribe("append_new_txn", self._on_new_transaction)
         self.call_later(self._finish_initialization)
 
     def _finish_initialization(self) -> None:
         """Complete initialization and load data."""
         self._is_initializing = False
 
+    def on_unmount(self) -> None:
+        """Clean up subscriptions on unmount."""
+        self.app.state.unsubscribe("append_new_txn", self._on_new_transaction)
+
     def on_screen_resume(self, event) -> None:
         """Refresh data when returning from modal."""
         super().on_screen_resume(event)
         self._load_transactions()
+
+    def _on_new_transaction(self, txn_id: str) -> None:
+        """Refresh transactions table when new transaction is synced."""
+        if self.screen.visible:
+            self._load_transactions()
 
     def on_txn_validated(self, result) -> None:
         """Handle transaction validation result."""

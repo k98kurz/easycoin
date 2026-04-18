@@ -1,6 +1,9 @@
 from sys import argv
+import asyncio
+import logging
+from easycoin import models, node
 from easycoin.config import get_config_manager
-from easycoin import models
+from easycoin.version import version
 import os
 
 
@@ -30,7 +33,27 @@ def query():
 
 
 def daemon():
-    print("Not yet implemented")
+    """Run node in headless daemon mode."""
+    config = get_config_manager()
+    config.load()
+    db_path = config.get_db_path()
+    migrations_path = config.path('migrations')
+    os.makedirs(migrations_path, exist_ok=True)
+    models.set_connection_info(db_path)
+    models.publish_migrations(migrations_path)
+    models.automigrate(migrations_path, db_path)
+
+    logger = logging.getLogger("easycoin")
+    logger.info("Starting EasyCoin node in daemon mode")
+
+    try:
+        asyncio.run(node.run_node())
+    except KeyboardInterrupt:
+        logger.info("Shutting down daemon...")
+        node.stop()
+    except Exception as e:
+        logger.error(f"Daemon error: {e}")
+        raise
 
 
 def interactive(debug = False):
@@ -62,7 +85,7 @@ def mine():
 
 
 def print_version():
-    print("Not yet implemented")
+    print(version())
 
 
 def run():
