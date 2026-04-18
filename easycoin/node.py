@@ -354,7 +354,7 @@ def _handle_txn_ids_page(msg: Message, addr: tuple[str, int]):
     sqb = Txn.query().is_in('id', txn_ids)
     if sqb.count() < len(txn_ids):
         already_have = [t.id for t in sqb.select(['id']).get()]
-        missing = [tid in txn_ids if tid not in already_have]
+        missing = [tid for tid in txn_ids if tid not in already_have]
         for txn_id in missing:
             key = f'txn:{txn_id}'
             sync_cache.put(key, {addr})
