@@ -172,10 +172,13 @@ def _attempt_sync():
 
 
 # log error messages
-@udpnode.on((MessageType.NOT_FOUND,))
-@udpnode.on((MessageType.ERROR,))
+@udpnode.on(MessageType.NOT_FOUND)
+def _not_found(msg: Message, addr: tuple[str, int]):
+    udpnode.logger.warning(f'NOT_FOUND encountered from {addr}')
+
+@udpnode.on(MessageType.ERROR)
 def _error(msg: Message, addr: tuple[str, int]):
-    udpnode.logger.warning(f'{msg.header.message_type.name} encountered from {addr}')
+    udpnode.logger.warning(f'ERROR encountered from {addr}')
 
 # metadata helper + handlers
 def _get_metadata(model, cols: list[str]):
