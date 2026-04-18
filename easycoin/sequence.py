@@ -51,8 +51,8 @@ class Part:
         ))
 
     @classmethod
-    def unpack(cls, data: bytes) -> Part:
-        return cls(*packify.unpack(data))
+    def unpack(cls, data: bytes, inject={}) -> Part:
+        return cls(*packify.unpack(data, inject={}))
 
 
 @dataclass
@@ -129,8 +129,8 @@ class Sequence:
         ))
 
     @classmethod
-    def unpack(cls, data: bytes) -> Sequence:
-        return cls(*packify.unpack(data))
+    def unpack(cls, data: bytes, inject={}) -> Sequence:
+        return cls(*packify.unpack(data, inject={'Part': Part, **inject}))
 
 
 def prepare_sequence(record: packify.Packable) -> Sequence:
