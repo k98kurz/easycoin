@@ -122,6 +122,7 @@ def _sync_peer():
     if not candidates:
         return
     peer = random_choice(list(candidates))
+    node.logger.debug(f'_sync_peer choose: {peer}')
     peers_synched.put(peer, {})
     udpnode.send(
         Message.prepare(
@@ -141,6 +142,7 @@ def _attempt_sync():
 
     # if the record has been acquired, remove it from the sync cache
     key, addrs = item
+    udpnode.logger.debug(f'_attempt_sync: {key=}, {addrs=}')
     if len(key.split(':')) == 2:
         scope, record_id = key.split(':')
         idx = None
@@ -199,6 +201,7 @@ def _pull_txn_ids_from_peer(msg: Message, addr: tuple[str, int]):
     try:
         info = packify.unpack(msg.body.content)
         type_assert(type(info) is dict)
+        udpnode.logger.debug(f'_pull_txn_ids_from_peer: {info}')
     except:
         udpnode.logger.warn('failed to parse txns metadata from peer')
         return
@@ -325,6 +328,7 @@ def _handle_txn_ids_page(msg: Message, addr: tuple[str, int]):
     try:
         txn_ids = packify.unpack(msg.body.content)
         type_assert(type(txn_ids) is list)
+        udpnode.logger.debug(f'_handle_txn_ids_page: got {len(txn_ids)} txn ids')
     except:
         udpnode.logger.warn('failed to parse txn:list page from peer')
         return
@@ -347,6 +351,7 @@ def _handle_txn_ids_page(msg: Message, addr: tuple[str, int]):
     info['offset'] = offset
     peers_synched.put(addr, info)
     if offset < info.get('count', 0):
+        udpnode.logger.debug(f'_handle_txn_ids_page: request next page with {offset=}')
         return Message.prepare(
             Body.prepare(
                 packify.pack({'offset': offset}), uri=b'txn:list'
